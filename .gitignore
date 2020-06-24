@@ -1,0 +1,16 @@
+.coverage
+.install-cython
+.python-version
+*.egg-info/
+docs/_build
+.DS_Store
+__pycache__
+venv
+build
+dist
+*.so
+*.swp
+*.c
+*.cpp
+*.pyc
+*.swo

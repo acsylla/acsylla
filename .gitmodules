@@ -1,0 +1,3 @@
+[submodule "vendor/cpp-driver"]
+	path = vendor/cpp-driver
+	url = git@github.com:datastax/cpp-driver.git

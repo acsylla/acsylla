@@ -22,8 +22,16 @@ for installing any dependency that you would need for compiling the driver:
 
 Set up the environment and compile the package using the following commands:
 
-
 .. code-block:: bash
 
     python -m venv venv
+    source venv/bin/activate
     make compile
+    make install-dev
+
+And finnally run the tests:
+
+.. code-block:: bash
+
+    make test
+ 

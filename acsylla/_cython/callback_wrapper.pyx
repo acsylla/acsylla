@@ -9,14 +9,11 @@ cdef class CallbackWrapper:
     async def __await__(self):
         await self.future
     
-    @staticmethod
-    cdef void cb(CassFuture* cass_future, void* data) with gil:
-        cdef CallbackWrapper cb_wrapper = <CallbackWrapper>data
- 
-        if cb_wrapper.future.done():
+    cdef void set_result(self):
+        if self.future.done():
             return
 
-        cb_wrapper.future.set_result()
+        self.future.set_result(None)
 
     @staticmethod
     cdef CallbackWrapper new_(CassFuture* cass_future, object loop):
@@ -28,11 +25,10 @@ cdef class CallbackWrapper:
 
         error = cass_future_set_callback(
             cb_wrapper.cass_future,
-            CallbackWrapper.cb,
+            cb_cass_future,
             <void*> cb_wrapper
         ) 
         if error != CASS_OK:
             raise RuntimeError(error)
 
         return cb_wrapper
-

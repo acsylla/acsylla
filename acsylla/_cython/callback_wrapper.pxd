@@ -3,9 +3,9 @@ cdef class CallbackWrapper:
         CassFuture* cass_future
         object future
 
+    cdef void set_result(self)
+
     @staticmethod
     cdef CallbackWrapper new_(CassFuture* cass_future, object loop)
 
-    @staticmethod
-    cdef void cb(CassFuture* future, void* data) with gil
     

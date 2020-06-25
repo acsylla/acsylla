@@ -33,5 +33,5 @@ And finnally run the tests:
 
 .. code-block:: bash
 
+    docker run -d -p 9042:9042 -t -i --rm cassandra:latest
     make test
- 

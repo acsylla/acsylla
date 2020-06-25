@@ -22,7 +22,4 @@ cdef class Session:
             self.loop
         )
 
-        try:
-            await cb_wrapper
-        finally:
-            cass_future_free(cass_future)
+        await cb_wrapper.__await__()

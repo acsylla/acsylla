@@ -1,6 +1,12 @@
 cdef class Cluster:
 
     def __cinit__(self):
+        # Starts the necessary machinary for bringing events
+        # from the CPP driver to a Python Thread.
+        # Is idempotent, can be called as many times as we want
+        # but would be initalize only once.
+        _initialize_posix_to_python_thread()
+
         self.cass_cluster = cass_cluster_new() 
 
     def __dealloc__(self):

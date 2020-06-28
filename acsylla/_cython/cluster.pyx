@@ -14,11 +14,16 @@ cdef class Cluster:
 
     def __init__(self):
         cdef CassError error
-        error = cass_cluster_set_contact_points(self.cass_cluster, "127.0.0.1")
+
+        error = cass_cluster_set_contact_points_n(self.cass_cluster, "127.0.0.1", 9)
+        if error != CASS_OK:
+            raise RuntimeError(error)
+
+        error = cass_cluster_set_protocol_version(self.cass_cluster, CASS_PROTOCOL_VERSION_V3)
         if error != CASS_OK:
             raise RuntimeError(error)
 
     async def create_session(self):
         session = Session(self)
-        await session._connect()
-        return
+        await session.connect()
+        return session

@@ -34,4 +34,6 @@ And finnally run the tests:
 .. code-block:: bash
 
     docker run -d -p 9042:9042 -t -i --rm cassandra:latest
+    cqlsh --cqlversion=3.4.4 -e "CREATE KEYSPACE IF NOT EXISTS acsylla WITH REPLICATION = { 'class': 'SimpleStrategy', 'replication_factor': 1}"
+    cqlsh --cqlversion=3.4.4 -k "acsylla" -e "CREATE TABLE IF NOT EXISTS test(id int PRIMARY KEY, value int)"
     make test

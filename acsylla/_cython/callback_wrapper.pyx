@@ -10,10 +10,21 @@ cdef class CallbackWrapper:
         await self.future
     
     cdef void set_result(self):
+        cdef const CassErrorResult* error_result
+        cdef CassError error
+
         if self.future.done():
             return
 
-        self.future.set_result(None)
+        error_result = cass_future_get_error_result(self.cass_future)
+        if error_result == NULL: 
+            # NULL means no error reported
+            self.future.set_result(None)
+            return
+
+        error = cass_error_result_code(error_result)
+        cass_error_result_free(error_result)
+        self.future.set_exception(Exception(error))
 
     @staticmethod
     cdef CallbackWrapper new_(CassFuture* cass_future, object loop):

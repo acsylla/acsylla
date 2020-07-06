@@ -94,5 +94,10 @@ cdef class Session:
 
         try:
             await cb_wrapper.__await__()
+        except CallbackError as callback_error:
+            if callback_error.cass_error == CASS_ERROR_SYNTAX_ERROR:
+                raise CassExceptionSyntaxError(statement)
+            else:
+                raise CassException(callback_error.cass_error)
         finally:
             cass_statement_free(cass_statement)

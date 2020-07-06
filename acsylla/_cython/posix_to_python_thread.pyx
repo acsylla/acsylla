@@ -9,16 +9,14 @@
 # CPP driver we do not have any chance of initalizing that thread.
 import socket
 import threading
+from posix cimport unistd
+
+cdef void _socket_write(int fd) nogil:
+    unistd.write(fd, b"1", 1)
 
 
-IF UNAME_SYSNAME == "Windows":
-    cdef void _unified_socket_write(int fd) nogil:
-        win_socket_send(<WIN_SOCKET>fd, b"1", 1, 0)
-ELSE:
-    from posix cimport unistd
-
-    cdef void _unified_socket_write(int fd) nogil:
-        unistd.write(fd, b"1", 1)
+cdef void _socket_close(int fd) nogil:
+    unistd.close(fd)
 
 
 cdef void cb_cass_future(CassFuture* cass_future, void* data):
@@ -30,7 +28,7 @@ cdef void cb_cass_future(CassFuture* cass_future, void* data):
     _queue_mutex.lock()
     _queue.push(data)
     _queue_mutex.unlock()
-    _unified_socket_write(_write_fd)
+    _socket_write(_write_fd)
 
 
 def _handle_events():
@@ -58,11 +56,33 @@ def _handle_events():
 _lock = threading.Lock()
 
 cdef _initialize_posix_to_python_thread():
-    global _lock, _initialized, _read_socket, _write_socket, _write_fd, _queue
+    cdef object current_loop
+    global _lock, _loop, _read_socket, _write_socket, _write_fd, _queue, _thread_id
+
     with _lock:
-        if _initialized == 0:
+
+        current_loop = asyncio.get_running_loop()
+
+        if _loop is None:
+            _thread_id = threading.get_ident()
+            _loop = current_loop
             _read_socket, _write_socket = socket.socketpair()
             _write_fd = _write_socket.fileno()
             _queue = cpp_event_queue()
-            asyncio.get_running_loop().add_reader(_read_socket, _handle_events)
-            _initialized = 1
+            _loop.add_reader(_read_socket, _handle_events)
+        elif _loop != current_loop:
+            # Either the loop has been recreated for the current thread
+            # or a new thread with a new asyncio loop has been started.
+
+            # for now new threads are not supported, they could be
+            # suppoted in the future.
+            assert threading.get_ident() == _thread_id, "More than one thread and loop not supported yet"
+
+            # If same main thread just started a new loop, we support it by
+            # adding the proper handlers to the loop
+            _loop = current_loop
+            _loop.add_reader(_read_socket, _handle_events)
+        else:
+            return
+
+

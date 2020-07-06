@@ -1,3 +1,17 @@
+CASS_ERROR_SYNTAX_ERROR = 2 << 24 | 0x2000
+
+
+class CallbackError(Exception):
+    """ Generic exception used for storing the error number that
+    generated the callback error.
+
+    Later on upper layers can create their own ad-hoc Exceptions
+    for making the error less generics.
+    """
+    def __init__(self, object cass_error):
+        self.cass_error = cass_error
+
+
 cdef class CallbackWrapper:
 
     def __cinit__(self):
@@ -24,7 +38,7 @@ cdef class CallbackWrapper:
 
         error = cass_error_result_code(error_result)
         cass_error_result_free(error_result)
-        self.future.set_exception(Exception(error))
+        self.future.set_exception(CallbackError(error))
 
     @staticmethod
     cdef CallbackWrapper new_(CassFuture* cass_future, object loop):

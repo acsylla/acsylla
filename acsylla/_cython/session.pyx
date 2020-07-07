@@ -38,16 +38,6 @@ cdef class Session:
         cdef CallbackWrapper cb_wrapper
         cdef CassFuture* cass_future
 
-        if self.closed == 1:
-            raise RuntimeError("Session closed")
-
-        if self.connected == 1:
-            raise RuntimeError("Session already connected")
-
-        # Not really connected but on our way
-        # of connecting it.
-        self.connected = 1
-
         if self.keyspace is not None:
             keyspace = self.keyspace.encode()
             cb_wrapper = CallbackWrapper.new_(
@@ -74,12 +64,6 @@ cdef class Session:
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
-
-        if self.connected == 0:
-            raise RuntimeError("Session not connected")
-
-        if self.keyspace is None:
-            raise RuntimeError("Raw queries need to use a session connected to a keyspace")
 
         cass_statement = cass_statement_new_n(
             statement,

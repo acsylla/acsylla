@@ -58,6 +58,12 @@ cdef class Session:
         await cb_wrapper.__await__()
 
     async def execute(self, bytes statement):
+        """ Execute an statement and returns the result.
+
+        Is responsability of the caller to know what to do with
+        the results object.
+        """
+        cdef Result result
         cdef CallbackWrapper cb_wrapper
         cdef CassStatement* cass_statement
         cdef CassFuture* cass_future
@@ -77,7 +83,7 @@ cdef class Session:
         )
 
         try:
-            await cb_wrapper.__await__()
+            result = await cb_wrapper.__await__()
         except CallbackError as callback_error:
             if callback_error.cass_error == CASS_ERROR_SYNTAX_ERROR:
                 raise CassExceptionSyntaxError(statement)
@@ -85,3 +91,5 @@ cdef class Session:
                 raise CassException(callback_error.cass_error)
         finally:
             cass_statement_free(cass_statement)
+
+        return result

@@ -2,6 +2,7 @@ import argparse
 import time
 import random
 from cassandra.cluster import Cluster
+from cassandra.query import tuple_factory
 from threading import Thread, Lock, Condition
 
 MAX_NUMBER_OF_KEYS = 65536
@@ -13,9 +14,30 @@ threads_started = 0
 thread_start = Condition()
 benchmark_start = Condition()
 
+def write(session, key):
+    start = time.monotonic()
+    statement = (
+        "INSERT INTO test (id, value) values(" +
+        key +
+        ", " +
+        key +
+        ")"
+    )
+    session.execute(statement)
+    return time.monotonic() - start
 
+def read(session, key):
+    start = time.monotonic()
+    statement = (
+        "SELECT id, value FROM test WHERE id =" + key
+    )
+    result = session.execute(statement)
+    row = result.one()
+    if row is not None:
+        value = row[0]
+    return time.monotonic() - start
 
-def run(session) -> None:
+def run(session, func) -> None:
     global latencies, real_started, threads_started
 
     local_latencies = []
@@ -30,22 +52,24 @@ def run(session) -> None:
 
     while not finish_benchmark:
         key = random.randint(0, MAX_NUMBER_OF_KEYS)
-        start = time.monotonic()
-        session.execute("INSERT INTO test (id, value) values({}, {})".format(str(key), str(key)))
-        latency = time.monotonic() - start
+        latency = func(session, str(key))
         local_latencies.append(latency)
 
     lock_latencies.acquire()
     latencies += local_latencies
     lock_latencies.release()
 
-def benchmark(session, concurrency: int, duration: int) -> None:
-    global finish_benchmark, real_started
+def benchmark(desc, func, session, concurrency: int, duration: int) -> None:
+    global finish_benchmark, real_started, threads_started, latencies
 
-    print("Starting threads ....")
+    finish_benchmark = False
+    latencies = []
+    threads_started = 0
+
+    print("Starting benchmark {} ....".format(desc))
     threads = []
     for idx in range(concurrency):
-        thread = Thread(target=run, args=(session,))
+        thread = Thread(target=run, args=(session, func))
         thread.start()
         threads.append(thread)
 
@@ -97,8 +121,18 @@ if __name__ == '__main__':
 
     cluster = Cluster()
     session = cluster.connect("acsylla")
+    session.row_factory = tuple_factory
 
     benchmark(
+        "write",
+        write,
+        session,
+        args.concurrency,
+        args.duration
+    )
+    benchmark(
+        "read",
+        read,
         session,
         args.concurrency,
         args.duration

@@ -32,5 +32,8 @@ install: compile
 test: 
 	pytest -sv tests
 
+stress: 
+	python benchmark/acsylla_benchmark.py --duration 10 --concurrency 32
 
-.PHONY: clean setup-build install install-dev compile test
+
+.PHONY: clean setup-build install install-dev compile test stress

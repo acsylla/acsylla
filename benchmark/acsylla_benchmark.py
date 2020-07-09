@@ -13,7 +13,27 @@ uvloop.install()
 
 MAX_NUMBER_OF_KEYS = 65536
 
-async def benchmark(desc: str, session, concurrency: int, duration: int) -> None:
+async def write(session, key, value):
+    start = time.monotonic()
+    statement = b"INSERT INTO test (id, value) values(" + key + b"," + value + b")"
+    await session.execute(statement)
+    return time.monotonic() - start
+
+
+async def read(session, key, value):
+    start = time.monotonic()
+    statement = (
+        b"SELECT id, value FROM test WHERE id =" + key
+    )
+    result = await session.execute(statement)
+    if result.count() > 0:
+        row = result.first()
+        value = row.column_by_name(b"value").int()
+        
+    return time.monotonic() - start
+
+
+async def benchmark(desc: str, coro, session, concurrency: int, duration: int) -> None:
     print("Starting benchmark {}".format(desc))
 
     not_finish_benchmark = True
@@ -24,10 +44,7 @@ async def benchmark(desc: str, session, concurrency: int, duration: int) -> None
         while not_finish_benchmark:
             key = str(random.randint(0, MAX_NUMBER_OF_KEYS)).encode()
             value = key
-            statement = b"INSERT INTO test (id, value) values(" + key + b"," + value + b")"
-            start = time.monotonic()
-            await session.execute(statement)
-            elapsed = time.monotonic() - start
+            elapsed = await coro(session, key, value)
             times.append(elapsed)
         return times
 
@@ -70,7 +87,8 @@ async def main():
 
     cluster = Cluster(["127.0.0.1"])
     session = await cluster.create_session(keyspace="acsylla")
-    await benchmark("write", session, args.concurrency, args.duration)
+    await benchmark("write", write, session, args.concurrency, args.duration)
+    await benchmark("read", read, session, args.concurrency, args.duration)
 
 
 if __name__ == "__main__":

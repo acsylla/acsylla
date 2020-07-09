@@ -1,7 +1,4 @@
 from acsylla._cython.cyacsylla import Cluster
-from acsylla._cython.cyacsylla import (
-    CassException,
-    CassExceptionSyntaxError
-)
+from . import errors
 
-__all__ = ("Cluster", "CassError", "CassErrorSyntaxError")
+__all__ = ("Cluster", "errors")

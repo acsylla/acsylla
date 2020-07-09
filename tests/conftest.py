@@ -1,5 +1,6 @@
 import asyncio
 import pytest
+import time
 
 from acsylla import Cluster
 
@@ -35,3 +36,13 @@ async def session(event_loop, cluster, keyspace):
         yield session
     finally:
         await session.close()
+
+@pytest.fixture(scope="session")
+def id_generation():
+    def _():
+        cnt = int(time.time())
+        while True:
+            yield cnt
+            cnt += 1
+
+    return _()

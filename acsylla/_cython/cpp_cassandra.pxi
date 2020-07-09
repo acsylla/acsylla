@@ -1,4 +1,4 @@
-ctypedef unsigned int       uint32_t
+ctypedef int cass_int32_t
 
 cdef extern from "cassandra.h":
   ctypedef enum CassError:
@@ -26,6 +26,15 @@ cdef extern from "cassandra.h":
   ctypedef struct CassErrorResult:
     pass
 
+  ctypedef struct CassResult:
+    pass
+
+  ctypedef struct CassRow:
+    pass
+
+  ctypedef struct CassValue:
+    pass
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data);  
 
   CassCluster* cass_cluster_new()
@@ -47,6 +56,16 @@ cdef extern from "cassandra.h":
   void cass_future_free(CassFuture* future)
   CassError cass_future_set_callback(CassFuture* future, CassFutureCallback callback, void* data)
   CassErrorResult* cass_future_get_error_result(CassFuture* future)
+  CassResult* cass_future_get_result(CassFuture* future)
   
   CassError cass_error_result_code(CassErrorResult* error_result)
   void cass_error_result_free(CassErrorResult* error_result)
+
+  size_t cass_result_row_count(CassResult* result)
+  size_t cass_result_column_count(CassResult* result)
+  CassRow* cass_result_first_row(CassResult* result)
+  void cass_result_free(CassResult* result)
+
+  const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
+
+  CassError cass_value_get_int32(const CassValue* value, cass_int32_t * output)

@@ -1,8 +1,8 @@
 import asyncio
 import pytest
 
-from acsylla import CassExceptionSyntaxError
 from acsylla import Cluster
+from acsylla.errors import CassExceptionSyntaxError
 
 pytestmark = pytest.mark.asyncio
 

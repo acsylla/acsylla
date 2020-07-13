@@ -1,6 +1,12 @@
 ctypedef int cass_int32_t
+ctypedef float cass_float_t
+ctypedef unsigned char cass_byte_t
 
 cdef extern from "cassandra.h":
+  ctypedef enum cass_bool_t:
+    cass_false = 0
+    cass_true = 1
+
   ctypedef enum CassError:
     CASS_OK
 
@@ -51,6 +57,12 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
+  CassError cass_statement_bind_null(CassStatement* statement, size_t index)
+  CassError cass_statement_bind_int32(CassStatement* statement, size_t index, cass_int32_t value)
+  CassError cass_statement_bind_float(CassStatement* statement, size_t index, cass_float_t value)
+  CassError cass_statement_bind_bool(CassStatement* statement, size_t index, cass_bool_t value)
+  CassError cass_statement_bind_string_n(CassStatement* statement, size_t index, const char* value, size_t value_length)
+  CassError cass_statement_bind_bytes(CassStatement* statement, size_t index, const cass_byte_t* value, size_t value_length)
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)

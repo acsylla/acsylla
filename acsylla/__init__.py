@@ -1,4 +1,7 @@
-from acsylla._cython.cyacsylla import Cluster
+from acsylla._cython.cyacsylla import (
+    Cluster,
+    Statement
+)
 from . import errors
 
-__all__ = ("Cluster", "errors")
+__all__ = ("Cluster", "Statement", "errors")

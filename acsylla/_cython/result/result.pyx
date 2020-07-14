@@ -39,3 +39,20 @@ cdef class Result:
             return None
 
         return Row.new_(cass_row)
+
+    def all(self):
+        """ Return the all rows using of a result, using an 
+        iterator.
+
+        If there is no rows iterator returns no rows.
+        """
+        cdef CassIterator* cass_iterator
+        cdef const CassRow* cass_row
+
+        try:
+            cass_iterator = cass_iterator_from_result(self.cass_result)
+            while (cass_iterator_next(cass_iterator) == cass_true):
+                cass_row = cass_iterator_get_row(cass_iterator)
+                yield Row.new_(cass_row)
+        finally:
+            cass_iterator_free(cass_iterator)

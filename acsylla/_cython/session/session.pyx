@@ -57,7 +57,7 @@ cdef class Session:
 
         await cb_wrapper.__await__()
 
-    async def execute(self, bytes statement):
+    async def execute(self, Statement statement):
         """ Execute an statement and returns the result.
 
         Is responsability of the caller to know what to do with
@@ -65,20 +65,13 @@ cdef class Session:
         """
         cdef Result result
         cdef CallbackWrapper cb_wrapper
-        cdef CassStatement* cass_statement
         cdef CassFuture* cass_future
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
 
-        cass_statement = cass_statement_new_n(
-            statement,
-            len(statement),
-            0
-        )
-
         cb_wrapper = CallbackWrapper.new_(
-            cass_session_execute(self.cass_session, cass_statement),
+            cass_session_execute(self.cass_session, statement.cass_statement),
             self.loop
         )
 
@@ -89,7 +82,5 @@ cdef class Session:
                 raise CassExceptionSyntaxError(statement)
             else:
                 raise CassException(callback_error.cass_error)
-        finally:
-            cass_statement_free(cass_statement)
 
         return result

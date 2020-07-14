@@ -7,7 +7,7 @@ from typing import List
 
 import uvloop
 
-from acsylla import Cluster
+from acsylla import Cluster, Statement
 
 uvloop.install()
 
@@ -15,15 +15,15 @@ MAX_NUMBER_OF_KEYS = 65536
 
 async def write(session, key, value):
     start = time.monotonic()
-    statement = b"INSERT INTO test (id, value) values(" + key + b"," + value + b")"
+    statement = Statement("INSERT INTO test (id, value) values(" + key + "," + value + ")")
     await session.execute(statement)
     return time.monotonic() - start
 
 
 async def read(session, key, value):
     start = time.monotonic()
-    statement = (
-        b"SELECT id, value FROM test WHERE id =" + key
+    statement = Statement(
+        "SELECT id, value FROM test WHERE id =" + key
     )
     result = await session.execute(statement)
     if result.count() > 0:
@@ -42,7 +42,7 @@ async def benchmark(desc: str, coro, session, concurrency: int, duration: int) -
         nonlocal not_finish_benchmark
         times = []
         while not_finish_benchmark:
-            key = str(random.randint(0, MAX_NUMBER_OF_KEYS)).encode()
+            key = str(random.randint(0, MAX_NUMBER_OF_KEYS))
             value = key
             elapsed = await coro(session, key, value)
             times.append(elapsed)

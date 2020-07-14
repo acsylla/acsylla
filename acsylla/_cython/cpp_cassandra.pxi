@@ -41,6 +41,9 @@ cdef extern from "cassandra.h":
   ctypedef struct CassValue:
     pass
 
+  ctypedef struct CassIterator:
+    pass
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data);  
 
   CassCluster* cass_cluster_new()
@@ -76,8 +79,13 @@ cdef extern from "cassandra.h":
   size_t cass_result_row_count(CassResult* result)
   size_t cass_result_column_count(CassResult* result)
   CassRow* cass_result_first_row(CassResult* result)
+  CassIterator* cass_iterator_from_result(const CassResult* result)
   void cass_result_free(CassResult* result)
 
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
   CassError cass_value_get_int32(const CassValue* value, cass_int32_t * output)
+
+  CassRow* cass_iterator_get_row(const CassIterator* iterator)
+  cass_bool_t cass_iterator_next(CassIterator* iterator)
+  void cass_iterator_free(CassIterator* iterator)

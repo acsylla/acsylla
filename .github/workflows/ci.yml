@@ -51,4 +51,5 @@ jobs:
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
         sleep 10
+        docker-compose logs
         make test

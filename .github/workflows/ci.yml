@@ -28,6 +28,9 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Install driver dependencies
+      run: |
+        sudo apt-get install libuv libuv-dev 
     - name: Compile Cassandra Driver
       run: |
         cd vendor/cpp-driver

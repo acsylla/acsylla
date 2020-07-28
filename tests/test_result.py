@@ -1,5 +1,5 @@
 import pytest
-from acsylla import Statement
+from acsylla import create_statement
 from acsylla.errors import ColumnNotFound
 
 
@@ -11,7 +11,7 @@ class TestResult:
         id_ = next(id_generation)
 
         # try to read a none inserted value
-        statement = Statement(
+        statement = create_statement(
             "SELECT id, value FROM test WHERE id =" +
             str(id_)
         )
@@ -25,7 +25,7 @@ class TestResult:
         value = 100
 
         # insert a new value into the table
-        statement = Statement(
+        statement = create_statement(
             "INSERT INTO test (id, value) values(" +
             str(id_) +
             ', ' +
@@ -35,7 +35,7 @@ class TestResult:
         await session.execute(statement)
 
         # read the new inserted value
-        statement = Statement(
+        statement = create_statement(
             "SELECT id, value FROM test WHERE id =" +
             str(id_)
         )
@@ -55,7 +55,7 @@ class TestResult:
         value = 100
 
         # insert a new value into the table
-        statement = Statement(
+        statement = create_statement(
             "INSERT INTO test (id, value) values(" +
             str(id_) +
             ', ' +
@@ -65,7 +65,7 @@ class TestResult:
         await session.execute(statement)
 
         # read the new inserted value
-        statement = Statement(
+        statement = create_statement(
             "SELECT id, value FROM test WHERE id =" +
             str(id_)
         )
@@ -79,7 +79,7 @@ class TestResult:
         total_rows = 100
         value = 33
 
-        statement = Statement(
+        statement = create_statement(
             "INSERT INTO test (id, value) values(?, ?)",
             parameters=2
         )
@@ -94,7 +94,7 @@ class TestResult:
             await session.execute(statement)
 
         # read all results
-        statement = Statement(
+        statement = create_statement(
             "SELECT id, value FROM test WHERE id >= ? and id <= ? ALLOW FILTERING",
             parameters=2
         )
@@ -117,7 +117,7 @@ class TestResult:
         ids = [next(id_generation) for i in range(total_rows)]
 
         # try to read unavailable results
-        statement = Statement(
+        statement = create_statement(
             "SELECT id, value FROM test WHERE id >= ? and id <= ? ALLOW FILTERING",
             parameters=2
         )

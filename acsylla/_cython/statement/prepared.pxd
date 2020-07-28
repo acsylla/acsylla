@@ -1,3 +1,6 @@
 cdef class PreparedStatement:
     cdef:
-        CassStatement* cass_statement
+        const CassPrepared* cass_prepared
+
+    @staticmethod
+    cdef PreparedStatement new_(const CassPrepared* cass_prepared)

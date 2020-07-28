@@ -1,7 +1,12 @@
 cdef class Statement:
     cdef:
-        int parameters
+        bint prepared
         CassStatement* cass_statement
 
-    cdef _check_index_or_raise(self, index)
+    @staticmethod
+    cdef Statement new_from_string(str statement_str, int parameters)
+
+    @staticmethod
+    cdef Statement new_from_prepared(CassStatement* cass_statement)
+
     cdef _check_bind_error_or_raise(self, CassError error)

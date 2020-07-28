@@ -1,8 +1,11 @@
 import asyncio
 import pytest
 
-from acsylla import Cluster, Statement
-from acsylla.errors import CassExceptionSyntaxError
+from acsylla import Cluster, create_statement
+from acsylla.errors import (
+    CassExceptionSyntaxError,
+    CassExceptionInvalidQuery
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -29,15 +32,30 @@ class TestSession:
 
     async def test_execute(self, session):
         key_and_value = "100"
-        statement = Statement(
+        statement = create_statement(
             "INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         await session.execute(statement)
 
     async def test_execute_using_a_closed_session(self, session):
         await session.close()
         with pytest.raises(RuntimeError):
-            await session.execute(Statement("foobar"))
+            await session.execute(create_statement("foobar"))
 
     async def test_execute_syntax_error(self, session):
         with pytest.raises(CassExceptionSyntaxError):
-            await session.execute(Statement("foobar"))
+            await session.execute(create_statement("foobar"))
+
+    async def test_execute_invalid_query(self, session):
+        with pytest.raises(CassExceptionInvalidQuery):
+            await session.execute(create_statement("CREATE TABLE foo(id invalid_type PRIMARY KEY)"))
+
+    async def test_create_prepared(self, session):
+        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+        prepared = await session.create_prepared(statement_str)
+        assert prepared is not None
+
+    async def test_create_prepared_using_a_closed_session(self, session):
+        await session.close()
+        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+        with pytest.raises(RuntimeError):
+            await session.create_prepared(statement_str)

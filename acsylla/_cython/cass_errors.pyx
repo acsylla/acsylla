@@ -9,3 +9,13 @@ class CassExceptionSyntaxError(CassException):
     def __init__(self, statment):
         self.statment = statment
         super().__init__(self)
+
+
+class CassExceptionInvalidQuery(CassException):
+    """ Raised when a statment presented an invalid query,
+    for example using an invalid type.
+    """
+
+    def __init__(self, statment):
+        self.statment = statment
+        super().__init__(self)

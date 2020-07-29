@@ -1,7 +1,7 @@
 from acsylla._cython.cyacsylla import (
     Cluster,
-    Statement
+    create_statement
 )
 from . import errors
 
-__all__ = ("Cluster", "Statement", "errors")
+__all__ = ("Cluster", "create_statement", "errors")

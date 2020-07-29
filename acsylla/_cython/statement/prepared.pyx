@@ -1,10 +1,23 @@
 cdef class PreparedStatement:
 
     def __cinit__(self):
-        pass
+        self.cass_prepared = NULL
 
     def __dealloc__(self):
-        pass
+        cass_prepared_free(self.cass_prepared)
 
-    def __init__(self):
-        pass
+    @staticmethod
+    cdef PreparedStatement new_(const CassPrepared* cass_prepared):
+        cdef PreparedStatement prepared
+
+        prepared = PreparedStatement()
+        prepared.cass_prepared = cass_prepared
+        return prepared
+
+    def bind(self):
+        cdef CassStatement* cass_statement
+        cdef Statement statement
+
+        cass_statement = cass_prepared_bind(self.cass_prepared)
+        statement = Statement.new_from_prepared(cass_statement)
+        return statement

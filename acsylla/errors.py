@@ -5,7 +5,14 @@ from acsylla._cython.cyacsylla import (
 
 from acsylla._cython.cyacsylla import (
     CassException,
-    CassExceptionSyntaxError
+    CassExceptionSyntaxError,
+    CassExceptionInvalidQuery
 )
 
-__all__ = ("ColumnNotFound", "ColumnValueError", "CassError", "CassErrorSyntaxError")
+__all__ = (
+    "ColumnNotFound",
+    "ColumnValueError",
+    "CassException",
+    "CassExceptionSyntaxError",
+    "CassExceptionInvalidQuery"
+)

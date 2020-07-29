@@ -11,13 +11,14 @@ cdef class Row:
         row.cass_row = cass_row
         return row
 
-    def column_by_name(self, bytes name):
+    def column_by_name(self, str name):
         """ Returns the row column called `name`.
 
         Raises a `ColumnNotFound` exception if the column can not be found"""
         cdef const CassValue* cass_value
+        cdef bytes_name = name.encode()
 
-        cass_value = cass_row_get_column_by_name(self.cass_row, name)
+        cass_value = cass_row_get_column_by_name(self.cass_row, bytes_name)
         if (cass_value == NULL):
             raise ColumnNotFound()
 

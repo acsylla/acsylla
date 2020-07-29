@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import time
 
-from acsylla import Cluster, Statement
+from acsylla import Cluster, create_statement
 
 @pytest.fixture
 def keyspace():
@@ -20,23 +20,34 @@ async def cluster(event_loop, host):
 async def session(event_loop, cluster, keyspace):
     # Create the acsylla keyspace if it does not exist yet
     session_without_keyspace = await cluster.create_session()
-    create_keyspace_statement = Statement(
+    create_keyspace_statement = create_statement(
         "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = ".format(keyspace) +
         "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
     )
     await session_without_keyspace.execute(create_keyspace_statement)
     await session_without_keyspace.close()
 
-    # Create the table test in the acsylla keyspace
     session = await cluster.create_session(keyspace=keyspace)
-    create_table_statement = Statement(
-        "CREATE TABLE IF NOT EXISTS test(id int PRIMARY KEY, value int)")
+
+    # Drop table if exits, will truncate any data used before
+    # and will enforce in the next step that if the schema of
+    # table changed is used during the tests.
+    create_table_statement = create_statement(
+        "DROP TABLE IF EXISTS test")
     await session.execute(create_table_statement)
 
-    # Truncate table
-    create_table_statement = Statement(
-        "TRUNCATE TABLE test")
+    # Create the table test in the acsylla keyspace
+    create_table_statement = create_statement(
+        "CREATE TABLE test(id int PRIMARY KEY," +
+        "value int," +
+        "value_int int," +
+        "value_float float," +
+        "value_bool boolean," +
+        "value_text text," +
+        "value_blob blob)"
+    )
     await session.execute(create_table_statement)
+
 
     try:
         yield session

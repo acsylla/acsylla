@@ -9,6 +9,11 @@ cdef extern from "cassandra.h":
 
   ctypedef enum CassError:
     CASS_OK
+    CASS_ERROR_LIB_NAME_DOES_NOT_EXIST
+    CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS
+    CASS_ERROR_SERVER_SYNTAX_ERROR
+    CASS_ERROR_SERVER_INVALID_QUERY
+    
 
   ctypedef enum CassProtocolVersion:
     CASS_PROTOCOL_VERSION_V1 = 1
@@ -24,6 +29,9 @@ cdef extern from "cassandra.h":
     pass
 
   ctypedef struct CassFuture:
+    pass
+
+  ctypedef struct CassPrepared:
     pass
 
   ctypedef struct CassStatement:
@@ -57,6 +65,7 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_connect(CassSession* session, const CassCluster* cluster)
   CassFuture* cass_session_connect_keyspace_n(CassSession* session,const CassCluster* cluster, const char* keyspace, size_t keyspace_length)
   CassFuture* cass_session_execute(CassSession * session, const CassStatement* statement)
+  CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length);
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
@@ -66,13 +75,23 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_bool(CassStatement* statement, size_t index, cass_bool_t value)
   CassError cass_statement_bind_string_n(CassStatement* statement, size_t index, const char* value, size_t value_length)
   CassError cass_statement_bind_bytes(CassStatement* statement, size_t index, const cass_byte_t* value, size_t value_length)
+  CassError cass_statement_bind_bytes_by_name_n(CassStatement* statement, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_statement_bind_string_by_name_n(CassStatement* statement, const char* name, size_t name_length, const char* value, size_t value_length)
+  CassError cass_statement_bind_bool_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_bool_t value)
+  CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value);
+  CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value);
+  CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length);
+
+
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)
+  CassError cass_future_error_code(CassFuture* future);
   CassError cass_future_set_callback(CassFuture* future, CassFutureCallback callback, void* data)
   CassErrorResult* cass_future_get_error_result(CassFuture* future)
   CassResult* cass_future_get_result(CassFuture* future)
-  
+  const CassPrepared* cass_future_get_prepared(CassFuture* future);
+ 
   CassError cass_error_result_code(CassErrorResult* error_result)
   void cass_error_result_free(CassErrorResult* error_result)
 
@@ -89,3 +108,6 @@ cdef extern from "cassandra.h":
   CassRow* cass_iterator_get_row(const CassIterator* iterator)
   cass_bool_t cass_iterator_next(CassIterator* iterator)
   void cass_iterator_free(CassIterator* iterator)
+
+  CassStatement* cass_prepared_bind(const CassPrepared* prepared);
+  void cass_prepared_free(const CassPrepared* prepared);

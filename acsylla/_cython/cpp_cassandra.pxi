@@ -8,10 +8,11 @@ cdef extern from "cassandra.h":
     cass_true = 1
 
   ctypedef enum CassError:
-    CASS_OK = 0
-    CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS = 16777227
-    CASS_ERROR_SERVER_SYNTAX_ERROR = 33562624
-    CASS_ERROR_SERVER_INVALID_QUERY = 33563136
+    CASS_OK
+    CASS_ERROR_LIB_NAME_DOES_NOT_EXIST
+    CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS
+    CASS_ERROR_SERVER_SYNTAX_ERROR
+    CASS_ERROR_SERVER_INVALID_QUERY
     
 
   ctypedef enum CassProtocolVersion:
@@ -74,6 +75,14 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_bool(CassStatement* statement, size_t index, cass_bool_t value)
   CassError cass_statement_bind_string_n(CassStatement* statement, size_t index, const char* value, size_t value_length)
   CassError cass_statement_bind_bytes(CassStatement* statement, size_t index, const cass_byte_t* value, size_t value_length)
+  CassError cass_statement_bind_bytes_by_name_n(CassStatement* statement, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_statement_bind_string_by_name_n(CassStatement* statement, const char* name, size_t name_length, const char* value, size_t value_length)
+  CassError cass_statement_bind_bool_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_bool_t value)
+  CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value);
+  CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value);
+  CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length);
+
+
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)

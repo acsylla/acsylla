@@ -34,40 +34,101 @@ class TestStatement:
             statement.bind_null(TestStatement.OUT_OF_BAND_PARAMETER)
 
     def test_bind_int(self, statement):
-        statement.bind_int(10, 2)
+        statement.bind_int(2, 10)
 
     def test_bind_int_invalid_index(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_int(10, TestStatement.OUT_OF_BAND_PARAMETER)
+            statement.bind_int(TestStatement.OUT_OF_BAND_PARAMETER, 10)
 
     def test_bind_float(self, statement):
-        statement.bind_float(10.0, 3)
+        statement.bind_float(3, 10.0)
 
     def test_bind_float_invalid_index(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_float(10.0, TestStatement.OUT_OF_BAND_PARAMETER)
+            statement.bind_float(TestStatement.OUT_OF_BAND_PARAMETER, 10.0)
 
     def test_bind_bool(self, statement):
-        statement.bind_bool(True, 4)
+        statement.bind_bool(4, True)
 
     def test_bind_bool_invalid_object(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_bool("", 4)
+            statement.bind_bool(4, "")
 
     def test_bind_bool_invalid_index(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_bool(True, TestStatement.OUT_OF_BAND_PARAMETER)
+            statement.bind_bool(TestStatement.OUT_OF_BAND_PARAMETER, True)
 
     def test_bind_string(self, statement):
-        statement.bind_string("acsylla", 5)
+        statement.bind_string(5, "acsylla")
 
     def test_bind_string_invalid_index(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_string("acsylla", TestStatement.OUT_OF_BAND_PARAMETER)
+            statement.bind_string(TestStatement.OUT_OF_BAND_PARAMETER, "acsylla")
 
     def test_bind_bytes(self, statement):
-        statement.bind_bytes(b"acsylla", 6)
+        statement.bind_bytes(6, b"acsylla")
 
     def test_bind_bytes_invalid_index(self, statement):
         with pytest.raises(ValueError):
-            statement.bind_bytes(b"acsylla", TestStatement.OUT_OF_BAND_PARAMETER)
+            statement.bind_bytes(TestStatement.OUT_OF_BAND_PARAMETER, b"acsylla")
+
+
+class TestStatementOnlyPrepared:
+    """Special tests for testing some methods that are only allowed for statements
+    that were created by using prepared statements."""
+
+    @pytest.fixture
+    async def statement(self, session):
+        statement_str = (
+            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values " +
+            "(?, ?, ?, ?, ?, ?, ?)"
+        )
+        prepared = await session.create_prepared(statement_str)
+        statement_ = prepared.bind()
+        return statement_
+
+    def test_bind_null_by_name(self, statement):
+        statement.bind_null_by_name("value")
+
+    def test_bind_null_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_null_by_name("invalid_field")
+
+    def test_bind_int_by_name(self, statement):
+        statement.bind_int_by_name("value_int", 10)
+
+    def test_bind_int_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_int_by_name("invalid_field", 10)
+
+    def test_bind_float_by_name(self, statement):
+        statement.bind_float_by_name("value_float", 10.0)
+
+    def test_bind_float_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_float_by_name("invalid_field", 10.0)
+
+    def test_bind_bool_by_name(self, statement):
+        statement.bind_bool_by_name("value_bool", True)
+
+    def test_bind_bool_by_name_invalid_object(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_bool_by_name("value_bool", "")
+
+    def test_bind_bool_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_bool_by_name("invalid_field", True)
+
+    def test_bind_string_by_name(self, statement):
+        statement.bind_string_by_name("value_text", "acsylla")
+
+    def test_bind_string_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_string_by_name("invalid_field", "acsylla")
+
+    def test_bind_bytes_by_name(self, statement):
+        statement.bind_bytes_by_name("value_blob", b"acsylla")
+
+    def test_bind_bytes_by_name_invalid_name(self, statement):
+        with pytest.raises(ValueError):
+            statement.bind_bytes_by_name("invalid_field", b"acsylla")

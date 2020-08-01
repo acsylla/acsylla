@@ -4,7 +4,8 @@ import pytest
 from acsylla import Cluster, create_statement
 from acsylla.errors import (
     CassExceptionSyntaxError,
-    CassExceptionInvalidQuery
+    CassExceptionInvalidQuery,
+    CassExceptionConnectionError
 )
 
 pytestmark = pytest.mark.asyncio
@@ -24,10 +25,9 @@ class TestSession:
 
         await session.close()
 
-    @pytest.mark.xfail(reason="Needs investigation")
     async def test_create_session_invalid_host(self, keyspace):
-        cluster = Cluster(["127.0.0.2"])
-        with pytest.raises(Exception):
+        cluster = Cluster(["1.0.0.0"])
+        with pytest.raises(CassExceptionConnectionError):
             session = await cluster.create_session(keyspace=keyspace)
 
     async def test_execute(self, session):

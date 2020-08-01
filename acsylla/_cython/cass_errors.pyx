@@ -3,6 +3,10 @@ class CassException(Exception):
     pass
 
 
+class CassExceptionConnectionError(CassException):
+    """ Raised when server can't be reached. """
+
+
 class CassExceptionSyntaxError(CassException):
     """ Raised when a statment presented a syntax error. """
 

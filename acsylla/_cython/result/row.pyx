@@ -4,11 +4,17 @@ cdef class Row:
         self.cass_row = NULL
 
     @staticmethod
-    cdef Row new_(const CassRow* cass_row):
+    cdef Row new_(const CassRow* cass_row, Result result):
         cdef Row row
 
         row = Row()
         row.cass_row = cass_row
+
+        # Increase the references to the result object, behind the scenes
+        # Cassandra uses the data owned by the result object, so we need to
+        # keep the object alive while the row is still in use.
+        row.result = result 
+
         return row
 
     def column_by_name(self, str name):

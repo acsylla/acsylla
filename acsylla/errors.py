@@ -6,7 +6,8 @@ from acsylla._cython.cyacsylla import (
 from acsylla._cython.cyacsylla import (
     CassException,
     CassExceptionSyntaxError,
-    CassExceptionInvalidQuery
+    CassExceptionInvalidQuery,
+    CassExceptionConnectionError
 )
 
 __all__ = (
@@ -14,5 +15,6 @@ __all__ = (
     "ColumnValueError",
     "CassException",
     "CassExceptionSyntaxError",
-    "CassExceptionInvalidQuery"
+    "CassExceptionInvalidQuery",
+    "CassExceptionConnectionError"
 )

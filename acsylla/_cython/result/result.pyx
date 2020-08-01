@@ -38,7 +38,7 @@ cdef class Result:
         if (cass_row == NULL):
             return None
 
-        return Row.new_(cass_row)
+        return Row.new_(cass_row, self)
 
     def all(self):
         """ Return the all rows using of a result, using an 
@@ -53,6 +53,6 @@ cdef class Result:
             cass_iterator = cass_iterator_from_result(self.cass_result)
             while (cass_iterator_next(cass_iterator) == cass_true):
                 cass_row = cass_iterator_get_row(cass_iterator)
-                yield Row.new_(cass_row)
+                yield Row.new_(cass_row, self)
         finally:
             cass_iterator_free(cass_iterator)

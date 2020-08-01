@@ -9,6 +9,7 @@ cdef extern from "cassandra.h":
 
   ctypedef enum CassError:
     CASS_OK
+    CASS_ERROR_LIB_NO_HOSTS_AVAILABLE
     CASS_ERROR_LIB_NAME_DOES_NOT_EXIST
     CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS
     CASS_ERROR_SERVER_SYNTAX_ERROR

@@ -63,7 +63,10 @@ cdef class Session:
             await cb_wrapper.__await__()
             error = cass_future_error_code(cass_future)
             if error != CASS_OK:
-                raise CassException(error)
+                if error == CASS_ERROR_LIB_NO_HOSTS_AVAILABLE:
+                    raise CassExceptionConnectionError()
+                else:
+                    raise CassException(error)
         finally:
             cass_future_free(cass_future)
 

@@ -1,13 +1,10 @@
 from acsylla._cython.cyacsylla import (
-    ColumnNotFound,
-    ColumnValueError
-)
-
-from acsylla._cython.cyacsylla import (
     CassException,
-    CassExceptionSyntaxError,
+    CassExceptionConnectionError,
     CassExceptionInvalidQuery,
-    CassExceptionConnectionError
+    CassExceptionSyntaxError,
+    ColumnNotFound,
+    ColumnValueError,
 )
 
 __all__ = (
@@ -16,5 +13,5 @@ __all__ = (
     "CassException",
     "CassExceptionSyntaxError",
     "CassExceptionInvalidQuery",
-    "CassExceptionConnectionError"
+    "CassExceptionConnectionError",
 )

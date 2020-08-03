@@ -3,6 +3,27 @@ acsylla
 
 WORK IN PROGRESS, use only for developing
 
+The following snippet shows the minimal stuff that would be needed for creating a new ``Session``
+object for the keyspace ``acsylla`` and then peform a query for reading a set of rows.
+
+.. code-block:: python
+
+    import asyncio
+    import acsylla
+    async def main():
+        cluster = acsylla.create_cluster([host])
+        session = await cluster.create_session(keyspace="acsylla")
+        statement = ascylla.create_statement("SELECT id, value FROM test WHERE id = 100")
+        result = await session.execute(statement)
+        row = result.first()
+        value = row.column_by_name("value")
+        await session.close()
+    asyncio.run(main())
+
+
+Acsylla comes with a minimal support for the following objects: ``Cluster``, ``Session``,
+``Statement``, ``PreparedStatement``, ``Batch``, ``Result``, ``Row`` and ``Value``.
+
 
 Developing
 ============

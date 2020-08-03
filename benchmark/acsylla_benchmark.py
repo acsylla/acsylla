@@ -1,17 +1,16 @@
+from acsylla import Cluster, create_statement
+
 import argparse
 import asyncio
 import logging
 import random
 import time
-from typing import List
-
 import uvloop
-
-from acsylla import Cluster, create_statement
 
 uvloop.install()
 
 MAX_NUMBER_OF_KEYS = 65536
+
 
 async def write(session, key, value):
     start = time.monotonic()
@@ -22,14 +21,12 @@ async def write(session, key, value):
 
 async def read(session, key, value):
     start = time.monotonic()
-    statement = create_statement(
-        "SELECT id, value FROM test WHERE id =" + key
-    )
+    statement = create_statement("SELECT id, value FROM test WHERE id =" + key)
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        value = row.column_by_name("value").int()
-        
+        _ = row.column_by_name("value").int()
+
     return time.monotonic() - start
 
 

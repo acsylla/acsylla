@@ -1,7 +1,6 @@
-import pytest
-
 from acsylla import create_statement
 
+import pytest
 
 pytestmark = pytest.mark.asyncio
 
@@ -13,8 +12,8 @@ class TestStatement:
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def statement(self, request, session):
         statement_str = (
-            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values " +
-            "(?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values "
+            + "(?, ?, ?, ?, ?, ?, ?)"
         )
         if request.param == "none_prepared":
             statement_ = create_statement(statement_str, parameters=7)
@@ -80,8 +79,8 @@ class TestStatementOnlyPrepared:
     @pytest.fixture
     async def statement(self, session):
         statement_str = (
-            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values " +
-            "(?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values "
+            + "(?, ?, ?, ?, ?, ?, ?)"
         )
         prepared = await session.create_prepared(statement_str)
         statement_ = prepared.bind()

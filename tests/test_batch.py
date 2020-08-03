@@ -1,23 +1,14 @@
+from acsylla import create_batch_logged, create_batch_unlogged, create_statement
+
 import pytest
-
-from acsylla import (
-    create_batch_logged,
-    create_batch_unlogged,
-    create_statement
-)
-
 
 pytestmark = pytest.mark.asyncio
 
 
 class TestBatch:
-
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def statement(self, request, session):
-        statement_str = (
-            "INSERT INTO test (id, value) values " +
-            "(?, ?)"
-        )
+        statement_str = "INSERT INTO test (id, value) values " + "(?, ?)"
         if request.param == "none_prepared":
             statement_ = create_statement(statement_str, parameters=2)
         elif request.param == "prepared":

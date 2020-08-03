@@ -1,43 +1,34 @@
-import asyncio
-import pytest
+from acsylla import create_batch_unlogged, create_cluster, create_statement
+from acsylla.errors import CassExceptionConnectionError, CassExceptionInvalidQuery, CassExceptionSyntaxError
 
-from acsylla import (
-    Cluster,
-    create_batch_unlogged,
-    create_statement
-)
-from acsylla.errors import (
-    CassExceptionSyntaxError,
-    CassExceptionInvalidQuery,
-    CassExceptionConnectionError
-)
+import pytest
 
 pytestmark = pytest.mark.asyncio
 
+
 class TestSession:
     async def test_create_session(self, host, keyspace):
-        cluster = Cluster([host])
+        cluster = create_cluster([host])
         session = await cluster.create_session(keyspace=keyspace)
         assert session is not None
 
         await session.close()
 
     async def test_create_session_without_keyspace(self, host):
-        cluster = Cluster([host])
+        cluster = create_cluster([host])
         session = await cluster.create_session()
         assert session is not None
 
         await session.close()
 
     async def test_create_session_invalid_host(self, keyspace):
-        cluster = Cluster(["1.0.0.0"])
+        cluster = create_cluster(["1.0.0.0"])
         with pytest.raises(CassExceptionConnectionError):
-            session = await cluster.create_session(keyspace=keyspace)
+            await cluster.create_session(keyspace=keyspace)
 
     async def test_execute(self, session, id_generation):
         key_and_value = str(next(id_generation))
-        statement = create_statement(
-            "INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
+        statement = create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         await session.execute(statement)
 
     async def test_execute_using_a_closed_session(self, session):
@@ -68,15 +59,11 @@ class TestSession:
         batch = create_batch_unlogged()
         key_and_value = str(next(id_generation))
         batch.add_statement(
-            create_statement(
-                "INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")"
-            )
+            create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         )
         key_and_value = str(next(id_generation))
         batch.add_statement(
-            create_statement(
-                "INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")"
-            )
+            create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         )
         await session.execute_batch(batch)
 

@@ -1,8 +1,8 @@
+from setuptools import Extension, setup
+
 import os
 import re
 import sys
-
-from setuptools import Extension, setup
 
 if sys.platform in ("win32", "cygwin", "cli"):
     raise RuntimeError("acsylla does not support Windows at the moment")
@@ -22,7 +22,7 @@ extensions = [
         include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
         extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
         extra_compile_args=["-std=c++11"],
-        libraries=["crypto", "ssl", "uv", "z"]
+        libraries=["crypto", "ssl", "uv", "z"],
     )
 ]
 
@@ -36,6 +36,7 @@ dev_requires = [
     "black==19.10b0",
     "isort==4.3.21",
     "flake8==3.7.9",
+    "mypy==0.782",
 ]
 
 

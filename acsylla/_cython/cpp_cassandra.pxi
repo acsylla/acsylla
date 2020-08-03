@@ -15,13 +15,17 @@ cdef extern from "cassandra.h":
     CASS_ERROR_SERVER_SYNTAX_ERROR
     CASS_ERROR_SERVER_INVALID_QUERY
     
-
   ctypedef enum CassProtocolVersion:
     CASS_PROTOCOL_VERSION_V1 = 1
     CASS_PROTOCOL_VERSION_V2 = 2
     CASS_PROTOCOL_VERSION_V3 = 3
     CASS_PROTOCOL_VERSION_V4 = 4
     CASS_PROTOCOL_VERSION_V5 = 5
+
+  ctypedef enum CassBatchType:
+    CASS_BATCH_TYPE_LOGGED
+    CASS_BATCH_TYPE_UNLOGGED
+    CASS_BATCH_TYPE_COUNTER
 
   ctypedef struct CassCluster:
     pass
@@ -53,6 +57,9 @@ cdef extern from "cassandra.h":
   ctypedef struct CassIterator:
     pass
 
+  ctypedef struct CassBatch:
+    pass
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data);  
 
   CassCluster* cass_cluster_new()
@@ -66,7 +73,8 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_connect(CassSession* session, const CassCluster* cluster)
   CassFuture* cass_session_connect_keyspace_n(CassSession* session,const CassCluster* cluster, const char* keyspace, size_t keyspace_length)
   CassFuture* cass_session_execute(CassSession * session, const CassStatement* statement)
-  CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length);
+  CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length)
+  CassFuture* cass_session_execute_batch(CassSession* session, const CassBatch* batch)
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
@@ -112,3 +120,8 @@ cdef extern from "cassandra.h":
 
   CassStatement* cass_prepared_bind(const CassPrepared* prepared);
   void cass_prepared_free(const CassPrepared* prepared);
+
+
+  CassBatch* cass_batch_new(CassBatchType type)
+  CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
+  void cass_batch_free(CassBatch* cass_batch)

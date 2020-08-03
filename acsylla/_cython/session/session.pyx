@@ -15,6 +15,22 @@ cdef class Session:
         self.closed = 0
         self.connected = 0
 
+    cdef _raise_if_error(self, CassFuture * cass_future):
+        cdef CassError cass_error
+
+        cass_error = cass_future_error_code(cass_future)
+        if cass_error == CASS_OK:
+            return
+
+        if cass_error == CASS_ERROR_LIB_NO_HOSTS_AVAILABLE:
+            raise CassExceptionConnectionError()
+        elif cass_error == CASS_ERROR_SERVER_SYNTAX_ERROR:
+            raise CassExceptionSyntaxError()
+        elif cass_error == CASS_ERROR_SERVER_INVALID_QUERY:
+            raise CassExceptionInvalidQuery()
+        else:
+            raise CassException(cass_error)
+
     async def close(self):
         cdef CassFuture* cass_future
         cdef CassError cass_error
@@ -33,9 +49,7 @@ cdef class Session:
 
         try:
             await cb_wrapper.__await__()
-            error = cass_future_error_code(cass_future)
-            if error != CASS_OK:
-                raise CassException(error)
+            self._raise_if_error(cass_future)
         finally:
             cass_future_free(cass_future)
 
@@ -61,12 +75,7 @@ cdef class Session:
 
         try:
             await cb_wrapper.__await__()
-            error = cass_future_error_code(cass_future)
-            if error != CASS_OK:
-                if error == CASS_ERROR_LIB_NO_HOSTS_AVAILABLE:
-                    raise CassExceptionConnectionError()
-                else:
-                    raise CassException(error)
+            self._raise_if_error(cass_future)
         finally:
             cass_future_free(cass_future)
 
@@ -93,13 +102,7 @@ cdef class Session:
             await cb_wrapper.__await__()
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
-                cass_error = cass_future_error_code(cass_future)
-                if cass_error == CASS_ERROR_SERVER_SYNTAX_ERROR:
-                    raise CassExceptionSyntaxError(statement)
-                elif cass_error == CASS_ERROR_SERVER_INVALID_QUERY:
-                    raise CassExceptionInvalidQuery(statement)
-                else:
-                    raise CassException(cass_error)
+                self._raise_if_error(cass_future)
 
             result = Result.new_(cass_result)
         finally:
@@ -129,11 +132,36 @@ cdef class Session:
             await cb_wrapper.__await__()
             cass_prepared = cass_future_get_prepared(cass_future)
             if cass_prepared == NULL:
-                cass_error = cass_future_error_code(cass_future)
-                raise CassException(cass_error)
+                self._raise_if_error(cass_future)
 
             prepared = PreparedStatement.new_(cass_prepared)
         finally:
             cass_future_free(cass_future)
 
         return prepared
+
+    async def execute_batch(self, Batch batch):
+        """ Execute a batch of statements and returns the result.
+
+        Is responsability of the caller to know what to do with
+        the results object.
+        """
+        cdef CassFuture* cass_future
+        cdef CassError cass_error
+        cdef const CassResult* cass_result = NULL
+
+        cdef CallbackWrapper cb_wrapper
+
+        if self.closed == 1:
+            raise RuntimeError("Session closed")
+
+        cass_future = cass_session_execute_batch(self.cass_session, batch.cass_batch)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+
+        try:
+            await cb_wrapper.__await__()
+            cass_result = cass_future_get_result(cass_future)
+            if cass_result == NULL:
+                self._raise_if_error(cass_future)
+        finally:
+            cass_future_free(cass_future)

@@ -30,8 +30,3 @@ skip_covered = true
 [tool.coverage.run]
 branch = true
 source = ["acsylla"]
-
-[build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
-

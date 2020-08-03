@@ -1,15 +1,33 @@
-from acsylla._cython.cyacsylla import (
+from . import errors
+from .base import (
+    Batch,
     Cluster,
+    PreparedStatement,
+    Result,
+    Row,
+    Session,
+    Statement,
+    Value,
+)
+from .factories import (
     create_batch_logged,
     create_batch_unlogged,
-    create_statement
+    create_cluster,
+    create_statement,
 )
-from . import errors
 
 __all__ = (
     "Cluster",
+    "Session",
+    "Statement",
+    "PreparedStatement",
+    "Batch",
+    "Result",
+    "Row",
+    "Value",
+    "create_cluster",
+    "create_statement",
     "create_batch_logged",
     "create_batch_unlogged",
-    "create_statement",
-    "errors"
+    "errors",
 )

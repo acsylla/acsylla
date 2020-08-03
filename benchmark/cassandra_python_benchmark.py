@@ -1,9 +1,10 @@
-import argparse
-import time
-import random
 from cassandra.cluster import Cluster
 from cassandra.query import tuple_factory
-from threading import Thread, Lock, Condition
+from threading import Condition, Lock, Thread
+
+import argparse
+import random
+import time
 
 MAX_NUMBER_OF_KEYS = 65536
 
@@ -14,34 +15,28 @@ threads_started = 0
 thread_start = Condition()
 benchmark_start = Condition()
 
+
 def write(session, key):
     start = time.monotonic()
-    statement = (
-        "INSERT INTO test (id, value) values(" +
-        key +
-        ", " +
-        key +
-        ")"
-    )
+    statement = "INSERT INTO test (id, value) values(" + key + ", " + key + ")"
     session.execute(statement)
     return time.monotonic() - start
 
+
 def read(session, key):
     start = time.monotonic()
-    statement = (
-        "SELECT id, value FROM test WHERE id =" + key
-    )
+    statement = "SELECT id, value FROM test WHERE id =" + key
     result = session.execute(statement)
     row = result.one()
     if row is not None:
-        value = row[0]
+        _ = row[0]
     return time.monotonic() - start
+
 
 def run(session, func) -> None:
     global latencies, real_started, threads_started
 
     local_latencies = []
-    elapsed = None
 
     with thread_start:
         threads_started += 1
@@ -58,6 +53,7 @@ def run(session, func) -> None:
     lock_latencies.acquire()
     latencies += local_latencies
     lock_latencies.release()
+
 
 def benchmark(desc, func, session, concurrency: int, duration: int) -> None:
     global finish_benchmark, real_started, threads_started, latencies
@@ -93,29 +89,23 @@ def benchmark(desc, func, session, concurrency: int, duration: int) -> None:
     latencies.sort()
 
     total_requests = len(latencies)
-    avg = sum(latencies) / total_requests 
-    p90 = latencies[int((90*total_requests)/100)]
-    p99 = latencies[int((99*total_requests)/100)]
+    avg = sum(latencies) / total_requests
+    p90 = latencies[int((90 * total_requests) / 100)]
+    p99 = latencies[int((99 * total_requests) / 100)]
 
-    print('QPS: {0}'.format(int(total_requests/duration)))
-    print('Avg: {0:.6f}'.format(avg))
-    print('P90: {0:.6f}'.format(p90))
-    print('P99: {0:.6f}'.format(p99))
+    print("QPS: {0}".format(int(total_requests / duration)))
+    print("Avg: {0:.6f}".format(avg))
+    print("P90: {0:.6f}".format(p90))
+    print("P99: {0:.6f}".format(p99))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--concurrency",
-        help="Number of concurrency clients, by default 32",
-        type=int,
-        default=32,
+        "--concurrency", help="Number of concurrency clients, by default 32", type=int, default=32,
     )
     parser.add_argument(
-        "--duration",
-        help="Test duration in seconds, by default 60",
-        type=int,
-        default=60,
+        "--duration", help="Test duration in seconds, by default 60", type=int, default=60,
     )
     args = parser.parse_args()
 
@@ -123,17 +113,5 @@ if __name__ == '__main__':
     session = cluster.connect("acsylla")
     session.row_factory = tuple_factory
 
-    benchmark(
-        "write",
-        write,
-        session,
-        args.concurrency,
-        args.duration
-    )
-    benchmark(
-        "read",
-        read,
-        session,
-        args.concurrency,
-        args.duration
-    )
+    benchmark("write", write, session, args.concurrency, args.duration)
+    benchmark("read", read, session, args.concurrency, args.duration)

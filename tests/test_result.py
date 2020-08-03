@@ -1,13 +1,12 @@
-import pytest
 from acsylla import create_statement
 from acsylla.errors import ColumnNotFound
 
+import pytest
 
 pytestmark = pytest.mark.asyncio
 
 
 class TestResult:
-
     async def _build_statement(self, session, type_, statement_str, parameters):
         if type_ == "none_prepared":
             statement_ = create_statement(statement_str, parameters=parameters)
@@ -20,23 +19,17 @@ class TestResult:
 
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def insert_statement(self, request, session):
-        statement_str = (
-            "INSERT INTO test (id, value) values(?, ?)"
-        )
+        statement_str = "INSERT INTO test (id, value) values(?, ?)"
         return await self._build_statement(session, request.param, statement_str, 2)
 
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def select_statement(self, request, session):
-        statement_str = (
-            "SELECT id, value FROM test WHERE id = ?"
-        )
+        statement_str = "SELECT id, value FROM test WHERE id = ?"
         return await self._build_statement(session, request.param, statement_str, 1)
 
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def select_filter_statement(self, request, session):
-        statement_str = (
-            "SELECT id, value FROM test WHERE id >= :min and id <= :max ALLOW FILTERING"
-        )
+        statement_str = "SELECT id, value FROM test WHERE id >= :min and id <= :max ALLOW FILTERING"
         return await self._build_statement(session, request.param, statement_str, 2)
 
     async def test_result_no_row(self, session, select_statement, id_generation):
@@ -76,26 +69,16 @@ class TestResult:
         value = 100
 
         # insert a new value into the table
-        statement = create_statement(
-            "INSERT INTO test (id, value) values(" +
-            str(id_) +
-            ', ' +
-            str(value) +
-            ')'
-        )
+        statement = create_statement("INSERT INTO test (id, value) values(" + str(id_) + ", " + str(value) + ")")
         await session.execute(statement)
 
         # read the new inserted value
-        statement = create_statement(
-            "SELECT id, value FROM test WHERE id =" +
-            str(id_)
-        )
+        statement = create_statement("SELECT id, value FROM test WHERE id =" + str(id_))
         result = await session.execute(statement)
 
         row = result.first()
         with pytest.raises(ColumnNotFound):
             row.column_by_name("invalid_column_name")
-
 
     async def test_result_multiple_rows(self, session, insert_statement, select_filter_statement, id_generation):
         total_rows = 100
@@ -105,7 +88,7 @@ class TestResult:
 
         ids = [next(id_generation) for i in range(total_rows)]
 
-        # write results 
+        # write results
         for id_ in ids:
             insert_statement.bind_int(0, id_)
             await session.execute(insert_statement)

@@ -29,6 +29,18 @@ install-dev: compile
 install: compile
 	$(PIP) install -e .
 
+format:
+	isort --recursive .
+	black .
+
+lint:
+	isort --check-only --recursive .
+	black --check .
+	flake8 --config setup.cfg
+
+mypy:
+	mypy -p acsylla -p tests.test_types
+
 test: 
 	pytest -sv tests
 
@@ -36,4 +48,4 @@ stress:
 	python benchmark/acsylla_benchmark.py --duration 10 --concurrency 32
 
 
-.PHONY: clean setup-build install install-dev compile test stress
+.PHONY: clean setup-build install install-dev compile test stress mypy lint format

@@ -1,28 +1,30 @@
-import asyncio
-import pytest
-import time
+from acsylla import create_cluster, create_statement
 
-from acsylla import Cluster, create_statement
+import pytest
+
 
 @pytest.fixture
 def keyspace():
     return "acsylla"
 
+
 @pytest.fixture
 def host():
     return "127.0.0.1"
 
+
 @pytest.fixture
 async def cluster(event_loop, host):
-    return Cluster([host])
+    return create_cluster([host])
+
 
 @pytest.fixture
 async def session(event_loop, cluster, keyspace):
     # Create the acsylla keyspace if it does not exist yet
     session_without_keyspace = await cluster.create_session()
     create_keyspace_statement = create_statement(
-        "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = ".format(keyspace) +
-        "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
+        "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = ".format(keyspace)
+        + "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
     )
     await session_without_keyspace.execute(create_keyspace_statement)
     await session_without_keyspace.close()
@@ -32,27 +34,26 @@ async def session(event_loop, cluster, keyspace):
     # Drop table if exits, will truncate any data used before
     # and will enforce in the next step that if the schema of
     # table changed is used during the tests.
-    create_table_statement = create_statement(
-        "DROP TABLE IF EXISTS test")
+    create_table_statement = create_statement("DROP TABLE IF EXISTS test")
     await session.execute(create_table_statement)
 
     # Create the table test in the acsylla keyspace
     create_table_statement = create_statement(
-        "CREATE TABLE test(id int PRIMARY KEY," +
-        "value int," +
-        "value_int int," +
-        "value_float float," +
-        "value_bool boolean," +
-        "value_text text," +
-        "value_blob blob)"
+        "CREATE TABLE test(id int PRIMARY KEY,"
+        + "value int,"
+        + "value_int int,"
+        + "value_float float,"
+        + "value_bool boolean,"
+        + "value_text text,"
+        + "value_blob blob)"
     )
     await session.execute(create_table_statement)
-
 
     try:
         yield session
     finally:
         await session.close()
+
 
 @pytest.fixture(scope="session")
 def id_generation():

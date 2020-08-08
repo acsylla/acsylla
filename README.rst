@@ -32,16 +32,13 @@ For developing you must clone the respository and first compile the CPP Cassandr
 follow the `instructions <https://docs.datastax.com/en/developer/cpp-driver/2.6/topics/building/>`_
 for installing any dependency that you would need for compiling the driver:
 
+.. note::
+    The driver depends on `libuv`. To install on Mac OS X, do `brew install libuv`.
+
 .. code-block:: bash
 
     git clone git@github.com:pfreixes/acsylla.git
-    cd ascylla/
-    git submodule update --init --recursive
-    cd vendor/cpp-driver
-    mkdir build
-    cd build
-    cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC ..
-    make
+    make install-driver
 
 Set up the environment and compile the package using the following commands:
 
@@ -52,7 +49,12 @@ Set up the environment and compile the package using the following commands:
     make compile
     make install-dev
 
-And finnally run the tests:
+.. note::
+    On Mac OS X, you might need to install openssl `brew install openssl` and then
+    export the location of the libs: `export LDFLAGS="-L/usr/local/opt/openssl/lib"`
+    and `export CPPFLAGS="-I/usr/local/opt/openssl/include"`.
+
+And finally run the tests:
 
 .. code-block:: bash
 

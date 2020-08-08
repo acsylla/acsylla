@@ -1,6 +1,7 @@
 PYTHON ?= python
 PIP ?= pip
 CYTHON ?= cython
+current_dir = $(shell pwd)
 
 _default: compile
 
@@ -22,6 +23,14 @@ setup-build:
 	$(PYTHON) setup.py build_ext --inplace
 
 compile: clean cythonize setup-build
+
+install-driver:
+	echo $(current_dir)
+	git submodule update --init --recursive
+	mkdir -p $(current_dir)/vendor/cpp-driver/build
+	cd $(current_dir)/vendor/cpp-driver/build && \
+		cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC .. && \
+		make
 
 install-dev: compile
 	$(PIP) install -e ".[dev]"

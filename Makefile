@@ -25,7 +25,6 @@ setup-build:
 compile: clean cythonize setup-build
 
 install-driver:
-	echo $(current_dir)
 	git submodule update --init --recursive
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \

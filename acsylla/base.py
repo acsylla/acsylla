@@ -9,6 +9,10 @@ class Cluster(metaclass=ABCMeta):
     for creating a new instance"""
 
     @abstractmethod
+    def __init__(self, contact_points: List[str], protocol_version: int = 3):
+        ...
+
+    @abstractmethod
     async def create_session(self, keyspace: Optional[str] = None) -> "Session":
         """Returns a new session by using the Cluster configuration.
 

@@ -1,7 +1,7 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 
 class Cluster(metaclass=ABCMeta):

@@ -12,7 +12,6 @@ on:
 
 jobs:
   build:
-
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -21,35 +20,31 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: true
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install driver dependencies
-      run: |
-        sudo apt-get install libuv1 libuv1-dev 
-    - name: Compile Cassandra Driver
-      run: |
-        cd vendor/cpp-driver
-        mkdir build
-        cd build
-        cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC ..
-        make
-    - name: Compile and install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        make compile
-        make install-dev
-    - name: Docker dependencies
-      run: |
-        docker-compose up -d
-    - name: Test
-      run: |
-        # wait till casssandra server is up, to be improved
-        # by checking the readiness of the serivce
-        sleep 30
-        docker-compose logs
-        make test
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install driver dependencies
+        run: |
+          sudo apt-get install libuv1 libuv1-dev
+      - name: Compile Cassandra Driver
+        run: |
+          make install-driver
+      - name: Compile and install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          make compile
+          make install-dev
+      - name: Docker dependencies
+        run: |
+          docker-compose up -d
+      - name: Test
+        run: |
+          # wait till casssandra server is up, to be improved
+          # by checking the readiness of the serivce
+          sleep 30
+          docker-compose logs
+          make test

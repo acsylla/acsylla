@@ -1,4 +1,4 @@
-from acsylla import Cluster, create_statement
+from acsylla import create_cluster, create_statement
 
 import argparse
 import asyncio
@@ -82,7 +82,7 @@ async def main():
     )
     args = parser.parse_args()
 
-    cluster = Cluster(["127.0.0.1"])
+    cluster = create_cluster(["127.0.0.1"])
     session = await cluster.create_session(keyspace="acsylla")
     await benchmark("write", write, session, args.concurrency, args.duration)
     await benchmark("read", read, session, args.concurrency, args.duration)

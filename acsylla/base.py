@@ -1,12 +1,16 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 
 class Cluster(metaclass=ABCMeta):
     """Provides a Cluster instance class. Use the factory `create_cluster`
     for creating a new instance"""
+
+    @abstractmethod
+    def __init__(self, contact_points: List[str], protocol_version: int = 3):
+        ...
 
     @abstractmethod
     async def create_session(self, keyspace: Optional[str] = None) -> "Session":

@@ -113,6 +113,11 @@ cdef extern from "cassandra.h":
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
   CassError cass_value_get_int32(const CassValue* value, cass_int32_t * output)
+  CassError cass_value_get_float(const CassValue* value, cass_float_t* output)
+  CassError cass_value_get_bool(const CassValue* value, cass_bool_t* output)
+  CassError cass_value_get_string(const CassValue* value, const char** output, size_t* output_size)
+  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size);
+
 
   CassRow* cass_iterator_get_row(const CassIterator* iterator)
   cass_bool_t cass_iterator_next(CassIterator* iterator)

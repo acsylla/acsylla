@@ -167,3 +167,19 @@ class Value(metaclass=ABCMeta):
     @abstractmethod
     def int(self) -> int:
         """ Returns the int value associated to a column."""
+
+    @abstractmethod
+    def bool(self) -> bool:
+        """ Returns the bool value associated to a column."""
+
+    @abstractmethod
+    def float(self) -> float:
+        """ Returns the float value associated to a column."""
+
+    @abstractmethod
+    def string(self) -> str:
+        """ Returns the string value associated to a column."""
+
+    @abstractmethod
+    def bytes(self) -> bytes:
+        """ Returns the bytes value associated to a column."""

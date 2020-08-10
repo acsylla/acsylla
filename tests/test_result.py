@@ -126,9 +126,5 @@ class TestResult:
         assert values_returned == []
 
     @pytest.mark.xfail
-    async def test_result_types_supported(self, session, id_generation):
-        raise Exception("TODO")
-
-    @pytest.mark.xfail
     async def test_result_more_pages(self, session, id_generation):
         raise Exception("TODO")

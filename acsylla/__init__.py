@@ -1,7 +1,7 @@
 from . import errors
-from ._cython.cyacsylla import Cluster
 from .base import (
     Batch,
+    Cluster,
     PreparedStatement,
     Result,
     Row,

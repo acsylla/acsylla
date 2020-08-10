@@ -33,7 +33,10 @@ follow the `instructions <https://docs.datastax.com/en/developer/cpp-driver/2.6/
 for installing any dependency that you would need for compiling the driver:
 
 .. note::
-    The driver depends on `libuv`. To install on Mac OS X, do `brew install libuv`.
+    The driver depends on `libuv` and `openssl`. To install on Mac OS X, do `brew install libuv`
+    and `brew install openssl` respectively. Additionally, you may need to export openssl lib
+    locations: `export LDFLAGS="-L/usr/local/opt/openssl/lib"`
+    and `export CPPFLAGS="-I/usr/local/opt/openssl/include"`.
 
 .. code-block:: bash
 
@@ -48,11 +51,6 @@ Set up the environment and compile the package using the following commands:
     source venv/bin/activate
     make compile
     make install-dev
-
-.. note::
-    On Mac OS X, you might need to install openssl `brew install openssl` and then
-    export the location of the libs: `export LDFLAGS="-L/usr/local/opt/openssl/lib"`
-    and `export CPPFLAGS="-I/usr/local/opt/openssl/include"`.
 
 And finally run the tests:
 

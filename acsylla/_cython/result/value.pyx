@@ -61,19 +61,18 @@ cdef class Value:
 
         Raises a `ColumnValueError` if the value can not be retrieved"""
         cdef Py_ssize_t length = 0
-        cdef const char* output
+        cdef char* output = NULL
         cdef CassError error
         cdef bytes string
 
-        error = cass_value_get_string(self.cass_value, &output, <size_t*> &length)
+        error = cass_value_get_string(self.cass_value,<const char**> &output, <size_t*> &length)
         if error != CASS_OK:
             raise ColumnValueError()
 
-        try:
-            string = output[:length]
-        finally:
-            free(<void*>output)
-
+        # This pointer does not need to be free up since its an
+        # slice of the buffer kept by the Cassandra driver and related to
+        # the result. When the result is free up all the space will be free up.
+        string = output[:length]
         return string.decode()
             
     def bytes(self):
@@ -81,17 +80,16 @@ cdef class Value:
 
         Raises a `ColumnValueError` if the value can not be retrieved"""
         cdef Py_ssize_t length = 0
-        cdef const cass_byte_t* output
+        cdef cass_byte_t* output = NULL
         cdef CassError error
         cdef bytes bytes_
 
-        error = cass_value_get_bytes(self.cass_value, &output, <size_t*> &length)
+        error = cass_value_get_bytes(self.cass_value, <const cass_byte_t**> &output, <size_t*> &length)
         if error != CASS_OK:
             raise ColumnValueError()
 
-        try:
-            bytes_ = output[:length]
-        finally:
-            free(<void*>output)
- 
+        # This pointer does not need to be free up since its an
+        # slice of the buffer kept by the Cassandra driver and related to
+        # the result. When the result is free up all the space will be free up.
+        bytes_ = output[:length]
         return bytes_

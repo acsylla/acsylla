@@ -71,7 +71,7 @@ cdef class Value:
 
         try:
             string = output[:length]
-        except:
+        finally:
             free(<void*>output)
 
         return string.decode()
@@ -91,7 +91,7 @@ cdef class Value:
 
         try:
             bytes_ = output[:length]
-        except:
+        finally:
             free(<void*>output)
  
         return bytes_

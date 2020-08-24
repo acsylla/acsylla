@@ -1,0 +1,69 @@
+name: PyPi release
+on:
+  push:
+    tags:
+      - v*
+jobs:
+  build:
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Generate manylinux2014-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        mkdir /tmp/acsylla
+        cp -r . /tmp/acsylla
+        docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
+        mkdir dist
+        cp /tmp/acsylla/dist/acsylla-*.whl dist/
+    - name: Linux acceptance test dependencies
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        docker-compose up -d
+    - name: Test generated wheel
+      run: |
+        pip install virtualenv
+        python -m virtualenv env
+        source env/bin/activate
+        rm -f .install-cython
+        make install-dev
+        rm -r acsylla
+        pip install dist/acsylla-*.whl --upgrade
+        make test
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ steps.get_version.outputs.VERSION }}
+        path: test_wheel/acsylla-*.whl
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/download-artifact@v2
+      with:
+        name: ${{ needs.build.outputs.version }}
+        path: wheelhouse/
+    - name: Display content
+      run: ls -R
+      working-directory: wheelhouse/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        packages_dir: wheelhouse/
+        password: ${{ secrets.PYPI_RELEASE_UPLOAD }}
+        repository_url: https://upload.pypi.org/legacy/

@@ -34,6 +34,7 @@ jobs:
         docker-compose up -d
     - name: Test generated wheel
       run: |
+        cp dist/acsylla-*.whl .
         pip install virtualenv
         python -m virtualenv env
         source env/bin/activate
@@ -43,7 +44,7 @@ jobs:
         make install-dev
         sudo apt-get remove libuv1 libuv1-dev
         rm -r acsylla
-        pip install dist/acsylla-*.whl --upgrade
+        pip install acsylla-*.whl --upgrade
         make test
     - name: Get the version
       id: get_version

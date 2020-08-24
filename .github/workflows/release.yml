@@ -38,6 +38,7 @@ jobs:
         python -m virtualenv env
         source env/bin/activate
         rm -f .install-cython
+        make install-driver
         make install-dev
         rm -r acsylla
         pip install dist/acsylla-*.whl --upgrade

@@ -3,6 +3,21 @@ acsylla
 
 WORK IN PROGRESS, use only for developing
 
+Install
+==========
+
+There is an Alpha realease compabitble with Python 3.7 and Python 3.8 for Linux environments uploaded as a Pypi package. Use the following command for installing it:
+
+.. code-block:: bash
+
+    pip install acsylla
+
+If you are using another operating system, like Mac OS, you will need to compile the module by hand, follow the instructions that are described
+in the Developing section.
+
+Usage
+==========
+
 The following snippet shows the minimal stuff that would be needed for creating a new ``Session``
 object for the keyspace ``acsylla`` and then peform a query for reading a set of rows.
 

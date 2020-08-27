@@ -109,7 +109,7 @@ class PreparedStatement(metaclass=ABCMeta):
     `session.create_prepared()` coroutine for creating a new instance"""
 
     @abstractmethod
-    def bind(self) -> Statement:
+    def bind(self, page_size: Optional[int] = None, page_state: Optional[bytes] = None) -> Statement:
         """ Returns a new statment using the prepared."""
 
 
@@ -148,6 +148,21 @@ class Result(metaclass=ABCMeta):
         iterator.
 
         If there is no rows iterator returns no rows.
+        """
+
+    @abstractmethod
+    def has_more_pages(self) -> bool:
+        """ Returns true if there is still pages to be fetched"""
+
+    @abstractmethod
+    def page_state(self) -> bytes:
+        """ Returns a token with the page state for continuing fetching
+        new results.
+
+        Before calling this method you must first checks if there are more
+        results using the `has_more_pages` function, and if there are use the
+        token returned by this function as an argument of the factories for creating
+        an statement for returning the next page.
         """
 
 

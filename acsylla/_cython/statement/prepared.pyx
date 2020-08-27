@@ -14,10 +14,10 @@ cdef class PreparedStatement:
         prepared.cass_prepared = cass_prepared
         return prepared
 
-    def bind(self):
+    def bind(self, object page_size=None, object page_state=None):
         cdef CassStatement* cass_statement
         cdef Statement statement
 
         cass_statement = cass_prepared_bind(self.cass_prepared)
-        statement = Statement.new_from_prepared(cass_statement)
+        statement = Statement.new_from_prepared(cass_statement, page_size, page_state)
         return statement

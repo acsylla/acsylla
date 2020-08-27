@@ -7,7 +7,12 @@ cdef class Statement:
         cass_statement_free(self.cass_statement)
 
     @staticmethod
-    cdef Statement new_from_string(str statement_str, int parameters):
+    cdef Statement new_from_string(
+        str statement_str,
+        int parameters,
+        object page_size,
+        object page_state):
+
         cdef Statement statement
         cdef bytes encoded_statement
 
@@ -20,17 +25,43 @@ cdef class Statement:
             len(encoded_statement),
             parameters
         )
+        statement._set_paging(page_size, page_state)
         return statement
 
     @staticmethod
-    cdef Statement new_from_prepared(CassStatement* cass_statement):
+    cdef Statement new_from_prepared(
+            CassStatement* cass_statement,
+            object page_size,
+            object page_state):
+
         cdef Statement statement
 
         statement = Statement()
         statement.cass_statement = cass_statement
         statement.prepared = 1
+        statement._set_paging(page_size, page_state)
         return statement
 
+    cdef _set_paging(self, object py_page_size, object py_page_state): 
+        cdef CassError error
+        cdef int page_size
+        cdef int length
+        cdef char* page_state = NULL
+
+        if py_page_size is not None:
+            page_size = py_page_size
+            error = cass_statement_set_paging_size(self.cass_statement, page_size)
+            if error != CASS_OK:
+                raise RuntimeError("Error {} trying to set page size".format(error))
+
+        if py_page_state is not None:
+            page_state = py_page_state
+            length = len(py_page_state)
+            error = cass_statement_set_paging_state_token(
+                self.cass_statement, page_state, length);
+            if error != CASS_OK:
+                raise RuntimeError("Error {} trying to set page token state".format(error))
+ 
     cdef _check_bind_error_or_raise(self, CassError error):
         if error == CASS_OK:
             return
@@ -178,7 +209,7 @@ cdef class Statement:
         )
 
 
-def create_statement(str statement_str, int parameters=0):
+def create_statement(str statement_str, int parameters=0, object page_size=None, object page_state=None):
     cdef Statement statement
-    statement = Statement.new_from_string(statement_str, parameters)
+    statement = Statement.new_from_string(statement_str, parameters, page_size, page_state)
     return statement

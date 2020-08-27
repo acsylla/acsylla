@@ -90,6 +90,8 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value);
   CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value);
   CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length);
+  CassError cass_statement_set_paging_size(CassStatement* statement, int page_size);
+  CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size);
 
 
   void cass_statement_free(CassStatement* statement)
@@ -108,6 +110,8 @@ cdef extern from "cassandra.h":
   size_t cass_result_column_count(CassResult* result)
   CassRow* cass_result_first_row(CassResult* result)
   CassIterator* cass_iterator_from_result(const CassResult* result)
+  cass_bool_t cass_result_has_more_pages(const CassResult* result)
+  CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size);
   void cass_result_free(CassResult* result)
 
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)

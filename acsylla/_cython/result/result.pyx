@@ -14,6 +14,39 @@ cdef class Result:
         result.cass_result = cass_result
         return result
 
+    def has_more_pages(self):
+        """ Returns true if there is still pages to be fetched"""
+        cdef cass_bool_t more_pages
+
+        more_pages = cass_result_has_more_pages(self.cass_result)
+        if more_pages == cass_true:
+            return True
+        else:
+            return False
+
+    def page_state(self):
+        """ Returns a token with the page state for continuing fetching
+        new results.
+
+        First checks if there are more results using the `has_more_pages` function,
+        and if there are use this token as an argument of the factories for creating
+        an statement.
+        """
+        cdef Py_ssize_t length = 0
+        cdef char* output = NULL
+        cdef CassError error
+        cdef bytes page_state
+
+        error = cass_result_paging_state_token(self.cass_result, <const char**> &output, <size_t*> &length)
+        if error != CASS_OK:
+            raise RuntimeError("Error {} trying to get the page token state".format(error))
+
+        # This pointer does not need to be free up since its an
+        # slice of the buffer kept by the Cassandra driver and related to
+        # the result. When the result is free up all the space will be free up.
+        page_state = output[:length]
+        return page_state
+
     def count(self):
         """ Returns the total rows of the result"""
         cdef size_t count

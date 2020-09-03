@@ -6,14 +6,18 @@ WORK IN PROGRESS, use only for developing
 Install
 ==========
 
-There is an Alpha realease compabitble with Python 3.7 and Python 3.8 for Linux environments uploaded as a Pypi package. Use the following command for installing it:
+There is an Alpha realease compabitble with Python 3.7 and Python 3.8 for Linux and MacOS environments uploaded as a Pypi package. Use the following
+command for installing it:
 
 .. code-block:: bash
 
     pip install acsylla
 
-If you are using another operating system, like Mac OS, you will need to compile the module by hand, follow the instructions that are described
-in the Developing section.
+For MacOS you would need to install the following libraries for make it work:
+
+.. code-block:: bash
+
+    brew install libuv openssl 
 
 Usage
 ==========

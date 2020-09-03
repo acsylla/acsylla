@@ -14,7 +14,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: [3.7, 3.8]
 
     runs-on: ${{ matrix.os }}
@@ -27,26 +27,40 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install driver dependencies
+      - name: Install Linux driver dependencies
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get install libuv1 libuv1-dev
+      - name: Install Mac driver dependencies
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install cmake libuv openssl
       - name: Compile Cassandra Driver
         run: |
           make install-driver
       - name: Compile and install dependencies
         run: |
           python -m pip install --upgrade pip
+          export LDFLAGS="-L/usr/local/opt/openssl/lib"
+          export CPPFLAGS="-I/usr/local/opt/openssl/include"
           make compile
           make install-dev
       - name: Lint with flake8
         run: |
           make lint
-      - name: Docker dependencies
+      - name: Linux Test dependencies
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           docker-compose up -d
+      - name: Mac Test dependencies
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install cassandra
+          cassandra
       - name: Test
         run: |
           # wait till casssandra server is up, to be improved
           # by checking the readiness of the serivce
           sleep 30
+          cqlsh -e "describe keyspaces"
           make test

@@ -31,7 +31,7 @@ jobs:
         pip install wheel
         make compile
         python setup.py bdist_wheel
-   - name: Test dependencies for macos-wheel
+    - name: Test dependencies for macos-wheel
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
         brew install cassandra

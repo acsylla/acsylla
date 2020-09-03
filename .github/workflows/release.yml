@@ -41,7 +41,7 @@ jobs:
         sleep 30
         cqlsh -e "describe keyspaces"
     - name: Test generated macos-wheel
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.os == 'macos-latest' }}
       run: |
         mkdir test_wheel
         cp dist/acsylla-*.whl test_wheel

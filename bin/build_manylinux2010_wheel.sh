@@ -19,17 +19,26 @@ fi
 cd /io
 
 yum install cmake -y
-yum install libuv libuv-devel -y
+yum install wget -y
 yum install openssl openssl-devel -y
+
+# We need to download the libuv library and compile it
+wget https://dist.libuv.org/dist/v1.9.1/libuv-v1.9.1.tar.gz
+tar -xzvf libuv-v1.9.1.tar.gz
+cd libuv-v1.9.1
+sh autogen.sh
+./configure
+make
+make install
+cd ..
 
 # We compile the driver by hand becuase for an unkown reason
 # we have to provide the following extra flags during the compilatio within
 # the manylinux environment
-# -D LIBUV_LIBRARY=/lib64/libuv.so
 git submodule update --init --recursive
 mkdir -p vendor/cpp-driver/build
 cd vendor/cpp-driver/build
-cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC -D LIBUV_LIBRARY=/lib64/libuv.so ..
+cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC ..
 make
 cd ../../..
 

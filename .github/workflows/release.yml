@@ -9,7 +9,7 @@ jobs:
       version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [macos-latest, ubuntu-latest]
         python-version: [3.7, 3.8]
     runs-on: ${{ matrix.os }}
     steps:
@@ -20,6 +20,42 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Generate macos-wheel
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install cmake libuv openssl
+        make install-driver
+        python -m pip install --upgrade pip
+        export LDFLAGS="-L/usr/local/opt/openssl/lib"
+        export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        pip install wheel
+        make compile
+        python setup.py bdist_wheel
+   - name: Test dependencies for macos-wheel
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install cassandra
+        cassandra
+        # wait till casssandra server is up, to be improved
+        # by checking the readiness of the serivce
+        sleep 30
+        cqlsh -e "describe keyspaces"
+    - name: Test generated macos-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        mkdir test_wheel
+        cp dist/acsylla-*.whl test_wheel
+        pip install virtualenv
+        python -m virtualenv env
+        source env/bin/activate
+        rm -f .install-cython
+        export LDFLAGS="-L/usr/local/opt/openssl/lib"
+        export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        make install-driver
+        make install-dev
+        rm -r acsylla
+        pip install test_wheel/acsylla-*.whl --upgrade
+        make test
     - name: Generate manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
@@ -28,11 +64,12 @@ jobs:
         docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2010_x86_64 /io/bin/build_manylinux2010_wheel.sh
         mkdir dist
         cp /tmp/acsylla/dist/acsylla-*.whl dist/
-    - name: Linux test dependencies
+    - name: Test dependencies for manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         docker-compose up -d
-    - name: Test generated wheel
+    - name: Test generated manylinux2010-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         mkdir test_wheel
         cp dist/acsylla-*.whl test_wheel

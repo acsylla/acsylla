@@ -20,12 +20,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Generate manylinux2014-wheel
+    - name: Generate manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         mkdir /tmp/acsylla
         cp -r . /tmp/acsylla
-        docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
+        docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2010_x86_64 /io/bin/build_manylinux2010_wheel.sh
         mkdir dist
         cp /tmp/acsylla/dist/acsylla-*.whl dist/
     - name: Linux test dependencies

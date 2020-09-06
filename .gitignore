@@ -1,6 +1,7 @@
 .coverage
 .install-cython
 .python-version
+pip-wheel-metadata/
 *.egg-info/
 docs/_build
 .DS_Store

@@ -5,7 +5,7 @@ cdef class Session:
     def __cinit__(self, Cluster cluster, object keyspace):
         self.cass_cluster = cluster.cass_cluster
         self.cass_session = cass_session_new()
-  
+
     def __dealloc__(self):
         cass_session_free(self.cass_session)
 
@@ -14,22 +14,6 @@ cdef class Session:
         self.keyspace = keyspace
         self.closed = 0
         self.connected = 0
-
-    cdef _raise_if_error(self, CassFuture * cass_future):
-        cdef CassError cass_error
-
-        cass_error = cass_future_error_code(cass_future)
-        if cass_error == CASS_OK:
-            return
-
-        if cass_error == CASS_ERROR_LIB_NO_HOSTS_AVAILABLE:
-            raise CassExceptionConnectionError()
-        elif cass_error == CASS_ERROR_SERVER_SYNTAX_ERROR:
-            raise CassExceptionSyntaxError()
-        elif cass_error == CASS_ERROR_SERVER_INVALID_QUERY:
-            raise CassExceptionInvalidQuery()
-        else:
-            raise CassException(cass_error)
 
     async def close(self):
         cdef CassFuture* cass_future
@@ -49,7 +33,8 @@ cdef class Session:
 
         try:
             await cb_wrapper.__await__()
-            self._raise_if_error(cass_future)
+            cass_error = cass_future_error_code(cass_future)
+            raise_if_error(cass_error)
         finally:
             cass_future_free(cass_future)
 
@@ -75,7 +60,8 @@ cdef class Session:
 
         try:
             await cb_wrapper.__await__()
-            self._raise_if_error(cass_future)
+            cass_error = cass_future_error_code(cass_future)
+            raise_if_error(cass_error)
         finally:
             cass_future_free(cass_future)
 
@@ -102,7 +88,8 @@ cdef class Session:
             await cb_wrapper.__await__()
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
-                self._raise_if_error(cass_future)
+                cass_error = cass_future_error_code(cass_future)
+                raise_if_error(cass_error)
 
             result = Result.new_(cass_result)
         finally:
@@ -132,7 +119,8 @@ cdef class Session:
             await cb_wrapper.__await__()
             cass_prepared = cass_future_get_prepared(cass_future)
             if cass_prepared == NULL:
-                self._raise_if_error(cass_future)
+                cass_error = cass_future_error_code(cass_future)
+                raise_if_error(cass_error)
 
             prepared = PreparedStatement.new_(cass_prepared)
         finally:
@@ -162,6 +150,7 @@ cdef class Session:
             await cb_wrapper.__await__()
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
-                self._raise_if_error(cass_future)
+                cass_error = cass_future_error_code(cass_future)
+                raise_if_error(cass_error)
         finally:
             cass_future_free(cass_future)

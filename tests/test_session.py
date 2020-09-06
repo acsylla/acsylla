@@ -1,5 +1,5 @@
 from acsylla import create_batch_unlogged, create_cluster, create_statement
-from acsylla.errors import CassExceptionConnectionError, CassExceptionInvalidQuery, CassExceptionSyntaxError
+from acsylla.errors import CassErrorLibNoHostsAvailable, CassErrorServerInvalidQuery, CassErrorServerSyntaxError
 
 import pytest
 
@@ -23,7 +23,7 @@ class TestSession:
 
     async def test_create_session_invalid_host(self, keyspace):
         cluster = create_cluster(["1.0.0.0"])
-        with pytest.raises(CassExceptionConnectionError):
+        with pytest.raises(CassErrorLibNoHostsAvailable):
             await cluster.create_session(keyspace=keyspace)
 
     async def test_execute(self, session, id_generation):
@@ -37,11 +37,11 @@ class TestSession:
             await session.execute(create_statement("foobar"))
 
     async def test_execute_syntax_error(self, session):
-        with pytest.raises(CassExceptionSyntaxError):
+        with pytest.raises(CassErrorServerSyntaxError):
             await session.execute(create_statement("foobar"))
 
     async def test_execute_invalid_query(self, session):
-        with pytest.raises(CassExceptionInvalidQuery):
+        with pytest.raises(CassErrorServerInvalidQuery):
             await session.execute(create_statement("CREATE TABLE foo(id invalid_type PRIMARY KEY)"))
 
     async def test_create_prepared(self, session):

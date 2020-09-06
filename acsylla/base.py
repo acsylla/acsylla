@@ -173,7 +173,7 @@ class Row(metaclass=ABCMeta):
     def column_by_name(self, name: str) -> "Value":
         """ Returns the row column value called by `name`.
 
-        Raises a `ColumnNotFound` exception if the column can not be found"""
+        Raises a `CassException` derived exception if the column can not be found"""
 
 
 class Value(metaclass=ABCMeta):

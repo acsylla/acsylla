@@ -6,5 +6,3 @@ cdef class Session:
         object keyspace
         bint closed
         bint connected
-
-    cdef _raise_if_error(self, CassFuture * cass_future)

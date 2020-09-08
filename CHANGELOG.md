@@ -1,3 +1,7 @@
+NOT RELEASED YET
+=======
+- Expose the c++ library error definitions as python exceptions
+
 0.1.2a0
 =======
 - Wheel support for MacOS

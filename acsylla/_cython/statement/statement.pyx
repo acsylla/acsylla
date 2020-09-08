@@ -42,7 +42,7 @@ cdef class Statement:
         statement._set_paging(page_size, page_state)
         return statement
 
-    cdef _set_paging(self, object py_page_size, object py_page_state): 
+    cdef _set_paging(self, object py_page_size, object py_page_state):
         cdef CassError error
         cdef int page_size
         cdef int length
@@ -61,11 +61,11 @@ cdef class Statement:
                 self.cass_statement, page_state, length);
             if error != CASS_OK:
                 raise RuntimeError("Error {} trying to set page token state".format(error))
- 
+
     cdef _check_bind_error_or_raise(self, CassError error):
         if error == CASS_OK:
             return
- 
+
         if error == CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS:
             raise ValueError("Index out of band")
         elif error == CASS_ERROR_LIB_NAME_DOES_NOT_EXIST:
@@ -120,7 +120,7 @@ cdef class Statement:
         if self.prepared == 0:
             raise ValueError(
                 "Method only availabe for statements created from prepared statements")
- 
+
     def bind_null_by_name(self, str name):
         cdef bytes bytes_name
 

@@ -35,7 +35,7 @@ cdef class Value:
         raise_if_error(error)
 
         cass_uuid_string(uuid, output)
-        return output.decode('UTF-8')
+        return output.decode()
 
     def float(self):
         """ Returns the float value of a column.

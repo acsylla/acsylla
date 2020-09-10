@@ -45,7 +45,8 @@ async def session(event_loop, cluster, keyspace):
         + "value_float float,"
         + "value_bool boolean,"
         + "value_text text,"
-        + "value_blob blob)"
+        + "value_blob blob,"
+        + "value_uuid uuid)"
     )
     await session.execute(create_table_statement)
 

@@ -207,6 +207,33 @@ cdef class Statement:
                 len(value)
             )
         )
+    def bind_uuid_by_name(self, str name, str value):
+        cdef CassUuid uuid
+        cdef bytes bytes_value
+        cdef bytes bytes_name
+
+        self._check_if_prepared_or_raise()
+
+        bytes_value = value.encode()
+        bytes_name = name.encode()
+
+        cass_uuid_from_string(bytes_value, &uuid)
+        self._check_bind_error_or_raise(
+            cass_statement_bind_uuid_by_name_n(
+                self.cass_statement,
+                bytes_name,
+                len(bytes_name),
+                uuid)
+        )
+
+    def bind_uuid(self, int index, str value):
+        cdef CassUuid uuid
+        cdef bytes bytes_value = value.encode()
+
+        cass_uuid_from_string(bytes_value, &uuid)
+        self._check_bind_error_or_raise(
+            cass_statement_bind_uuid(self.cass_statement, index, uuid)
+        )
 
 
 def create_statement(str statement_str, int parameters=0, object page_size=None, object page_state=None):

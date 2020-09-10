@@ -7,6 +7,9 @@ cdef extern from "cassandra.h":
     cass_false = 0
     cass_true = 1
 
+  cdef enum:
+    CASS_UUID_STRING_LENGTH
+
   ctypedef enum CassError:
     CASS_OK
     CASS_ERROR_LIB_BAD_PARAMS
@@ -116,7 +119,10 @@ cdef extern from "cassandra.h":
   ctypedef struct CassBatch:
     pass
 
-  ctypedef void (*CassFutureCallback)(CassFuture* future, void* data);
+  ctypedef struct CassUuid:
+    pass
+
+  ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
 
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
@@ -140,23 +146,26 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_bool(CassStatement* statement, size_t index, cass_bool_t value)
   CassError cass_statement_bind_string_n(CassStatement* statement, size_t index, const char* value, size_t value_length)
   CassError cass_statement_bind_bytes(CassStatement* statement, size_t index, const cass_byte_t* value, size_t value_length)
+  CassError cass_statement_bind_uuid(CassStatement* statement, size_t index, CassUuid value)
   CassError cass_statement_bind_bytes_by_name_n(CassStatement* statement, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
   CassError cass_statement_bind_string_by_name_n(CassStatement* statement, const char* name, size_t name_length, const char* value, size_t value_length)
   CassError cass_statement_bind_bool_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_bool_t value)
-  CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value);
-  CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value);
-  CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length);
-  CassError cass_statement_set_paging_size(CassStatement* statement, int page_size);
-  CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size);
+  CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value)
+  CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value)
+  CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length)
+  CassError cass_statement_bind_uuid_by_name_n(CassStatement* statement, const char* name, size_t name_length, CassUuid value)
+  CassError cass_statement_bind_uuid_by_name(CassStatement* statement, const char* name, CassUuid value)
+  CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
+  CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
 
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)
-  CassError cass_future_error_code(CassFuture* future);
+  CassError cass_future_error_code(CassFuture* future)
   CassError cass_future_set_callback(CassFuture* future, CassFutureCallback callback, void* data)
   CassErrorResult* cass_future_get_error_result(CassFuture* future)
   CassResult* cass_future_get_result(CassFuture* future)
-  const CassPrepared* cass_future_get_prepared(CassFuture* future);
+  const CassPrepared* cass_future_get_prepared(CassFuture* future)
 
   CassError cass_error_result_code(CassErrorResult* error_result)
   void cass_error_result_free(CassErrorResult* error_result)
@@ -166,7 +175,7 @@ cdef extern from "cassandra.h":
   CassRow* cass_result_first_row(CassResult* result)
   CassIterator* cass_iterator_from_result(const CassResult* result)
   cass_bool_t cass_result_has_more_pages(const CassResult* result)
-  CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size);
+  CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size)
   void cass_result_free(CassResult* result)
 
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
@@ -175,17 +184,20 @@ cdef extern from "cassandra.h":
   CassError cass_value_get_float(const CassValue* value, cass_float_t* output)
   CassError cass_value_get_bool(const CassValue* value, cass_bool_t* output)
   CassError cass_value_get_string(const CassValue* value, const char** output, size_t* output_size)
-  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size);
-  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size);
-
+  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size)
+  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size)
+  CassError cass_value_get_uuid(const CassValue* value, CassUuid* output)
   CassRow* cass_iterator_get_row(const CassIterator* iterator)
   cass_bool_t cass_iterator_next(CassIterator* iterator)
   void cass_iterator_free(CassIterator* iterator)
 
-  CassStatement* cass_prepared_bind(const CassPrepared* prepared);
-  void cass_prepared_free(const CassPrepared* prepared);
+  CassStatement* cass_prepared_bind(const CassPrepared* prepared)
+  void cass_prepared_free(const CassPrepared* prepared)
 
 
   CassBatch* cass_batch_new(CassBatchType type)
   CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
   void cass_batch_free(CassBatch* cass_batch)
+
+  CassError cass_uuid_from_string(const char* str, CassUuid* output)
+  void cass_uuid_string(CassUuid uuid, char* output)

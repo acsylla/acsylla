@@ -2,6 +2,7 @@
 .install-cython
 .python-version
 pip-wheel-metadata/
+.mypy_cache/
 *.egg-info/
 docs/_build
 .DS_Store

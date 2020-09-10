@@ -12,11 +12,11 @@ class TestStatement:
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def statement(self, request, session):
         statement_str = (
-            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values "
-            + "(?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob, value_uuid) values "  # noqa
+            + "(?, ?, ?, ?, ?, ?, ?, ?)"
         )
         if request.param == "none_prepared":
-            statement_ = create_statement(statement_str, parameters=7)
+            statement_ = create_statement(statement_str, parameters=8)
         elif request.param == "prepared":
             prepared = await session.create_prepared(statement_str)
             statement_ = prepared.bind()
@@ -71,6 +71,9 @@ class TestStatement:
         with pytest.raises(ValueError):
             statement.bind_bytes(TestStatement.OUT_OF_BAND_PARAMETER, b"acsylla")
 
+    def test_bind_uuid(self, statement):
+        statement.bind_uuid(7, "550e8400-e29b-41d4-a716-446655440000")
+
 
 class TestStatementOnlyPrepared:
     """Special tests for testing some methods that are only allowed for statements
@@ -79,8 +82,8 @@ class TestStatementOnlyPrepared:
     @pytest.fixture
     async def statement(self, session):
         statement_str = (
-            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob) values "
-            + "(?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO test (id, value, value_int, value_float, value_bool, value_text, value_blob, value_uuid) values "  # noqa
+            + "(?, ?, ?, ?, ?, ?, ?, ?)"
         )
         prepared = await session.create_prepared(statement_str)
         statement_ = prepared.bind()
@@ -95,6 +98,9 @@ class TestStatementOnlyPrepared:
 
     def test_bind_int_by_name(self, statement):
         statement.bind_int_by_name("value_int", 10)
+
+    def test_bind_uuid_by_name(self, statement):
+        statement.bind_uuid_by_name("value_uuid", "550e8400-e29b-41d4-a716-446655440000")
 
     def test_bind_int_by_name_invalid_name(self, statement):
         with pytest.raises(ValueError):

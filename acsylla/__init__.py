@@ -1,4 +1,4 @@
-from . import errors
+from . import errors, utils
 from .base import (
     Batch,
     Cluster,
@@ -30,4 +30,5 @@ __all__ = (
     "create_batch_logged",
     "create_batch_unlogged",
     "errors",
+    "utils",
 )

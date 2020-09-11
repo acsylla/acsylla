@@ -26,6 +26,15 @@ cdef class Value:
 
         return output
 
+    def timeuuid(self):
+        cdef CassError error
+        cdef CassUuid uuid
+
+        error = cass_value_get_uuid(self.cass_value, &uuid)
+        raise_if_error(error)
+
+        return cass_uuid_timestamp(uuid)
+
     def uuid(self):
         cdef char output[CASS_UUID_STRING_LENGTH]
         cdef CassError error

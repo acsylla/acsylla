@@ -1,4 +1,4 @@
-def uuid_max_from_timestamp(int timestamp):
+def uuid_max_from_timestamp(double timestamp):
     cdef CassUuid uuid
     cdef char output[CASS_UUID_STRING_LENGTH]
 
@@ -7,7 +7,7 @@ def uuid_max_from_timestamp(int timestamp):
     return output.decode()
 
 
-def uuid_min_from_timestamp(int timestamp):
+def uuid_min_from_timestamp(double timestamp):
     cdef CassUuid uuid
     cdef char output[CASS_UUID_STRING_LENGTH]
 

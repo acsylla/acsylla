@@ -76,6 +76,10 @@ class Statement(metaclass=ABCMeta):
     def bind_bytes(self, index: int, value: bytes) -> None:
         """ Binds the bytes value to a specific index parameter."""
 
+    @abstractmethod
+    def bind_uuid(self, index: int, value: str) -> None:
+        """ Binds the str value of a uuid to a specific index parameter."""
+
     # following methods are only allowed for statements
     # created using prepared statements
 
@@ -102,6 +106,10 @@ class Statement(metaclass=ABCMeta):
     @abstractmethod
     def bind_bytes_by_name(self, name: str, value: bytes) -> None:
         """ Binds the bytes value to a specific parameter."""
+
+    @abstractmethod
+    def bind_uuid_by_name(self, name: str, value: str) -> None:
+        """ Binds the str value for a uuid to a specific index parameter."""
 
 
 class PreparedStatement(metaclass=ABCMeta):
@@ -198,3 +206,7 @@ class Value(metaclass=ABCMeta):
     @abstractmethod
     def bytes(self) -> bytes:
         """ Returns the bytes value associated to a column."""
+
+    @abstractmethod
+    def uuid(self) -> str:
+        """ Returns the str value of the uuid associated to a column."""

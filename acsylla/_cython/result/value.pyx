@@ -26,6 +26,17 @@ cdef class Value:
 
         return output
 
+    def uuid(self):
+        cdef char output[CASS_UUID_STRING_LENGTH]
+        cdef CassError error
+        cdef CassUuid uuid
+
+        error = cass_value_get_uuid(self.cass_value, &uuid)
+        raise_if_error(error)
+
+        cass_uuid_string(uuid, output)
+        return output.decode()
+
     def float(self):
         """ Returns the float value of a column.
 

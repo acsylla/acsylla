@@ -1,7 +1,6 @@
-from acsylla import create_statement, utils
+from acsylla import create_statement
 
 import pytest
-import time
 
 pytestmark = pytest.mark.asyncio
 
@@ -57,40 +56,6 @@ class TestValue:
         row = result.first()
 
         assert row.column_by_name("value_uuid").uuid() == value
-
-    async def test_timeuuid(self, session, id_generation):
-        id_ = next(id_generation)
-
-        timestamp = time.time()
-        value_uuid = utils.uuid_max_from_timestamp(timestamp)
-
-        insert_statement = create_statement("INSERT INTO test (id, value_uuid) values (?, ?)", parameters=2)
-        insert_statement.bind_int(0, id_)
-        insert_statement.bind_uuid(1, value_uuid)
-        await session.execute(insert_statement)
-
-        select_statement = create_statement("SELECT value_uuid FROM test WHERE ( id = ? )", parameters=1)
-        select_statement.bind_int(0, id_)
-        result = await session.execute(select_statement)
-
-        row = result.first()
-
-        assert int(row.column_by_name("value_uuid").timeuuid()) == int(timestamp)
-
-        value_uuid = utils.uuid_min_from_timestamp(timestamp)
-
-        insert_statement = create_statement("INSERT INTO test (id, value_uuid) values (?, ?)", parameters=2)
-        insert_statement.bind_int(0, id_)
-        insert_statement.bind_uuid(1, value_uuid)
-        await session.execute(insert_statement)
-
-        select_statement = create_statement("SELECT value_uuid FROM test WHERE ( id = ? )", parameters=1)
-        select_statement.bind_int(0, id_)
-        result = await session.execute(select_statement)
-
-        row = result.first()
-
-        assert int(row.column_by_name("value_uuid").timeuuid()) == int(timestamp)
 
     async def test_bool(self, session, id_generation):
         id_ = next(id_generation)

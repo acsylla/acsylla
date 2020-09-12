@@ -3,8 +3,6 @@ types in your functions."""
 from abc import ABCMeta, abstractmethod
 from typing import Iterable, List, Optional
 
-import cython
-
 
 class Cluster(metaclass=ABCMeta):
     """Provides a Cluster instance class. Use the factory `create_cluster`
@@ -208,10 +206,6 @@ class Value(metaclass=ABCMeta):
     @abstractmethod
     def bytes(self) -> bytes:
         """ Returns the bytes value associated to a column."""
-
-    @abstractmethod
-    def timeuuid(self) -> cython.double:
-        """ Returns the float value of the uuid associated to a column."""
 
     @abstractmethod
     def uuid(self) -> str:

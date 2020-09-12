@@ -1,4 +1,4 @@
-from . import errors, utils
+from . import errors
 from .base import (
     Batch,
     Cluster,

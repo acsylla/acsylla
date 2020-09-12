@@ -203,7 +203,3 @@ cdef extern from "cassandra.h":
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)
   void cass_uuid_string(CassUuid uuid, char* output)
-  cass_uint64_t cass_uuid_timestamp(CassUuid uuid)
-
-  void cass_uuid_min_from_time(cass_uint64_t time, CassUuid* output)
-  void cass_uuid_max_from_time(cass_uint64_t time, CassUuid* output)

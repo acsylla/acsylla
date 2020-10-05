@@ -2,6 +2,8 @@ NOT RELEASED YET
 =======
 - Expose the c++ library error definitions as python exceptions
 - UUID: bindings and value method.
+- Add support for configuring a timeout during cluster, statement, prepared and batch creation time. Timeouts
+are expressed in seconds.
 
 0.1.2a0
 =======

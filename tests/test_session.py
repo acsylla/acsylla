@@ -22,7 +22,7 @@ class TestSession:
         await session.close()
 
     async def test_create_session_invalid_host(self, keyspace):
-        cluster = create_cluster(["1.0.0.0"])
+        cluster = create_cluster(["1.0.0.0"], connect_timeout=0.1)
         with pytest.raises(CassErrorLibNoHostsAvailable):
             await cluster.create_session(keyspace=keyspace)
 

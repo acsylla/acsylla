@@ -11,7 +11,8 @@ cdef class Statement:
         str statement_str,
         int parameters,
         object page_size,
-        object page_state):
+        object page_state,
+        object timeout):
 
         cdef Statement statement
         cdef bytes encoded_statement
@@ -26,13 +27,15 @@ cdef class Statement:
             parameters
         )
         statement._set_paging(page_size, page_state)
+        statement._set_timeout(timeout)
         return statement
 
     @staticmethod
     cdef Statement new_from_prepared(
             CassStatement* cass_statement,
             object page_size,
-            object page_state):
+            object page_state,
+            object timeout):
 
         cdef Statement statement
 
@@ -40,6 +43,7 @@ cdef class Statement:
         statement.cass_statement = cass_statement
         statement.prepared = 1
         statement._set_paging(page_size, page_state)
+        statement._set_timeout(timeout)
         return statement
 
     cdef _set_paging(self, object py_page_size, object py_page_state):
@@ -61,6 +65,18 @@ cdef class Statement:
                 self.cass_statement, page_state, length);
             if error != CASS_OK:
                 raise RuntimeError("Error {} trying to set page token state".format(error))
+
+    cdef _set_timeout(self, object timeout):
+        cdef CassError error
+        cdef int timeout_ms
+
+        if timeout is None:
+            return
+
+        timeout_ms = int(timeout * 1000)
+        error = cass_statement_set_request_timeout(self.cass_statement, timeout_ms)
+        if error != CASS_OK:
+            raise RuntimeError("Error {} trying to set the timeout".format(error))
 
     cdef _check_bind_error_or_raise(self, CassError error):
         if error == CASS_OK:
@@ -236,7 +252,12 @@ cdef class Statement:
         )
 
 
-def create_statement(str statement_str, int parameters=0, object page_size=None, object page_state=None):
+def create_statement(
+    str statement_str,
+    int parameters=0,
+    object page_size=None,
+    object page_state=None,
+    object timeout=None):
     cdef Statement statement
-    statement = Statement.new_from_string(statement_str, parameters, page_size, page_state)
+    statement = Statement.new_from_string(statement_str, parameters, page_size, page_state, timeout)
     return statement

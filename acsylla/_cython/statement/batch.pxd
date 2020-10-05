@@ -3,4 +3,4 @@ cdef class Batch:
         CassBatch* cass_batch
 
     @staticmethod
-    cdef Batch new_(CassBatchType type_)
+    cdef Batch new_(CassBatchType type_, object timeout)

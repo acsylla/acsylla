@@ -1,6 +1,7 @@
 cdef class PreparedStatement:
     cdef:
         const CassPrepared* cass_prepared
+        object timeout
 
     @staticmethod
-    cdef PreparedStatement new_(const CassPrepared* cass_prepared)
+    cdef PreparedStatement new_(const CassPrepared* cass_prepared, object timeout)

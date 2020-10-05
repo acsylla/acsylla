@@ -36,6 +36,14 @@ class TestBatch:
         batch = create_batch_unlogged()
         assert batch is not None
 
+    def test_create_batch_logged_with_timeout(self):
+        batch = create_batch_logged(timeout=1.0)
+        assert batch is not None
+
+    def test_create_batch_unlogged_with_timeout(self):
+        batch = create_batch_unlogged(timeout=1.0)
+        assert batch is not None
+
     def test_add_statement(self, batch, statement):
         # just check that does not raise any error
         batch.add_statement(statement)

@@ -1,16 +1,12 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, List, Optional
+from typing import Iterable, Optional
 
 
 class Cluster(metaclass=ABCMeta):
     """Provides a Cluster instance class. Use the factory `create_cluster`
     for creating a new instance"""
-
-    @abstractmethod
-    def __init__(self, contact_points: List[str], protocol_version: int = 3):
-        ...
 
     @abstractmethod
     async def create_session(self, keyspace: Optional[str] = None) -> "Session":
@@ -40,8 +36,12 @@ class Session(metaclass=ABCMeta):
         """ Executes an statement and returns the result."""
 
     @abstractmethod
-    async def create_prepared(self, statement: str) -> "PreparedStatement":
-        """ Prepares an statement."""
+    async def create_prepared(self, statement: str, timeout: Optional[float] = None) -> "PreparedStatement":
+        """ Prepares an statement.
+
+        By providing a `timeout` all requests built by the prepared statement will use it,
+        otherwise timeout provided during the Cluster instantantation will be used. Value expected is seconds.
+        """
 
     @abstractmethod
     async def execute_batch(self, batch: "Batch") -> None:

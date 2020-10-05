@@ -25,6 +25,10 @@ class TestStatement:
 
         return statement_
 
+    def test_create_with_timeout(self):
+        statement = create_statement("INSERT INTO test (id) values (1)", timeout=1.0)
+        assert statement is not None
+
     def test_bind_null(self, statement):
         statement.bind_null(1)
 

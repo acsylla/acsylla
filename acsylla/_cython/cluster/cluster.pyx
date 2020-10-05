@@ -12,11 +12,21 @@ cdef class Cluster:
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
 
-    def __init__(self, list contact_points, protocol_version=3):
+    def __init__(
+        self,
+        list contact_points,
+        int protocol_version,
+        float connect_timeout,
+        float request_timeout,
+        float resolve_timeout):
+
         cdef CassProtocolVersion cass_protocol_version
         cdef str contact_points_csv
         cdef bytes contact_points_csv_b
         cdef CassError error
+        cdef int connect_timeout_ms = int(connect_timeout * 1000)
+        cdef int request_timeout_ms = int(request_timeout * 1000)
+        cdef int resolve_timeout_ms = int(resolve_timeout * 1000)
 
         if not contact_points:
             raise ValueError("Contact points can not be an empty list or a None value")
@@ -47,6 +57,10 @@ cdef class Cluster:
         error = cass_cluster_set_protocol_version(self.cass_cluster, cass_protocol_version)
         if error != CASS_OK:
             raise RuntimeError(error)
+
+        cass_cluster_set_connect_timeout(self.cass_cluster, connect_timeout_ms)
+        cass_cluster_set_request_timeout(self.cass_cluster, request_timeout_ms)
+        cass_cluster_set_resolve_timeout(self.cass_cluster, resolve_timeout_ms)
 
     async def create_session(self, keyspace=None):
         session = Session(self, keyspace=keyspace)

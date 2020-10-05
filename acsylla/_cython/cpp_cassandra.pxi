@@ -130,6 +130,9 @@ cdef extern from "cassandra.h":
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
   CassError cass_cluster_set_protocol_version(CassCluster* cluster, int protocol_version)
+  void cass_cluster_set_connect_timeout(CassCluster* cluster, unsigned timeout_ms)
+  void cass_cluster_set_request_timeout(CassCluster* cluster, unsigned timeout_ms)
+  void cass_cluster_set_resolve_timeout(CassCluster* cluster, unsigned timeout_ms)
 
 
   CassSession* cass_session_new()
@@ -142,6 +145,7 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
+  CassError cass_statement_set_request_timeout(CassStatement* statement, cass_uint64_t timeout_ms)
   CassError cass_statement_bind_null(CassStatement* statement, size_t index)
   CassError cass_statement_bind_int32(CassStatement* statement, size_t index, cass_int32_t value)
   CassError cass_statement_bind_float(CassStatement* statement, size_t index, cass_float_t value)
@@ -199,6 +203,7 @@ cdef extern from "cassandra.h":
 
   CassBatch* cass_batch_new(CassBatchType type)
   CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
+  CassError cass_batch_set_request_timeout(CassBatch* batch, cass_uint64_t timeout_ms)
   void cass_batch_free(CassBatch* cass_batch)
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)

@@ -15,7 +15,7 @@ def host():
 
 @pytest.fixture
 async def cluster(event_loop, host):
-    return create_cluster([host], connect_timeout=0.1, request_timeout=0.1, resolve_timeout=0.1)
+    return create_cluster([host], connect_timeout=1.0, request_timeout=1.0, resolve_timeout=1.0)
 
 
 @pytest.fixture

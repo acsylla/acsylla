@@ -2,6 +2,7 @@ ctypedef int cass_int32_t
 ctypedef float cass_float_t
 ctypedef unsigned char cass_byte_t
 ctypedef double cass_uint64_t
+ctypedef double cass_double_t
 
 
 cdef extern from "cassandra.h":
@@ -124,6 +125,38 @@ cdef extern from "cassandra.h":
   ctypedef struct CassUuid:
     pass
 
+  ctypedef struct _requests:
+    cass_uint64_t min
+    cass_uint64_t max
+    cass_uint64_t mean
+    cass_uint64_t stddev
+    cass_uint64_t median
+    cass_uint64_t percentile_75th
+    cass_uint64_t percentile_95th
+    cass_uint64_t percentile_98th
+    cass_uint64_t percentile_99th
+    cass_uint64_t percentile_999th
+    cass_double_t mean_rate
+    cass_double_t one_minute_rate
+    cass_double_t five_minute_rate
+    cass_double_t fifteen_minute_rate
+
+  ctypedef struct _stats:
+    cass_uint64_t total_connections
+    cass_uint64_t _deprecated_available_connections
+    cass_uint64_t _deprecated_exceeded_pending_requests_water_mark
+    cass_uint64_t _deprecated_exceeded_write_bytes_water_mark
+
+  ctypedef struct _errors:
+    cass_uint64_t connection_timeouts
+    cass_uint64_t _deprecated_pending_request_timeouts
+    cass_uint64_t request_timeouts
+
+  ctypedef struct CassMetrics:
+    _requests requests
+    _stats stats
+    _errors errors
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
 
   CassCluster* cass_cluster_new()
@@ -142,6 +175,9 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_execute(CassSession * session, const CassStatement* statement)
   CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length)
   CassFuture* cass_session_execute_batch(CassSession* session, const CassBatch* batch)
+  void cass_session_get_metrics(const CassSession* session, CassMetrics* output);
+
+
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)

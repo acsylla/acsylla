@@ -15,29 +15,6 @@ cdef class Session:
         self.closed = 0
         self.connected = 0
 
-    async def close(self):
-        cdef CassFuture* cass_future
-        cdef CassError cass_error
-
-        cdef CallbackWrapper cb_wrapper
-
-        if self.closed == 1:
-            return
-
-        # Not really closed but on our way
-        # of closing it.
-        self.closed = 1
-
-        cass_future = cass_session_close(self.cass_session)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
-
-        try:
-            await cb_wrapper.__await__()
-            cass_error = cass_future_error_code(cass_future)
-            raise_if_error(cass_error)
-        finally:
-            cass_future_free(cass_future)
-
     async def _connect(self):
         cdef CassFuture* cass_future
         cdef CassError cass_error
@@ -64,6 +41,30 @@ cdef class Session:
             raise_if_error(cass_error)
         finally:
             cass_future_free(cass_future)
+
+    async def close(self):
+        cdef CassFuture* cass_future
+        cdef CassError cass_error
+
+        cdef CallbackWrapper cb_wrapper
+
+        if self.closed == 1:
+            return
+
+        # Not really closed but on our way
+        # of closing it.
+        self.closed = 1
+
+        cass_future = cass_session_close(self.cass_session)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+
+        try:
+            await cb_wrapper.__await__()
+            cass_error = cass_future_error_code(cass_future)
+            raise_if_error(cass_error)
+        finally:
+            cass_future_free(cass_future)
+
 
     async def execute(self, Statement statement):
         """ Execute an statement and returns the result.
@@ -154,3 +155,40 @@ cdef class Session:
                 raise_if_error(cass_error)
         finally:
             cass_future_free(cass_future)
+
+    def metrics(self):
+        """ Returns performance metrics gathered by the driver.
+
+        Returns a `acsylla.Metrics` object.
+        """
+        cdef CassMetrics cass_metrics
+
+        cass_session_get_metrics(self.cass_session, &cass_metrics)
+
+        # Python code is only available at runtime, we can not export this
+        # as a simple Python module and we are forced to do so at runtime.
+        # Otherwise compilation will fail.
+
+        # metrics method should be called from time to time, having a
+        # check or a load the Metrics object should not have a significant
+        # impact.
+        from acsylla import SessionMetrics
+        return SessionMetrics(
+            requests_min=int(cass_metrics.requests.min),
+            requests_max=int(cass_metrics.requests.max),
+            requests_mean=int(cass_metrics.requests.mean),
+            requests_stddev=int(cass_metrics.requests.stddev),
+            requests_median=int(cass_metrics.requests.median),
+            requests_percentile_75th=int(cass_metrics.requests.percentile_75th),
+            requests_percentile_95th=int(cass_metrics.requests.percentile_95th),
+            requests_percentile_98th=int(cass_metrics.requests.percentile_98th),
+            requests_percentile_99th=int(cass_metrics.requests.percentile_99th),
+            requests_percentile_999th=int(cass_metrics.requests.percentile_999th),
+            requests_mean_rate=cass_metrics.requests.mean_rate,
+            requests_one_minute_rate=cass_metrics.requests.one_minute_rate,
+            requests_five_minute_rate=cass_metrics.requests.five_minute_rate,
+            requests_fifteen_minute_rate=cass_metrics.requests.fifteen_minute_rate,
+            stats_total_connections=int(cass_metrics.stats.total_connections),
+            errors_connection_timeouts=int(cass_metrics.errors.connection_timeouts),
+            errors_request_timeouts=int(cass_metrics.errors.request_timeouts)
+        )

@@ -6,6 +6,7 @@ from .base import (
     Result,
     Row,
     Session,
+    SessionMetrics,
     Statement,
     Value,
 )
@@ -25,6 +26,7 @@ __all__ = (
     "Result",
     "Row",
     "Value",
+    "SessionMetrics",
     "create_cluster",
     "create_statement",
     "create_batch_logged",

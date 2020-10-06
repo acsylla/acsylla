@@ -4,6 +4,7 @@ NOT RELEASED YET
 - UUID: bindings and value method.
 - Add support for configuring a timeout during cluster, statement, prepared and batch creation time. Timeouts
 are expressed in seconds.
+- Add support for returning metrics related to a Session. Returned metrics are latencies, rates and statistics.
 
 0.1.2a0
 =======

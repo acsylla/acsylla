@@ -1,6 +1,7 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from typing import Iterable, Optional
 
 
@@ -46,6 +47,10 @@ class Session(metaclass=ABCMeta):
     @abstractmethod
     async def execute_batch(self, batch: "Batch") -> None:
         """ Executes a batch of statements."""
+
+    @abstractmethod
+    async def metrics(self) -> "SessionMetrics":
+        """ Returns the metrics related to the session."""
 
 
 class Statement(metaclass=ABCMeta):
@@ -210,3 +215,34 @@ class Value(metaclass=ABCMeta):
     @abstractmethod
     def uuid(self) -> str:
         """ Returns the str value of the uuid associated to a column."""
+
+
+@dataclass
+class SessionMetrics:
+    """ Provides basic metrics for the Session."""
+
+    # requests time statistics in microseconds.
+    requests_min: int
+    requests_max: int
+    requests_mean: int
+    requests_stddev: int
+    requests_median: int
+    requests_percentile_75th: int
+    requests_percentile_95th: int
+    requests_percentile_98th: int
+    requests_percentile_99th: int
+    requests_percentile_999th: int
+
+    # requests rate, requests per second
+    requests_mean_rate: float
+    requests_one_minute_rate: float
+    requests_five_minute_rate: float
+    requests_fifteen_minute_rate: float
+
+    # Total connections available
+    stats_total_connections: int
+
+    # counters of timeouts at connection and
+    # request level
+    errors_connection_timeouts: int
+    errors_request_timeouts: int

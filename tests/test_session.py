@@ -71,3 +71,32 @@ class TestSession:
         await session.close()
         with pytest.raises(RuntimeError):
             await session.execute_batch(create_batch_unlogged())
+
+    async def test_metrics(self, session, id_generation):
+        # just for the sake of populate some metrics
+        key_and_value = str(next(id_generation))
+        statement = create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
+        await session.execute(statement)
+
+        metrics = session.metrics()
+
+        assert metrics.requests_min > 0
+        assert metrics.requests_max > 0
+        assert metrics.requests_mean > 0
+        assert metrics.requests_stddev > 0
+        assert metrics.requests_median > 0
+        assert metrics.requests_percentile_75th > 0
+        assert metrics.requests_percentile_95th > 0
+        assert metrics.requests_percentile_98th > 0
+        assert metrics.requests_percentile_99th > 0
+        assert metrics.requests_percentile_999th > 0
+        assert metrics.requests_mean_rate > 0.0
+
+        # TODO: driver reports 0.0, why?
+        # assert metrics.requests_five_minute_rate > 0.0
+        # assert metrics.requests_one_minute_rate > 0.0
+        # assert metrics.requests_fifteen_minute_rate > 0.0
+
+        assert metrics.stats_total_connections > 0
+        assert metrics.errors_connection_timeouts == 0
+        assert metrics.errors_request_timeouts == 0

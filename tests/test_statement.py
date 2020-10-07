@@ -1,4 +1,4 @@
-from acsylla import create_statement
+from acsylla import Consistency, create_statement
 
 import pytest
 
@@ -27,6 +27,26 @@ class TestStatement:
 
     def test_create_with_timeout(self):
         statement = create_statement("INSERT INTO test (id) values (1)", timeout=1.0)
+        assert statement is not None
+
+    @pytest.mark.parametrize(
+        "consistency",
+        [
+            Consistency.ANY,
+            Consistency.ONE,
+            Consistency.TWO,
+            Consistency.THREE,
+            Consistency.QUORUM,
+            Consistency.ALL,
+            Consistency.LOCAL_QUORUM,
+            Consistency.EACH_QUORUM,
+            Consistency.SERIAL,
+            Consistency.LOCAL_SERIAL,
+            Consistency.LOCAL_ONE,
+        ],
+    )
+    async def test_create_with_consistency(self, consistency):
+        statement = create_statement("INSERT INTO test (id) values (1)", consistency=consistency)
         assert statement is not None
 
     def test_bind_null(self, statement):

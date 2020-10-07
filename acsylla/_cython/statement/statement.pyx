@@ -12,7 +12,8 @@ cdef class Statement:
         int parameters,
         object page_size,
         object page_state,
-        object timeout):
+        object timeout,
+        object consistency):
 
         cdef Statement statement
         cdef bytes encoded_statement
@@ -28,6 +29,7 @@ cdef class Statement:
         )
         statement._set_paging(page_size, page_state)
         statement._set_timeout(timeout)
+        statement._set_consistency(consistency)
         return statement
 
     @staticmethod
@@ -35,7 +37,8 @@ cdef class Statement:
             CassStatement* cass_statement,
             object page_size,
             object page_state,
-            object timeout):
+            object timeout,
+            object consistency):
 
         cdef Statement statement
 
@@ -44,6 +47,7 @@ cdef class Statement:
         statement.prepared = 1
         statement._set_paging(page_size, page_state)
         statement._set_timeout(timeout)
+        statement._set_consistency(consistency)
         return statement
 
     cdef _set_paging(self, object py_page_size, object py_page_state):
@@ -77,6 +81,18 @@ cdef class Statement:
         error = cass_statement_set_request_timeout(self.cass_statement, timeout_ms)
         if error != CASS_OK:
             raise RuntimeError("Error {} trying to set the timeout".format(error))
+
+    cdef _set_consistency(self, object consistency):
+        cdef CassError error
+        cdef CassConsistency cass_consistency
+
+        if consistency is None:
+            return
+
+        cass_consistency = consistency.value
+        error = cass_statement_set_consistency(self.cass_statement, cass_consistency)
+        raise_if_error(error)
+
 
     cdef _check_bind_error_or_raise(self, CassError error):
         if error == CASS_OK:
@@ -257,7 +273,15 @@ def create_statement(
     int parameters=0,
     object page_size=None,
     object page_state=None,
-    object timeout=None):
+    object timeout=None,
+    object consistency=None):
     cdef Statement statement
-    statement = Statement.new_from_string(statement_str, parameters, page_size, page_state, timeout)
+    statement = Statement.new_from_string(
+        statement_str,
+        parameters,
+        page_size,
+        page_state,
+        timeout,
+        consistency
+    )
     return statement

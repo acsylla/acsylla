@@ -1,5 +1,10 @@
 from . import _cython
-from .base import Batch, Cluster, Statement
+from .base import (
+    Batch,
+    Cluster,
+    Consistency,
+    Statement,
+)
 from typing import List, Optional
 
 
@@ -9,6 +14,7 @@ def create_cluster(
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
     resolve_timeout: float = 1.0,
+    consistency: Consistency = Consistency.LOCAL_ONE,
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -20,9 +26,12 @@ def create_cluster(
 
     If `connect_timeout`, `request_timeout` or `resolve_timeout` are provided they will
     override the default values. Values provided are in seconds.
+
+    If `consistency` is provided the default value would be override, any statment will use
+    by default that consistency level unless it is specificily configured at statement level.
     """
     return _cython.cyacsylla.Cluster(
-        contact_points, protocol_version, connect_timeout, request_timeout, resolve_timeout,
+        contact_points, protocol_version, connect_timeout, request_timeout, resolve_timeout, consistency
     )
 
 
@@ -32,6 +41,7 @@ def create_statement(
     page_size: Optional[int] = None,
     page_state: Optional[bytes] = None,
     timeout: Optional[float] = None,
+    consistency: Optional[Consistency] = None,
 ) -> Statement:
     """
     Creates a new statment.
@@ -45,9 +55,17 @@ def create_statement(
 
     If `timeout` is provided, this will override the request timeout provided during the cluster
     creation. Value expected is in seconds.
+
+    If `consistency` is provided, this will override the consistency value provided during the cluster
+    creation.
     """
     return _cython.cyacsylla.create_statement(
-        statement, parameters=parameters, page_size=page_size, page_state=page_state, timeout=timeout
+        statement,
+        parameters=parameters,
+        page_size=page_size,
+        page_state=page_state,
+        timeout=timeout,
+        consistency=consistency,
     )
 
 

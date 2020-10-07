@@ -1,4 +1,4 @@
-from acsylla import create_cluster, create_statement
+from acsylla import create_cluster, create_statement, Consistency
 
 import argparse
 import asyncio
@@ -14,7 +14,9 @@ MAX_NUMBER_OF_KEYS = 65536
 
 async def write(session, key, value):
     start = time.monotonic()
-    statement = create_statement("INSERT INTO test (id, value) values(" + key + "," + value + ")")
+    statement = create_statement(
+        "INSERT INTO test (id, value) values(" + key + "," + value + ")", consistency=Consistency.ONE
+    )
     await session.execute(statement)
     return time.monotonic() - start
 

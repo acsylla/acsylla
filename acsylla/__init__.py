@@ -2,6 +2,7 @@ from . import errors
 from .base import (
     Batch,
     Cluster,
+    Consistency,
     PreparedStatement,
     Result,
     Row,
@@ -19,6 +20,7 @@ from .factories import (
 
 __all__ = (
     "Cluster",
+    "Consistency",
     "Session",
     "Statement",
     "PreparedStatement",

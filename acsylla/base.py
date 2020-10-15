@@ -1,7 +1,9 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
 from abc import ABCMeta, abstractmethod
+from acsylla._cython import cyacsylla
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterable, Optional
 
 
@@ -246,3 +248,17 @@ class SessionMetrics:
     # request level
     errors_connection_timeouts: int
     errors_request_timeouts: int
+
+
+class Consistency(Enum):
+    ANY = cyacsylla.Consistency.ANY
+    ONE = cyacsylla.Consistency.ONE
+    TWO = cyacsylla.Consistency.TWO
+    THREE = cyacsylla.Consistency.THREE
+    QUORUM = cyacsylla.Consistency.QUORUM
+    ALL = cyacsylla.Consistency.ALL
+    LOCAL_QUORUM = cyacsylla.Consistency.LOCAL_QUORUM
+    EACH_QUORUM = cyacsylla.Consistency.EACH_QUORUM
+    SERIAL = cyacsylla.Consistency.SERIAL
+    LOCAL_SERIAL = cyacsylla.Consistency.LOCAL_SERIAL
+    LOCAL_ONE = cyacsylla.Consistency.LOCAL_ONE

@@ -98,7 +98,7 @@ cdef class Session:
 
         return result
 
-    async def create_prepared(self, str statement, object timeout=None):
+    async def create_prepared(self, str statement, object timeout=None, object consistency=None):
         """ Prepares an statement."""
         cdef CassFuture* cass_future
         cdef CassError cass_error
@@ -123,7 +123,7 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 raise_if_error(cass_error)
 
-            prepared = PreparedStatement.new_(cass_prepared, timeout)
+            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency)
         finally:
             cass_future_free(cass_future)
 

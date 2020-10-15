@@ -13,6 +13,20 @@ cdef extern from "cassandra.h":
   cdef enum:
     CASS_UUID_STRING_LENGTH
 
+  ctypedef enum CassConsistency:
+    CASS_CONSISTENCY_UNKNOWN
+    CASS_CONSISTENCY_ANY
+    CASS_CONSISTENCY_ONE
+    CASS_CONSISTENCY_TWO
+    CASS_CONSISTENCY_THREE
+    CASS_CONSISTENCY_QUORUM
+    CASS_CONSISTENCY_ALL
+    CASS_CONSISTENCY_LOCAL_QUORUM
+    CASS_CONSISTENCY_EACH_QUORUM
+    CASS_CONSISTENCY_SERIAL
+    CASS_CONSISTENCY_LOCAL_SERIAL
+    CASS_CONSISTENCY_LOCAL_ONE
+
   ctypedef enum CassError:
     CASS_OK
     CASS_ERROR_LIB_BAD_PARAMS
@@ -166,7 +180,7 @@ cdef extern from "cassandra.h":
   void cass_cluster_set_connect_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_request_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_resolve_timeout(CassCluster* cluster, unsigned timeout_ms)
-
+  CassError cass_cluster_set_consistency(CassCluster* cluster, CassConsistency consistency)
 
   CassSession* cass_session_new()
   void cass_session_free(CassSession* session)
@@ -199,7 +213,7 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_uuid_by_name(CassStatement* statement, const char* name, CassUuid value)
   CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
-
+  CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)

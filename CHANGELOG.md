@@ -1,4 +1,8 @@
 NOT RELEASED YET
+================
+nothing new
+
+0.1.3a0
 =======
 - Expose the c++ library error definitions as python exceptions
 - UUID: bindings and value method.

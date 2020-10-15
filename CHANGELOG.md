@@ -5,6 +5,7 @@ NOT RELEASED YET
 - Add support for configuring a timeout during cluster, statement, prepared and batch creation time. Timeouts
 are expressed in seconds.
 - Add support for returning metrics related to a Session. Returned metrics are latencies, rates and statistics.
+- Add support for configuring the consistency at cluster, statement and prepared level.
 
 0.1.2a0
 =======

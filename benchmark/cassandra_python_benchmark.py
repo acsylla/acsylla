@@ -16,21 +16,38 @@ thread_start = Condition()
 benchmark_start = Condition()
 
 
-def write(session, key):
+def write(session, key, str_key):
     start = time.monotonic()
-    statement = "INSERT INTO test (id, value) values(" + key + ", " + key + ")"
+    statement = "INSERT INTO test (id, value) values(" + str_key + ", " + str_key + ")"
     session.execute(statement)
     return time.monotonic() - start
 
 
-def read(session, key):
+def read(session, key, str_key):
     start = time.monotonic()
-    statement = "SELECT id, value FROM test WHERE id =" + key
+    statement = "SELECT id, value FROM test WHERE id =" + str_key
     result = session.execute(statement)
     row = result.one()
     if row is not None:
         _ = row[0]
     return time.monotonic() - start
+
+def write_bind(session, key, str_key):
+    start = time.monotonic()
+    statement = "INSERT INTO test (id, value) values(%s, %s)"
+    session.execute(statement, [key, key])
+    return time.monotonic() - start
+
+
+def read_bind(session, key, str_key):
+    start = time.monotonic()
+    statement = "SELECT id, value FROM test WHERE id = %s"
+    result = session.execute(statement, [key])
+    row = result.one()
+    if row is not None:
+        _ = row[0]
+    return time.monotonic() - start
+
 
 
 def run(session, func) -> None:
@@ -47,7 +64,7 @@ def run(session, func) -> None:
 
     while not finish_benchmark:
         key = random.randint(0, MAX_NUMBER_OF_KEYS)
-        latency = func(session, str(key))
+        latency = func(session, key, str(key))
         local_latencies.append(latency)
 
     lock_latencies.acquire()
@@ -114,4 +131,6 @@ if __name__ == "__main__":
     session.row_factory = tuple_factory
 
     benchmark("write", write, session, args.concurrency, args.duration)
+    benchmark("write_bind", write_bind, session, args.concurrency, args.duration)
     benchmark("read", read, session, args.concurrency, args.duration)
+    benchmark("read_bind", read_bind, session, args.concurrency, args.duration)

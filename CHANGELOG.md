@@ -1,6 +1,6 @@
-NOT RELEASED YET
-================
-nothing new
+0.1.4a0
+========
+-  Support for Python 3.9
 
 0.1.3a0
 =======

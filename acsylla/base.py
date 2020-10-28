@@ -9,7 +9,7 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Seq,
+    Sequence,
 )
 
 
@@ -79,7 +79,7 @@ class Statement(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def bind_list(self, values: Seq[Any]) -> None:
+    def bind_list(self, values: Sequence[Any]) -> None:
         """ Binds the values into all parameters from left to right.
 
         For types supported and errors that this function might raise take

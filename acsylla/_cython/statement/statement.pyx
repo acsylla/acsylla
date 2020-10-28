@@ -132,6 +132,15 @@ cdef class Statement:
         )
         raise_if_error(error)
 
+    cdef inline _bind_uuid(self, int index, TypeUUID uuid):
+        cdef CassError error
+        cdef CassUuid cass_uuid
+        cdef bytes bytes_value = uuid.uuid.encode()
+
+        cass_uuid_from_string(bytes_value, &cass_uuid)
+        error = cass_statement_bind_uuid(self.cass_statement, index, cass_uuid)
+        raise_if_error(error)
+
     cdef inline _bind_null_by_name(self, bytes name):
         cdef CassError error
         error = cass_statement_bind_null_by_name_n(self.cass_statement, name, len(name))
@@ -179,19 +188,40 @@ cdef class Statement:
         )
         raise_if_error(error)
 
+    cdef inline _bind_uuid_by_name(self, bytes name, TypeUUID uuid):
+        cdef CassError error
+        cdef CassUuid cass_uuid
+        cdef bytes bytes_value
+
+        bytes_value = uuid.uuid.encode()
+
+        cass_uuid_from_string(bytes_value, &cass_uuid)
+        error = cass_statement_bind_uuid_by_name_n(
+            self.cass_statement,
+            name,
+            len(name),
+            cass_uuid
+        )
+        raise_if_error(error)
+
     cpdef bind(self, int idx, object value):
+
         if value is None:
             self._bind_null(idx)
+        # Bool needs to be the first one, since boolean types
+        # are implemented using integers.
+        elif isinstance(value, bool):
+            self._bind_bool(idx, value)
         elif isinstance(value, int):
             self._bind_int(idx, value)
         elif isinstance(value, float):
             self._bind_float(idx, value)
-        elif isinstance(value, bool):
-            self._bind_bool(idx, value)
         elif isinstance(value, str):
             self._bind_string(idx, value)
         elif isinstance(value, bytes):
             self._bind_bytes(idx, value)
+        elif isinstance(value, TypeUUID):
+            self._bind_uuid(idx, <TypeUUID>value)
         else:
             raise ValueError("Value {} not supported".format(value))
 
@@ -212,16 +242,20 @@ cdef class Statement:
 
         if value is None:
             self._bind_null_by_name(name.encode())
+        # Bool needs to be the first one, since boolean types
+        # are implemented using integers.
+        elif isinstance(value, bool):
+            self._bind_bool_by_name(name.encode(), value)
         elif isinstance(value, int):
             self._bind_int_by_name(name.encode(), value)
         elif isinstance(value, float):
             self._bind_float_by_name(name.encode(), value)
-        elif isinstance(value, bool):
-            self._bind_bool_by_name(name.encode(), value)
         elif isinstance(value, str):
             self._bind_string_by_name(name.encode(), value)
         elif isinstance(value, bytes):
             self._bind_bytes_by_name(name.encode(), value)
+        elif isinstance(value, TypeUUID):
+            self._bind_uuid_by_name(name.encode(), value)
         else:
             raise ValueError("Value {} not supported".format(value))
 

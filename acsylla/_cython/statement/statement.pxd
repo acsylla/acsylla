@@ -20,6 +20,7 @@ cdef class Statement:
     cdef inline _bind_bool(self, int index, object value)
     cdef inline _bind_string(self, int index, str value)
     cdef inline _bind_bytes(self, int index, bytes value)
+    cdef inline _bind_uuid(self, int index, TypeUUID uuid)
 
     cpdef bind_by_name(self, str name, object value)
     cdef inline _bind_null_by_name(self, bytes name)
@@ -28,3 +29,4 @@ cdef class Statement:
     cdef inline _bind_bool_by_name(self, bytes name, object value)
     cdef inline _bind_string_by_name(self, bytes name, str value)
     cdef inline _bind_bytes_by_name(self, bytes name, bytes value)
+    cdef inline _bind_uuid_by_name(self, bytes name, TypeUUID uuid)

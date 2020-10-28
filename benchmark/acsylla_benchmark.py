@@ -14,6 +14,7 @@ MAX_NUMBER_OF_KEYS = 65536
 prepared_statement_write = None
 prepared_statement_read = None
 
+
 async def write(session, key, value, str_key, str_value):
     start = time.monotonic()
     statement = create_statement(
@@ -30,6 +31,7 @@ async def write_bind(session, key, value, *args):
     statement.bind(1, value)
     await session.execute(statement)
     return time.monotonic() - start
+
 
 async def write_bind_list(session, key, value, *args):
     start = time.monotonic()
@@ -64,6 +66,7 @@ async def read(session, key, value, str_key, str_value):
         _ = row.column_by_name("value").int()
 
     return time.monotonic() - start
+
 
 async def read_bind(session, key, value, *args):
     start = time.monotonic()
@@ -111,7 +114,6 @@ async def read_prepared_bind_dict(session, key, value, *args):
         _ = row.column_by_name("value").int()
 
     return time.monotonic() - start
-
 
 
 async def benchmark(desc: str, coro, session, concurrency: int, duration: int) -> None:
@@ -171,13 +173,9 @@ async def main():
 
     cluster = create_cluster(["127.0.0.1"])
     session = await cluster.create_session(keyspace="acsylla")
-    
-    prepared_statement_write = await session.create_prepared(
-        "INSERT INTO test (id, value) values(:id, :value)"
-    )
-    prepared_statement_read = await session.create_prepared(
-        "SELECT id, value FROM test WHERE id = :id"
-    )
+
+    prepared_statement_write = await session.create_prepared("INSERT INTO test (id, value) values(:id, :value)")
+    prepared_statement_read = await session.create_prepared("SELECT id, value FROM test WHERE id = :id")
 
     await benchmark("write", write, session, args.concurrency, args.duration)
     await benchmark("write_bind", write_bind, session, args.concurrency, args.duration)

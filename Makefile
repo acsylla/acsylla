@@ -47,7 +47,7 @@ lint:
 	flake8 --config setup.cfg
 
 mypy:
-	mypy -p acsylla -p tests.test_types
+	mypy -p acsylla -p tests.test_typing
 
 test: 
 	pytest -sv tests

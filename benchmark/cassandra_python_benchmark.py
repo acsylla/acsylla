@@ -32,6 +32,7 @@ def read(session, key, str_key):
         _ = row[0]
     return time.monotonic() - start
 
+
 def write_bind(session, key, str_key):
     start = time.monotonic()
     statement = "INSERT INTO test (id, value) values(%s, %s)"
@@ -47,7 +48,6 @@ def read_bind(session, key, str_key):
     if row is not None:
         _ = row[0]
     return time.monotonic() - start
-
 
 
 def run(session, func) -> None:

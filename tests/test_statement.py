@@ -1,4 +1,9 @@
-from acsylla import Consistency, create_statement
+from acsylla import (
+    Consistency,
+    create_statement,
+    errors,
+    types,
+)
 
 import pytest
 
@@ -49,54 +54,59 @@ class TestStatement:
         statement = create_statement("INSERT INTO test (id) values (1)", consistency=consistency)
         assert statement is not None
 
+    def test_bind_list(self, statement):
+        statement.bind_list(
+            [1, None, 2, 10.0, True, "acsylla", b"acsylla", types.uuid("550e8400-e29b-41d4-a716-446655440000")]
+        )
+
     def test_bind_null(self, statement):
-        statement.bind_null(1)
+        statement.bind(1, None)
 
     def test_bind_null_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_null(TestStatement.OUT_OF_BAND_PARAMETER)
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, None)
 
     def test_bind_int(self, statement):
-        statement.bind_int(2, 10)
+        statement.bind(2, 10)
 
     def test_bind_int_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_int(TestStatement.OUT_OF_BAND_PARAMETER, 10)
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, 10)
 
     def test_bind_float(self, statement):
-        statement.bind_float(3, 10.0)
+        statement.bind(3, 10.0)
 
     def test_bind_float_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_float(TestStatement.OUT_OF_BAND_PARAMETER, 10.0)
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, 10.0)
 
     def test_bind_bool(self, statement):
-        statement.bind_bool(4, True)
-
-    def test_bind_bool_invalid_object(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bool(4, "")
+        statement.bind(4, True)
 
     def test_bind_bool_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bool(TestStatement.OUT_OF_BAND_PARAMETER, True)
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, True)
 
     def test_bind_string(self, statement):
-        statement.bind_string(5, "acsylla")
+        statement.bind(5, "acsylla")
 
     def test_bind_string_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_string(TestStatement.OUT_OF_BAND_PARAMETER, "acsylla")
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, "acsylla")
 
-    def test_bind_bytes(self, statement):
-        statement.bind_bytes(6, b"acsylla")
+    def test_test_bind_uuidbind_bytes(self, statement):
+        statement.bind(6, b"acsylla")
 
     def test_bind_bytes_invalid_index(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bytes(TestStatement.OUT_OF_BAND_PARAMETER, b"acsylla")
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, b"acsylla")
 
     def test_bind_uuid(self, statement):
-        statement.bind_uuid(7, "550e8400-e29b-41d4-a716-446655440000")
+        statement.bind(7, types.uuid("550e8400-e29b-41d4-a716-446655440000"))
+
+    def test_bind_uuid_invalid_index(self, statement):
+        with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, types.uuid("550e8400-e29b-41d4-a716-446655440000"))
 
 
 class TestStatementOnlyPrepared:
@@ -113,51 +123,65 @@ class TestStatementOnlyPrepared:
         statement_ = prepared.bind()
         return statement_
 
+    def test_bind_dict(self, statement):
+        statement.bind_dict(
+            {
+                "id": 1,
+                "value": None,
+                "value_int": 2,
+                "value_float": 10.0,
+                "value_bool": True,
+                "value_text": "acsylla",
+                "value_blob": b"acsylla",
+                "value_uuid": types.uuid("550e8400-e29b-41d4-a716-446655440000"),
+            }
+        )
+
     def test_bind_null_by_name(self, statement):
-        statement.bind_null_by_name("value")
+        statement.bind_by_name("value", None)
 
     def test_bind_null_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_null_by_name("invalid_field")
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", None)
 
     def test_bind_int_by_name(self, statement):
-        statement.bind_int_by_name("value_int", 10)
-
-    def test_bind_uuid_by_name(self, statement):
-        statement.bind_uuid_by_name("value_uuid", "550e8400-e29b-41d4-a716-446655440000")
+        statement.bind_by_name("value_int", 10)
 
     def test_bind_int_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_int_by_name("invalid_field", 10)
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", 10)
+
+    def test_bind_uuid_by_name(self, statement):
+        statement.bind_by_name("value_uuid", types.uuid("550e8400-e29b-41d4-a716-446655440000"))
+
+    def test_bind_uuid_by_name_invalid_name(self, statement):
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", types.uuid("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_float_by_name(self, statement):
-        statement.bind_float_by_name("value_float", 10.0)
+        statement.bind_by_name("value_float", 10.0)
 
     def test_bind_float_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_float_by_name("invalid_field", 10.0)
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", 10.0)
 
     def test_bind_bool_by_name(self, statement):
-        statement.bind_bool_by_name("value_bool", True)
-
-    def test_bind_bool_by_name_invalid_object(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bool_by_name("value_bool", "")
+        statement.bind_by_name("value_bool", True)
 
     def test_bind_bool_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bool_by_name("invalid_field", True)
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", True)
 
     def test_bind_string_by_name(self, statement):
-        statement.bind_string_by_name("value_text", "acsylla")
+        statement.bind_by_name("value_text", "acsylla")
 
     def test_bind_string_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_string_by_name("invalid_field", "acsylla")
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", "acsylla")
 
     def test_bind_bytes_by_name(self, statement):
-        statement.bind_bytes_by_name("value_blob", b"acsylla")
+        statement.bind_by_name("value_blob", b"acsylla")
 
     def test_bind_bytes_by_name_invalid_name(self, statement):
-        with pytest.raises(ValueError):
-            statement.bind_bytes_by_name("invalid_field", b"acsylla")
+        with pytest.raises(errors.CassErrorLibNameDoesNotExist):
+            statement.bind_by_name("invalid_field", b"acsylla")

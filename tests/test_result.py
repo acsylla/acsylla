@@ -38,7 +38,7 @@ class TestResult:
         id_ = next(id_generation)
 
         # try to read a none inserted value
-        select_statement.bind_int(0, id_)
+        select_statement.bind(0, id_)
         result = await session.execute(select_statement)
 
         assert result.count() == 0
@@ -49,12 +49,11 @@ class TestResult:
         value = 100
 
         # insert a new value into the table
-        insert_statement.bind_int(0, id_)
-        insert_statement.bind_int(1, value)
+        insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
 
         # read the new inserted value
-        select_statement.bind_int(0, id_)
+        select_statement.bind(0, id_)
         result = await session.execute(select_statement)
 
         assert result.count() == 1
@@ -86,18 +85,17 @@ class TestResult:
         total_rows = 100
         value = 33
 
-        insert_statement.bind_int(1, value)
+        insert_statement.bind(1, value)
 
         ids = [next(id_generation) for i in range(total_rows)]
 
         # write results
         for id_ in ids:
-            insert_statement.bind_int(0, id_)
+            insert_statement.bind(0, id_)
             await session.execute(insert_statement)
 
         # read all results
-        select_filter_statement.bind_int(0, ids[0])
-        select_filter_statement.bind_int(1, ids[-1])
+        select_filter_statement.bind_list([ids[0], ids[-1]])
         result = await session.execute(select_filter_statement)
 
         assert result.count() == total_rows
@@ -115,8 +113,7 @@ class TestResult:
         ids = [next(id_generation) for i in range(total_rows)]
 
         # try to read unavailable results
-        select_filter_statement.bind_int(0, ids[0])
-        select_filter_statement.bind_int(1, ids[-1])
+        select_filter_statement.bind_list([ids[0], ids[-1]])
         result = await session.execute(select_filter_statement)
 
         assert result.count() == 0
@@ -150,11 +147,11 @@ class TestResult:
         select_statement = "SELECT id, value FROM test WHERE id >= :min and id <= :max ALLOW FILTERING"
 
         statement = create_statement(insert_statement, parameters=2)
-        statement.bind_int(1, value)
+        statement.bind(1, value)
         ids = [next(id_generation) for i in range(total_rows)]
         # write results
         for id_ in ids:
-            statement.bind_int(0, id_)
+            statement.bind(0, id_)
             await session.execute(statement)
 
         # read all results using pagination
@@ -164,8 +161,7 @@ class TestResult:
             statement = await self._build_statement(
                 session, type_, select_statement, 2, page_size=page_size, page_state=page_state
             )
-            statement.bind_int(0, ids[0])
-            statement.bind_int(1, ids[-1])
+            statement.bind_list([ids[0], ids[-1]])
             result = await session.execute(statement)
 
             pages_fetched += 1

@@ -63,7 +63,7 @@ async def read(session, key, value, str_key, str_value):
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_by_name("value").value()
 
     return time.monotonic() - start
 
@@ -75,7 +75,7 @@ async def read_bind(session, key, value, *args):
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_by_name("value").value()
 
     return time.monotonic() - start
 
@@ -87,7 +87,7 @@ async def read_bind_list(session, key, value, *args):
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_by_name("value").value()
 
     return time.monotonic() - start
 
@@ -99,7 +99,7 @@ async def read_prepared_bind_list(session, key, value, *args):
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_by_name("value").value()
 
     return time.monotonic() - start
 
@@ -111,7 +111,7 @@ async def read_prepared_bind_dict(session, key, value, *args):
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_by_name("value").value()
 
     return time.monotonic() - start
 

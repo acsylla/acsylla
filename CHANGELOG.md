@@ -1,3 +1,7 @@
+NOT RELEASED YET
+================
+- Support only Pythonic methods for binding and gathering column values
+
 0.1.4a0
 ========
 -  Support for Python 3.9

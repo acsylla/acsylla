@@ -20,7 +20,7 @@ class TestValue:
 
         row = result.first()
 
-        assert row.column_by_name("value_int").int() == value
+        assert row.column_by_name("value_int").value() == value
 
     async def test_float(self, session, id_generation):
         id_ = next(id_generation)
@@ -36,7 +36,7 @@ class TestValue:
 
         row = result.first()
 
-        assert row.column_by_name("value_float").float() == value
+        assert row.column_by_name("value_float").value() == value
 
     async def test_uuid(self, session, id_generation):
         id_ = next(id_generation)
@@ -52,7 +52,7 @@ class TestValue:
 
         row = result.first()
 
-        assert row.column_by_name("value_uuid").uuid() == uuid.uuid
+        assert row.column_by_name("value_uuid").value() == uuid
 
     async def test_bool(self, session, id_generation):
         id_ = next(id_generation)
@@ -68,7 +68,7 @@ class TestValue:
 
         row = result.first()
 
-        assert row.column_by_name("value_bool").bool() == value
+        assert row.column_by_name("value_bool").value() == value
 
     async def test_string(self, session, id_generation):
         id_ = next(id_generation)
@@ -84,7 +84,7 @@ class TestValue:
 
         row = result.first()
 
-        assert row.column_by_name("value_text").string() == value
+        assert row.column_by_name("value_text").value() == value
 
     async def test_bytes(self, session, id_generation):
         id_ = next(id_generation)
@@ -99,4 +99,4 @@ class TestValue:
         result = await session.execute(select_statement)
         row = result.first()
 
-        assert row.column_by_name("value_blob").bytes() == value
+        assert row.column_by_name("value_blob").value() == value

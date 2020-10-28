@@ -5,12 +5,14 @@ from acsylla._cython import cyacsylla
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
-    Any,
     Iterable,
     Mapping,
     Optional,
     Sequence,
+    Union,
 )
+
+SupportedType = Union[None, int, float, bool, str, bytes, cyacsylla.TypeUUID]
 
 
 class Cluster(metaclass=ABCMeta):
@@ -66,7 +68,7 @@ class Statement(metaclass=ABCMeta):
     `create_statement` factory for creating a new instance"""
 
     @abstractmethod
-    def bind(self, index: int, value: Any) -> None:
+    def bind(self, index: int, value: SupportedType) -> None:
         """ Binds the value to a specific index parameter.
 
         Types support for now: None, bool, int, float, str, bytes, and UUID.
@@ -79,7 +81,7 @@ class Statement(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def bind_list(self, values: Sequence[Any]) -> None:
+    def bind_list(self, values: Sequence[SupportedType]) -> None:
         """ Binds the values into all parameters from left to right.
 
         For types supported and errors that this function might raise take
@@ -90,7 +92,7 @@ class Statement(metaclass=ABCMeta):
     # created using prepared statements
 
     @abstractmethod
-    def bind_by_name(self, name: str) -> None:
+    def bind_by_name(self, name: str, value: SupportedType) -> None:
         """ Binds the the value to a specific parameter by name.
 
         Types support for now: None, bool, int, float, str, bytes, and UUID.
@@ -100,7 +102,7 @@ class Statement(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def bind_dict(self, values: Mapping[str, Any]) -> None:
+    def bind_dict(self, values: Mapping[str, SupportedType]) -> None:
         """ Binds the values into all parameter names. Names are the keys
         of the mapping provided.
 
@@ -185,28 +187,15 @@ class Value(metaclass=ABCMeta):
     """Provides access to a column value of a `Row`"""
 
     @abstractmethod
-    def int(self) -> int:
-        """ Returns the int value associated to a column."""
+    def value(self) -> SupportedType:
+        """ Returns the value associated to a column.
 
-    @abstractmethod
-    def bool(self) -> bool:
-        """ Returns the bool value associated to a column."""
+        Type is inferred by using the Cassandra driver
+        and converted, if supported, to a Python type or one
+        of the extended types provided by Acsylla.
 
-    @abstractmethod
-    def float(self) -> float:
-        """ Returns the float value associated to a column."""
-
-    @abstractmethod
-    def string(self) -> str:
-        """ Returns the string value associated to a column."""
-
-    @abstractmethod
-    def bytes(self) -> bytes:
-        """ Returns the bytes value associated to a column."""
-
-    @abstractmethod
-    def uuid(self) -> str:
-        """ Returns the str value of the uuid associated to a column."""
+        Types support for now: None, bool, int, float, str, bytes, and UUID.
+        """
 
 
 @dataclass

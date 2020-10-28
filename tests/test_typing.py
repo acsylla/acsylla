@@ -35,4 +35,4 @@ async def test_types(host, keyspace, id_generation):
 
     row: Row = result.first()
     value: Value = row.column_by_name("id")
-    _: int = value.int()
+    _: int = value.value()

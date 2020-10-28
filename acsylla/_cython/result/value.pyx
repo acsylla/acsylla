@@ -14,7 +14,27 @@ cdef class Value:
         value.cass_value = cass_value
         return value
 
-    def int(self):
+    def value(self):
+        cdef CassValueType cass_type = cass_value_type(self.cass_value)
+
+        if cass_type == CASS_VALUE_TYPE_UNKNOWN:
+            raise RuntimeError("Value type returned can not be interpreted")
+        elif cass_type == CASS_VALUE_TYPE_INT:
+            return self._int()
+        elif cass_type == CASS_VALUE_TYPE_UUID:
+            return self._uuid()
+        elif cass_type == CASS_VALUE_TYPE_FLOAT:
+            return self._float()
+        elif cass_type == CASS_VALUE_TYPE_BOOLEAN:
+            return self._bool()
+        elif cass_type == CASS_VALUE_TYPE_VARCHAR:
+            return self._string()
+        elif cass_type == CASS_VALUE_TYPE_BLOB:
+            return self._bytes()
+        else:
+            raise ValueError("Type not supported")
+
+    cdef int _int(self):
         """ Returns the int value of a column.
 
         Raises a derived `CassException` if the value can not be retrieved"""
@@ -26,7 +46,7 @@ cdef class Value:
 
         return output
 
-    def uuid(self):
+    cdef TypeUUID _uuid(self):
         cdef char output[CASS_UUID_STRING_LENGTH]
         cdef CassError error
         cdef CassUuid uuid
@@ -35,9 +55,9 @@ cdef class Value:
         raise_if_error(error)
 
         cass_uuid_string(uuid, output)
-        return output.decode()
+        return TypeUUID(output.decode())
 
-    def float(self):
+    cdef float _float(self):
         """ Returns the float value of a column.
 
         Raises a derived `CassException` if the value can not be retrieved"""
@@ -49,7 +69,7 @@ cdef class Value:
 
         return output
 
-    def bool(self):
+    cdef object _bool(self):
         """ Returns the bool value of a column.
 
         Raises a derived `CassException` if the value can not be retrieved"""
@@ -64,7 +84,7 @@ cdef class Value:
         else:
             return False
 
-    def string(self):
+    cdef str _string(self):
         """ Returns the string value of a column.
 
         Raises a derived `CassException` if the value can not be retrieved"""
@@ -82,7 +102,7 @@ cdef class Value:
         string = output[:length]
         return string.decode()
 
-    def bytes(self):
+    cdef bytes _bytes(self):
         """ Returns the bytes value of a column.
 
         Raises a derived `CassException` if the value can not be retrieved"""

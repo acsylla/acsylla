@@ -90,7 +90,6 @@ cdef extern from "cassandra.h":
     CASS_ERROR_SSL_PROTOCOL_ERROR
     CASS_ERROR_SSL_CLOSED
 
-
   ctypedef enum CassProtocolVersion:
     CASS_PROTOCOL_VERSION_V1 = 1
     CASS_PROTOCOL_VERSION_V2 = 2
@@ -102,6 +101,36 @@ cdef extern from "cassandra.h":
     CASS_BATCH_TYPE_LOGGED
     CASS_BATCH_TYPE_UNLOGGED
     CASS_BATCH_TYPE_COUNTER
+
+  ctypedef enum CassValueType:
+    CASS_VALUE_TYPE_UNKNOWN 
+    CASS_VALUE_TYPE_CUSTOM
+    CASS_VALUE_TYPE_ASCII
+    CASS_VALUE_TYPE_BIGINT
+    CASS_VALUE_TYPE_BLOB
+    CASS_VALUE_TYPE_BOOLEAN
+    CASS_VALUE_TYPE_COUNTER
+    CASS_VALUE_TYPE_DECIMAL
+    CASS_VALUE_TYPE_DOUBLE
+    CASS_VALUE_TYPE_FLOAT
+    CASS_VALUE_TYPE_INT
+    CASS_VALUE_TYPE_TEXT
+    CASS_VALUE_TYPE_TIMESTAMP
+    CASS_VALUE_TYPE_UUID
+    CASS_VALUE_TYPE_VARCHAR
+    CASS_VALUE_TYPE_VARINT
+    CASS_VALUE_TYPE_TIMEUUID
+    CASS_VALUE_TYPE_INET
+    CASS_VALUE_TYPE_DATE
+    CASS_VALUE_TYPE_TIME
+    CASS_VALUE_TYPE_SMALL_INT
+    CASS_VALUE_TYPE_TINY_INT
+    CASS_VALUE_TYPE_DURATION
+    CASS_VALUE_TYPE_LIST
+    CASS_VALUE_TYPE_MAP
+    CASS_VALUE_TYPE_SET
+    CASS_VALUE_TYPE_UDT
+    CASS_VALUE_TYPE_TUPLE
 
   ctypedef struct CassCluster:
     pass
@@ -236,6 +265,7 @@ cdef extern from "cassandra.h":
 
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
+  CassValueType cass_value_type(const CassValue* value)
   CassError cass_value_get_int32(const CassValue* value, cass_int32_t * output)
   CassError cass_value_get_float(const CassValue* value, cass_float_t* output)
   CassError cass_value_get_bool(const CassValue* value, cass_bool_t* output)

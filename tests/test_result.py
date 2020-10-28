@@ -62,8 +62,8 @@ class TestResult:
         row = result.first()
 
         # check that the columns have the expected values
-        assert row.column_by_name("id").int() == id_
-        assert row.column_by_name("value").int() == value
+        assert row.column_by_name("id").value() == id_
+        assert row.column_by_name("value").value() == value
 
     async def test_result_invalid_column_name(self, session, id_generation):
         id_ = next(id_generation)
@@ -101,8 +101,8 @@ class TestResult:
         assert result.count() == total_rows
         assert result.column_count() == 2
 
-        ids_returned = [row.column_by_name("id").int() for row in result.all()]
-        values_returned = [row.column_by_name("value").int() for row in result.all()]
+        ids_returned = [row.column_by_name("id").value() for row in result.all()]
+        values_returned = [row.column_by_name("value").value() for row in result.all()]
 
         # values returned are unsorted
         assert sorted(ids_returned) == sorted(ids)

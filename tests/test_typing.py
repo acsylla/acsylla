@@ -7,7 +7,6 @@ from acsylla import (
     Row,
     Session,
     Statement,
-    Value,
 )
 
 import pytest
@@ -34,5 +33,4 @@ async def test_types(host, keyspace, id_generation):
     _: int = result.column_count()
 
     row: Row = result.first()
-    value: Value = row.column_by_name("id")
-    _: int = value.value()
+    _: int = row.column_value("id")

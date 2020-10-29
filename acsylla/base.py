@@ -177,18 +177,10 @@ class Row(metaclass=ABCMeta):
     """Provides access to a row of a `Result`"""
 
     @abstractmethod
-    def column_by_name(self, name: str) -> "Value":
+    def column_value(self, name: str) -> SupportedType:
         """ Returns the row column value called by `name`.
 
-        Raises a `CassException` derived exception if the column can not be found"""
-
-
-class Value(metaclass=ABCMeta):
-    """Provides access to a column value of a `Row`"""
-
-    @abstractmethod
-    def value(self) -> SupportedType:
-        """ Returns the value associated to a column.
+        Raises a `CassException` derived exception if the column can not be found
 
         Type is inferred by using the Cassandra driver
         and converted, if supported, to a Python type or one

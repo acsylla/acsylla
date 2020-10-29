@@ -9,7 +9,6 @@ from .base import (
     Session,
     SessionMetrics,
     Statement,
-    Value,
 )
 from .factories import (
     create_batch_logged,
@@ -27,7 +26,6 @@ __all__ = (
     "Batch",
     "Result",
     "Row",
-    "Value",
     "SessionMetrics",
     "create_cluster",
     "create_statement",

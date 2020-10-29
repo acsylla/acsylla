@@ -93,179 +93,182 @@ cdef class Statement:
         error = cass_statement_set_consistency(self.cass_statement, cass_consistency)
         raise_if_error(error)
 
+    cdef inline _bind_null(self, int index):
+        cdef CassError error
+        error = cass_statement_bind_null(self.cass_statement, index)
+        raise_if_error(error)
 
-    cdef _check_bind_error_or_raise(self, CassError error):
-        if error == CASS_OK:
-            return
+    cdef inline _bind_int(self, int index, int value):
+        cdef CassError error
+        error = cass_statement_bind_int32(self.cass_statement, index, value)
+        raise_if_error(error)
 
-        if error == CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS:
-            raise ValueError("Index out of band")
-        elif error == CASS_ERROR_LIB_NAME_DOES_NOT_EXIST:
-            raise ValueError("Name does not exist")
-        else:
-            raise RuntimeError("Error {} trying to bind the statement".format(error))
+    cdef inline _bind_float(self, int index, float value):
+        cdef CassError error
+        error = cass_statement_bind_float(self.cass_statement, index, value)
+        raise_if_error(error)
 
-    def bind_null(self, int index):
-        self._check_bind_error_or_raise(
-            cass_statement_bind_null(self.cass_statement, index)
-        )
-
-    def bind_int(self, int index, int value):
-        self._check_bind_error_or_raise(
-            cass_statement_bind_int32(self.cass_statement, index, value)
-        )
-
-    def bind_float(self, int index, float value):
-        self._check_bind_error_or_raise(
-            cass_statement_bind_float(self.cass_statement, index, value)
-        )
-
-    def bind_bool(self, int index, object value):
+    cdef inline _bind_bool(self, int index, object value):
+        cdef CassError error
         if value is True:
-            self._check_bind_error_or_raise(
-                cass_statement_bind_bool(self.cass_statement, index, cass_true)
-            )
-        elif value is False:
-            self._check_bind_error_or_raise(
-                cass_statement_bind_bool(self.cass_statement, index, cass_false)
-            )
+            error = cass_statement_bind_bool(self.cass_statement, index, cass_true)
         else:
-            raise ValueError("Value is not boolean")
+            error = cass_statement_bind_bool(self.cass_statement, index, cass_false)
+        raise_if_error(error)
 
-
-    def bind_string(self, int index, str value):
+    cdef inline _bind_string(self, int index, str value):
+        cdef CassError error
         cdef bytes bytes_value = value.encode()
 
-        self._check_bind_error_or_raise(
-            cass_statement_bind_string_n(self.cass_statement, index, bytes_value, len(bytes_value))
+        error = cass_statement_bind_string_n(
+            self.cass_statement, index, bytes_value, len(bytes_value)
         )
+        raise_if_error(error)
 
-    def bind_bytes(self, int index, bytes value):
-        self._check_bind_error_or_raise(
-            cass_statement_bind_bytes(self.cass_statement, index, <const cass_byte_t*> value, len(value))
+    cdef inline _bind_bytes(self, int index, bytes value):
+        cdef CassError error
+        error = cass_statement_bind_bytes(
+            self.cass_statement, index, <const cass_byte_t*> value, len(value)
         )
+        raise_if_error(error)
 
-    # following methods are only allowed for statements
-    # created using prepared statements
+    cdef inline _bind_uuid(self, int index, TypeUUID uuid):
+        cdef CassError error
+        cdef CassUuid cass_uuid
+        cdef bytes bytes_value = uuid.uuid.encode()
 
-    cdef _check_if_prepared_or_raise(self):
+        cass_uuid_from_string(bytes_value, &cass_uuid)
+        error = cass_statement_bind_uuid(self.cass_statement, index, cass_uuid)
+        raise_if_error(error)
+
+    cdef inline _bind_null_by_name(self, bytes name):
+        cdef CassError error
+        error = cass_statement_bind_null_by_name_n(self.cass_statement, name, len(name))
+        raise_if_error(error)
+
+    cdef inline _bind_int_by_name(self, bytes name, int value):
+        cdef CassError error
+        error = cass_statement_bind_int32_by_name_n(self.cass_statement, name, len(name), value)
+        raise_if_error(error)
+
+    cdef inline _bind_float_by_name(self, bytes name, float value):
+        cdef CassError error
+        error = cass_statement_bind_float_by_name_n(
+            self.cass_statement, name, len(name), value)
+        raise_if_error(error)
+
+    cdef inline _bind_bool_by_name(self, bytes name, object value):
+        cdef CassError error
+        if value is True:
+            error = cass_statement_bind_bool_by_name_n(
+                self.cass_statement, name, len(name), cass_true)
+        else:
+            error = cass_statement_bind_bool_by_name_n(
+                self.cass_statement, name, len(name), cass_false)
+        raise_if_error(error)
+
+    cdef inline _bind_string_by_name(self, bytes name, str value):
+        cdef CassError error
+        cdef bytes bytes_value
+
+        bytes_value = value.encode()
+
+        error = cass_statement_bind_string_by_name_n(
+            self.cass_statement, name, len(name), bytes_value, len(bytes_value))
+        raise_if_error(error)
+
+    cdef inline _bind_bytes_by_name(self, bytes name, bytes value):
+        cdef CassError error
+        error = cass_statement_bind_bytes_by_name_n(
+            self.cass_statement,
+            name,
+            len(name),
+            <const cass_byte_t*> value,
+            len(value)
+        )
+        raise_if_error(error)
+
+    cdef inline _bind_uuid_by_name(self, bytes name, TypeUUID uuid):
+        cdef CassError error
+        cdef CassUuid cass_uuid
+        cdef bytes bytes_value
+
+        bytes_value = uuid.uuid.encode()
+
+        cass_uuid_from_string(bytes_value, &cass_uuid)
+        error = cass_statement_bind_uuid_by_name_n(
+            self.cass_statement,
+            name,
+            len(name),
+            cass_uuid
+        )
+        raise_if_error(error)
+
+    cpdef bind(self, int idx, object value):
+
+        if value is None:
+            self._bind_null(idx)
+        # Bool needs to be the first one, since boolean types
+        # are implemented using integers.
+        elif isinstance(value, bool):
+            self._bind_bool(idx, value)
+        elif isinstance(value, int):
+            self._bind_int(idx, value)
+        elif isinstance(value, float):
+            self._bind_float(idx, value)
+        elif isinstance(value, str):
+            self._bind_string(idx, value)
+        elif isinstance(value, bytes):
+            self._bind_bytes(idx, value)
+        elif isinstance(value, TypeUUID):
+            self._bind_uuid(idx, <TypeUUID>value)
+        else:
+            raise ValueError("Value {} not supported".format(value))
+
+
+    def bind_list(self, list values):
+        cdef int idx
+        cdef object value
+
+        idx = 0
+        for value in values:
+            self.bind(idx, value)
+            idx += 1
+
+    cpdef bind_by_name(self, str name, object value):
         if self.prepared == 0:
             raise ValueError(
                 "Method only availabe for statements created from prepared statements")
 
-    def bind_null_by_name(self, str name):
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-        self._check_bind_error_or_raise(
-            cass_statement_bind_null_by_name_n(
-                self.cass_statement, bytes_name, len(bytes_name))
-        )
-
-    def bind_int_by_name(self, str name, int value):
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-        self._check_bind_error_or_raise(
-            cass_statement_bind_int32_by_name_n(
-                self.cass_statement, bytes_name, len(bytes_name), value)
-        )
-
-
-    def bind_float_by_name(self, str name, float value):
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-        self._check_bind_error_or_raise(
-            cass_statement_bind_float_by_name_n(
-                self.cass_statement, bytes_name, len(bytes_name), value)
-        )
-
-
-    def bind_bool_by_name(self, str name, object value):
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-        if value is True:
-            self._check_bind_error_or_raise(
-                cass_statement_bind_bool_by_name_n(
-                    self.cass_statement, bytes_name, len(bytes_name), cass_true)
-            )
-        elif value is False:
-            self._check_bind_error_or_raise(
-                cass_statement_bind_bool_by_name_n(
-                    self.cass_statement, bytes_name, len(bytes_name), cass_false)
-            )
+        if value is None:
+            self._bind_null_by_name(name.encode())
+        # Bool needs to be the first one, since boolean types
+        # are implemented using integers.
+        elif isinstance(value, bool):
+            self._bind_bool_by_name(name.encode(), value)
+        elif isinstance(value, int):
+            self._bind_int_by_name(name.encode(), value)
+        elif isinstance(value, float):
+            self._bind_float_by_name(name.encode(), value)
+        elif isinstance(value, str):
+            self._bind_string_by_name(name.encode(), value)
+        elif isinstance(value, bytes):
+            self._bind_bytes_by_name(name.encode(), value)
+        elif isinstance(value, TypeUUID):
+            self._bind_uuid_by_name(name.encode(), value)
         else:
-            raise ValueError("Value is not boolean")
+            raise ValueError("Value {} not supported".format(value))
 
+    def bind_dict(self, dict values):
+        cdef str name
+        cdef object value
 
-    def bind_string_by_name(self, str name, str value):
-        cdef bytes bytes_name
-        cdef bytes bytes_value
+        if self.prepared == 0:
+            raise ValueError(
+                "Method only availabe for statements created from prepared statements")
 
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-        bytes_value = value.encode()
-
-        self._check_bind_error_or_raise(
-            cass_statement_bind_string_by_name_n(
-                self.cass_statement, bytes_name, len(bytes_name), bytes_value, len(bytes_value)
-            )
-        )
-
-    def bind_bytes_by_name(self, str name, bytes value):
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_name = name.encode()
-
-        self._check_bind_error_or_raise(
-            cass_statement_bind_bytes_by_name_n(
-                self.cass_statement,
-                bytes_name,
-                len(bytes_name),
-                <const cass_byte_t*> value,
-                len(value)
-            )
-        )
-    def bind_uuid_by_name(self, str name, str value):
-        cdef CassUuid uuid
-        cdef bytes bytes_value
-        cdef bytes bytes_name
-
-        self._check_if_prepared_or_raise()
-
-        bytes_value = value.encode()
-        bytes_name = name.encode()
-
-        cass_uuid_from_string(bytes_value, &uuid)
-        self._check_bind_error_or_raise(
-            cass_statement_bind_uuid_by_name_n(
-                self.cass_statement,
-                bytes_name,
-                len(bytes_name),
-                uuid)
-        )
-
-    def bind_uuid(self, int index, str value):
-        cdef CassUuid uuid
-        cdef bytes bytes_value = value.encode()
-
-        cass_uuid_from_string(bytes_value, &uuid)
-        self._check_bind_error_or_raise(
-            cass_statement_bind_uuid(self.cass_statement, index, uuid)
-        )
+        for name, value in values.items():
+            self.bind_by_name(name, value)
 
 
 def create_statement(

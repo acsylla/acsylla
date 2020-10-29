@@ -2,7 +2,7 @@ class ColumnNotFound(CassException):
     pass
 
 
-cdef raise_if_error(CassError cass_error):
+cdef inline raise_if_error(CassError cass_error):
     # Note: consider to use `cass_future_get_error_result` instead to fill the
     #       exception with metadata.
     if cass_error == CASS_OK:

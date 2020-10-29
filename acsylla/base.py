@@ -4,7 +4,15 @@ from abc import ABCMeta, abstractmethod
 from acsylla._cython import cyacsylla
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Optional
+from typing import (
+    Iterable,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
+
+SupportedType = Union[None, int, float, bool, str, bytes, cyacsylla.TypeUUID]
 
 
 class Cluster(metaclass=ABCMeta):
@@ -60,63 +68,47 @@ class Statement(metaclass=ABCMeta):
     `create_statement` factory for creating a new instance"""
 
     @abstractmethod
-    def bind_null(self, index: int) -> None:
-        """ Binds the `null` value to a specific index parameter."""
+    def bind(self, index: int, value: SupportedType) -> None:
+        """ Binds the value to a specific index parameter.
+
+        Types support for now: None, bool, int, float, str, bytes, and UUID.
+
+        If an invalid type is used for a prepared statement this will raise
+        immediately an error. If a none prepared exception is used error will
+        be raised later during the execution statement.
+
+        If an invalid index is used this will raise immediately an error
+        """
 
     @abstractmethod
-    def bind_int(self, index: int, value: int) -> None:
-        """ Binds the int value to a specific index parameter."""
+    def bind_list(self, values: Sequence[SupportedType]) -> None:
+        """ Binds the values into all parameters from left to right.
 
-    @abstractmethod
-    def bind_float(self, index: int, value: float) -> None:
-        """ Binds the float value to a specific index parameter."""
-
-    @abstractmethod
-    def bind_bool(self, index: int, value: bool) -> None:
-        """ Binds the bool value to a specific index parameter."""
-
-    @abstractmethod
-    def bind_string(self, index: int, value: str) -> None:
-        """ Binds the str value to a specific index parameter."""
-
-    @abstractmethod
-    def bind_bytes(self, index: int, value: bytes) -> None:
-        """ Binds the bytes value to a specific index parameter."""
-
-    @abstractmethod
-    def bind_uuid(self, index: int, value: str) -> None:
-        """ Binds the str value of a uuid to a specific index parameter."""
+        For types supported and errors that this function might raise take
+        a look at the `Statement.bind` function.
+        """
 
     # following methods are only allowed for statements
     # created using prepared statements
 
     @abstractmethod
-    def bind_null_by_name(self, name: str) -> None:
-        """ Binds the `null` value to a specific parameter."""
+    def bind_by_name(self, name: str, value: SupportedType) -> None:
+        """ Binds the the value to a specific parameter by name.
+
+        Types support for now: None, bool, int, float, str, bytes, and UUID.
+
+        If an invalid type is used for this will raise immediately an error. If an
+        invalid name is used this will raise immediately an error
+        """
 
     @abstractmethod
-    def bind_int_by_name(self, name: str, value: int) -> None:
-        """ Binds the int value to a specific parameter."""
+    def bind_dict(self, values: Mapping[str, SupportedType]) -> None:
+        """ Binds the values into all parameter names. Names are the keys
+        of the mapping provided.
 
-    @abstractmethod
-    def bind_float_by_name(self, name: str, value: float) -> None:
-        """ Binds the float value to a specific parameter."""
-
-    @abstractmethod
-    def bind_bool_by_name(self, name: str, value: bool) -> None:
-        """ Binds the bool value to a specific parameter."""
-
-    @abstractmethod
-    def bind_string_by_name(self, name: str, value: str) -> None:
-        """ Binds the str value to a specific parameter."""
-
-    @abstractmethod
-    def bind_bytes_by_name(self, name: str, value: bytes) -> None:
-        """ Binds the bytes value to a specific parameter."""
-
-    @abstractmethod
-    def bind_uuid_by_name(self, name: str, value: str) -> None:
-        """ Binds the str value for a uuid to a specific index parameter."""
+        For types supported and errors that this function might raise take
+        a look at the `Statement.bind_dict` function.
+        """
 
 
 class PreparedStatement(metaclass=ABCMeta):
@@ -185,38 +177,17 @@ class Row(metaclass=ABCMeta):
     """Provides access to a row of a `Result`"""
 
     @abstractmethod
-    def column_by_name(self, name: str) -> "Value":
+    def column_value(self, name: str) -> SupportedType:
         """ Returns the row column value called by `name`.
 
-        Raises a `CassException` derived exception if the column can not be found"""
+        Raises a `CassException` derived exception if the column can not be found
 
+        Type is inferred by using the Cassandra driver
+        and converted, if supported, to a Python type or one
+        of the extended types provided by Acsylla.
 
-class Value(metaclass=ABCMeta):
-    """Provides access to a column value of a `Row`"""
-
-    @abstractmethod
-    def int(self) -> int:
-        """ Returns the int value associated to a column."""
-
-    @abstractmethod
-    def bool(self) -> bool:
-        """ Returns the bool value associated to a column."""
-
-    @abstractmethod
-    def float(self) -> float:
-        """ Returns the float value associated to a column."""
-
-    @abstractmethod
-    def string(self) -> str:
-        """ Returns the string value associated to a column."""
-
-    @abstractmethod
-    def bytes(self) -> bytes:
-        """ Returns the bytes value associated to a column."""
-
-    @abstractmethod
-    def uuid(self) -> str:
-        """ Returns the str value of the uuid associated to a column."""
+        Types support for now: None, bool, int, float, str, bytes, and UUID.
+        """
 
 
 @dataclass

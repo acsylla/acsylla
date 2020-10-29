@@ -11,23 +11,107 @@ uvloop.install()
 
 MAX_NUMBER_OF_KEYS = 65536
 
+prepared_statement_write = None
+prepared_statement_read = None
 
-async def write(session, key, value):
+
+async def write(session, key, value, str_key, str_value):
     start = time.monotonic()
     statement = create_statement(
-        "INSERT INTO test (id, value) values(" + key + "," + value + ")", consistency=Consistency.ONE
+        "INSERT INTO test (id, value) values(" + str_key + "," + str_value + ")", consistency=Consistency.ONE
     )
     await session.execute(statement)
     return time.monotonic() - start
 
 
-async def read(session, key, value):
+async def write_bind(session, key, value, *args):
     start = time.monotonic()
-    statement = create_statement("SELECT id, value FROM test WHERE id =" + key)
+    statement = create_statement("INSERT INTO test (id, value) values(?, ?)", parameters=2)
+    statement.bind(0, key)
+    statement.bind(1, value)
+    await session.execute(statement)
+    return time.monotonic() - start
+
+
+async def write_bind_list(session, key, value, *args):
+    start = time.monotonic()
+    statement = create_statement("INSERT INTO test (id, value) values(?, ?)", parameters=2)
+    statement.bind_list([key, value])
+    await session.execute(statement)
+    return time.monotonic() - start
+
+
+async def write_prepared_bind_list(session, key, value, *args):
+    start = time.monotonic()
+    statement = prepared_statement_write.bind()
+    statement.bind_list([key, value])
+    await session.execute(statement)
+    return time.monotonic() - start
+
+
+async def write_prepared_bind_dict(session, key, value, *args):
+    start = time.monotonic()
+    statement = prepared_statement_write.bind()
+    statement.bind_dict({"id": key, "value": value})
+    await session.execute(statement)
+    return time.monotonic() - start
+
+
+async def read(session, key, value, str_key, str_value):
+    start = time.monotonic()
+    statement = create_statement("SELECT id, value FROM test WHERE id =" + str_key)
     result = await session.execute(statement)
     if result.count() > 0:
         row = result.first()
-        _ = row.column_by_name("value").int()
+        _ = row.column_value("value")
+
+    return time.monotonic() - start
+
+
+async def read_bind(session, key, value, *args):
+    start = time.monotonic()
+    statement = create_statement("SELECT id, value FROM test WHERE id = ?", parameters=1)
+    statement.bind(0, key)
+    result = await session.execute(statement)
+    if result.count() > 0:
+        row = result.first()
+        _ = row.column_value("value")
+
+    return time.monotonic() - start
+
+
+async def read_bind_list(session, key, value, *args):
+    start = time.monotonic()
+    statement = create_statement("SELECT id, value FROM test WHERE id = ?", parameters=1)
+    statement.bind_list([key])
+    result = await session.execute(statement)
+    if result.count() > 0:
+        row = result.first()
+        _ = row.column_value("value")
+
+    return time.monotonic() - start
+
+
+async def read_prepared_bind_list(session, key, value, *args):
+    start = time.monotonic()
+    statement = prepared_statement_read.bind()
+    statement.bind_list([key])
+    result = await session.execute(statement)
+    if result.count() > 0:
+        row = result.first()
+        _ = row.column_value("value")
+
+    return time.monotonic() - start
+
+
+async def read_prepared_bind_dict(session, key, value, *args):
+    start = time.monotonic()
+    statement = prepared_statement_read.bind()
+    statement.bind_dict({"id": key})
+    result = await session.execute(statement)
+    if result.count() > 0:
+        row = result.first()
+        _ = row.column_value("value")
 
     return time.monotonic() - start
 
@@ -41,9 +125,11 @@ async def benchmark(desc: str, coro, session, concurrency: int, duration: int) -
         nonlocal not_finish_benchmark
         times = []
         while not_finish_benchmark:
-            key = str(random.randint(0, MAX_NUMBER_OF_KEYS))
+            key = random.randint(0, MAX_NUMBER_OF_KEYS)
             value = key
-            elapsed = await coro(session, key, value)
+            str_key = str(key)
+            str_value = str_key
+            elapsed = await coro(session, key, value, str_key, str_value)
             times.append(elapsed)
         return times
 
@@ -75,6 +161,7 @@ async def benchmark(desc: str, coro, session, concurrency: int, duration: int) -
 
 
 async def main():
+    global prepared_statement_write, prepared_statement_read
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--concurrency", help="Number of concurrency clients, by default 32", type=int, default=32,
@@ -86,8 +173,20 @@ async def main():
 
     cluster = create_cluster(["127.0.0.1"])
     session = await cluster.create_session(keyspace="acsylla")
+
+    prepared_statement_write = await session.create_prepared("INSERT INTO test (id, value) values(:id, :value)")
+    prepared_statement_read = await session.create_prepared("SELECT id, value FROM test WHERE id = :id")
+
     await benchmark("write", write, session, args.concurrency, args.duration)
+    await benchmark("write_bind", write_bind, session, args.concurrency, args.duration)
+    await benchmark("write_bind_list", write_bind_list, session, args.concurrency, args.duration)
+    await benchmark("write_prepared_bind_list", write_prepared_bind_list, session, args.concurrency, args.duration)
+    await benchmark("write_prepared_bind_dict", write_prepared_bind_dict, session, args.concurrency, args.duration)
     await benchmark("read", read, session, args.concurrency, args.duration)
+    await benchmark("read_bind", read_bind, session, args.concurrency, args.duration)
+    await benchmark("read_bind_list", read_bind_list, session, args.concurrency, args.duration)
+    await benchmark("read_prepared_bind_list", read_prepared_bind_list, session, args.concurrency, args.duration)
+    await benchmark("read_prepared_bind_dict", read_prepared_bind_dict, session, args.concurrency, args.duration)
 
 
 if __name__ == "__main__":

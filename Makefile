@@ -50,7 +50,7 @@ mypy:
 	mypy -p acsylla -p tests.test_typing
 
 test: 
-	pytest -sv tests
+	pytest -v tests
 
 stress: 
 	python benchmark/acsylla_benchmark.py --duration 10 --concurrency 32

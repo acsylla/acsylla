@@ -23,6 +23,7 @@ cdef class PreparedStatement:
         cass_statement = cass_prepared_bind(self.cass_prepared)
         statement = Statement.new_from_prepared(
             cass_statement,
+            self.cass_prepared,
             page_size,
             page_state,
             self.timeout,

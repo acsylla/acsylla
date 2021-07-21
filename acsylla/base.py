@@ -177,6 +177,10 @@ class Row(metaclass=ABCMeta):
     """Provides access to a row of a `Result`"""
 
     @abstractmethod
+    def as_dict(self) -> dict:
+        """ Returns the row as dict."""
+
+    @abstractmethod
     def column_value(self, name: str) -> SupportedType:
         """ Returns the row column value called by `name`.
 

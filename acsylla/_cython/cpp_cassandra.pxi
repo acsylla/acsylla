@@ -1,11 +1,18 @@
+ctypedef signed char cass_int8_t
+ctypedef short cass_int16_t
 ctypedef int cass_int32_t
+ctypedef unsigned int cass_uint32_t
+ctypedef long long cass_int64_t
 ctypedef float cass_float_t
 ctypedef unsigned char cass_byte_t
 ctypedef double cass_uint64_t
 ctypedef double cass_double_t
-
+ctypedef cass_uint64_t cass_duration_t
 
 cdef extern from "cassandra.h":
+  cdef enum:
+    CASS_INET_STRING_LENGTH
+
   ctypedef enum cass_bool_t:
     cass_false = 0
     cass_true = 1
@@ -132,6 +139,11 @@ cdef extern from "cassandra.h":
     CASS_VALUE_TYPE_UDT
     CASS_VALUE_TYPE_TUPLE
 
+  ctypedef enum CassCollectionType:
+    CASS_COLLECTION_TYPE_LIST
+    CASS_COLLECTION_TYPE_MAP
+    CASS_COLLECTION_TYPE_SET
+
   ctypedef struct CassCluster:
     pass
 
@@ -166,6 +178,21 @@ cdef extern from "cassandra.h":
     pass
 
   ctypedef struct CassUuid:
+    pass
+
+  ctypedef struct CassInet:
+    pass
+
+  ctypedef struct CassDataType:
+    pass
+
+  ctypedef struct CassCollection:
+    pass
+
+  ctypedef struct CassUserType:
+    pass
+
+  ctypedef struct CassTuple:
     pass
 
   ctypedef struct _requests:
@@ -215,31 +242,60 @@ cdef extern from "cassandra.h":
   void cass_session_free(CassSession* session)
   CassFuture* cass_session_connect(CassSession* session, const CassCluster* cluster)
   CassFuture* cass_session_connect_keyspace_n(CassSession* session,const CassCluster* cluster, const char* keyspace, size_t keyspace_length)
-  CassFuture* cass_session_execute(CassSession * session, const CassStatement* statement)
+  CassFuture* cass_session_execute(CassSession* session, const CassStatement* statement)
   CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length)
   CassFuture* cass_session_execute_batch(CassSession* session, const CassBatch* batch)
   void cass_session_get_metrics(const CassSession* session, CassMetrics* output);
 
-
+  CassError cass_prepared_parameter_name(const CassPrepared* prepared, size_t index, const char** name, size_t* name_length)
+  CassDataType* cass_prepared_parameter_data_type(const CassPrepared* prepared, size_t index)
+  CassDataType* cass_prepared_parameter_data_type_by_name(const CassPrepared* prepared,const char * name);
   CassFuture* cass_session_close(CassSession* session)
 
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
   CassError cass_statement_set_request_timeout(CassStatement* statement, cass_uint64_t timeout_ms)
   CassError cass_statement_bind_null(CassStatement* statement, size_t index)
+  CassError cass_statement_bind_int8(CassStatement* statement, size_t index, cass_int8_t value)
+  CassError cass_statement_bind_int16(CassStatement* statement, size_t index, cass_int16_t value)
   CassError cass_statement_bind_int32(CassStatement* statement, size_t index, cass_int32_t value)
+  CassError cass_statement_bind_int64(CassStatement* statement, size_t index, cass_int64_t value)
+  CassError cass_statement_bind_uint32(CassStatement* statement, size_t index, cass_uint32_t value)
   CassError cass_statement_bind_float(CassStatement* statement, size_t index, cass_float_t value)
+  CassError cass_statement_bind_double(CassStatement* statement, size_t index, cass_double_t value)
+  CassError cass_statement_bind_decimal(CassStatement * statement, size_t index, const cass_byte_t* varint, size_t varint_size, cass_int32_t scale)
   CassError cass_statement_bind_bool(CassStatement* statement, size_t index, cass_bool_t value)
+  CassError cass_statement_bind_string(CassStatement* statement, size_t index, const char* value)
   CassError cass_statement_bind_string_n(CassStatement* statement, size_t index, const char* value, size_t value_length)
   CassError cass_statement_bind_bytes(CassStatement* statement, size_t index, const cass_byte_t* value, size_t value_length)
   CassError cass_statement_bind_uuid(CassStatement* statement, size_t index, CassUuid value)
+  CassError cass_statement_bind_inet(CassStatement* statement, size_t index, CassInet value)
+  CassError cass_statement_bind_collection(CassStatement* statement, size_t index, const CassCollection * collection)
+  CassError cass_statement_bind_duration_by_name(CassStatement* statement, const char * name, cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_statement_bind_duration(CassStatement* statement, size_t index, cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_statement_bind_bytes_by_name(CassStatement* statement, const char* name, const cass_byte_t* value, size_t value_size)
   CassError cass_statement_bind_bytes_by_name_n(CassStatement* statement, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_statement_bind_string_by_name(CassStatement* statement, const char* name, const char* value)
   CassError cass_statement_bind_string_by_name_n(CassStatement* statement, const char* name, size_t name_length, const char* value, size_t value_length)
-  CassError cass_statement_bind_bool_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_bool_t value)
+  CassError cass_statement_bind_float_by_name(CassStatement* statement, const char* name, cass_float_t value)
   CassError cass_statement_bind_float_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_float_t value)
+  CassError cass_statement_bind_double_by_name(CassStatement* statement, const char* name, cass_double_t value)
+  CassError cass_statement_bind_decimal_by_name(CassStatement * statement, const char* name, const cass_byte_t* varint, size_t varint_size, cass_int32_t scale)
+  CassError cass_statement_bind_bool_by_name(CassStatement* statement, const char* name, cass_bool_t value)
+  CassError cass_statement_bind_bool_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_bool_t value)
+  CassError cass_statement_bind_int8_by_name(CassStatement* statement, const char* name, cass_int8_t value)
+  CassError cass_statement_bind_int16_by_name(CassStatement* statement, const char* name, cass_int16_t value)
+  CassError cass_statement_bind_int32_by_name(CassStatement* statement, const char* name, cass_int32_t value)
   CassError cass_statement_bind_int32_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int32_t value)
+  CassError cass_statement_bind_int64_by_name(CassStatement* statement, const char* name, cass_int64_t value)
+  CassError cass_statement_bind_int64_by_name_n(CassStatement* statement, const char* name, size_t name_length, cass_int64_t value)
+  CassError cass_statement_bind_uint32_by_name(CassStatement* statement, const char * name, cass_uint32_t value)
+  CassError cass_statement_bind_null_by_name(CassStatement* statement, const char* name)
   CassError cass_statement_bind_null_by_name_n(CassStatement* statement, const char* name, size_t name_length)
-  CassError cass_statement_bind_uuid_by_name_n(CassStatement* statement, const char* name, size_t name_length, CassUuid value)
   CassError cass_statement_bind_uuid_by_name(CassStatement* statement, const char* name, CassUuid value)
+  CassError cass_statement_bind_uuid_by_name_n(CassStatement* statement, const char* name, size_t name_length, CassUuid value)
+  CassError cass_statement_bind_inet_by_name(CassStatement* statement, const char* name, CassInet value)
+  CassError cass_statement_bind_collection_by_name(CassStatement* statement, const char * name, const CassCollection * collection)
+
   CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
   CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
@@ -261,18 +317,36 @@ cdef extern from "cassandra.h":
   CassIterator* cass_iterator_from_result(const CassResult* result)
   cass_bool_t cass_result_has_more_pages(const CassResult* result)
   CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size)
+  CassError cass_result_column_name(const CassResult *result, size_t index, const char** name,size_t* name_length)
   void cass_result_free(CassResult* result)
 
+  CassValueType cass_data_type_type(const CassDataType * data_type)
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
+
+  CassIterator* cass_iterator_from_map(const CassValue* value)
+  CassValue* cass_iterator_get_map_key(const CassIterator* iterator);
+  CassValue* cass_iterator_get_map_value(const CassIterator* iterator);
+
+  CassIterator* cass_iterator_fields_from_user_type(const CassValue* value)
+  CassError cass_iterator_get_user_type_field_name(const CassIterator* iterator, const char** name, size_t* name_length)
+  CassValue* cass_iterator_get_user_type_field_value(const CassIterator* iterator)
+
   CassValueType cass_value_type(const CassValue* value)
-  CassError cass_value_get_int32(const CassValue* value, cass_int32_t * output)
+  CassError cass_value_get_int8(const CassValue* value, cass_int8_t* output)
+  CassError cass_value_get_int16(const CassValue* value, cass_int16_t* output)
+  CassError cass_value_get_int32(const CassValue* value, cass_int32_t* output)
+  CassError cass_value_get_int64(const CassValue* value, cass_int64_t* output)
+  CassError cass_value_get_uint32(const CassValue* value, cass_uint32_t* output)
   CassError cass_value_get_float(const CassValue* value, cass_float_t* output)
+  CassError cass_value_get_double(const CassValue* value, cass_double_t* output)
+  CassError cass_value_get_decimal(const CassValue* value, const cass_byte_t** varint, size_t* varint_size, cass_int32_t* scale)
   CassError cass_value_get_bool(const CassValue* value, cass_bool_t* output)
   CassError cass_value_get_string(const CassValue* value, const char** output, size_t* output_size)
   CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size)
-  CassError cass_value_get_bytes(const CassValue* value, const cass_byte_t** output, size_t* output_size)
+  CassError cass_value_get_inet(const CassValue* value, CassInet* output)
   CassError cass_value_get_uuid(const CassValue* value, CassUuid* output)
+  CassError cass_value_get_duration(const CassValue* value, cass_int32_t* months, cass_int32_t* days, cass_int64_t* nanos)
   CassRow* cass_iterator_get_row(const CassIterator* iterator)
   cass_bool_t cass_iterator_next(CassIterator* iterator)
   void cass_iterator_free(CassIterator* iterator)
@@ -288,3 +362,34 @@ cdef extern from "cassandra.h":
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)
   void cass_uuid_string(CassUuid uuid, char* output)
+
+  CassError cass_inet_from_string(const char* str, CassInet* output)
+  void cass_inet_string(CassInet inet, char* output)
+
+  cass_int64_t cass_time_from_epoch(cass_int64_t epoch_secs)
+  cass_uint32_t cass_date_from_epoch(cass_int64_t epoch_secs)
+  cass_int64_t cass_date_time_to_epoch(cass_uint32_t date, cass_int64_t time)
+
+  CassCollection* cass_collection_new(CassCollectionType type, size_t item_count)
+  void cass_collection_free(CassCollection* collection)
+  const CassDataType* cass_collection_data_type(const CassCollection * collection)
+
+  CassError cass_collection_append_int8(CassCollection* collection, cass_int8_t value)
+  CassError cass_collection_append_int16(CassCollection* collection, cass_int16_t value)
+  CassError cass_collection_append_int32(CassCollection* collection, cass_int32_t value)
+  CassError cass_collection_append_uint32(CassCollection* collection, cass_uint32_t value)
+  CassError cass_collection_append_int64(CassCollection* collection, cass_int64_t value)
+  CassError cass_collection_append_float(CassCollection* collection, cass_float_t value)
+  CassError cass_collection_append_double(CassCollection* collection, cass_double_t value)
+  CassError cass_collection_append_bool(CassCollection* collection, cass_bool_t value)
+  CassError cass_collection_append_string(CassCollection* collection, const char* value)
+  CassError cass_collection_append_bytes(CassCollection* collection, const cass_byte_t* value, size_t value_size)
+  CassError cass_collection_append_custom(CassCollection* collection, const char* class_name, const cass_byte_t* value, size_t value_size)
+  CassError cass_collection_append_custom_n(CassCollection* collection, const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_collection_append_uuid(CassCollection* collection, CassUuid value)
+  CassError cass_collection_append_inet(CassCollection* collection, CassInet value)
+  CassError cass_collection_append_decimal(CassCollection* collection, const cass_byte_t* varint, size_t varint_size, cass_int32_t scale);
+  CassError cass_collection_append_duration(CassCollection* collection, cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_collection_append_collection(CassCollection* collection, const CassCollection* value)
+  CassError cass_collection_append_tuple(CassCollection* collection, const CassTuple* value)
+  CassError cass_collection_append_user_type(CassCollection* collection, const CassUserType* value)

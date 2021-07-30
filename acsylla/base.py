@@ -12,7 +12,13 @@ from typing import (
     Union,
 )
 
-SupportedType = Union[None, int, float, bool, str, bytes, cyacsylla.TypeUUID]
+from uuid import UUID
+from decimal import Decimal
+from datetime import datetime, date, time, timedelta
+from ipaddress import IPv4Address, IPv6Address
+
+SupportedType = Union[None, int, float, bool, str, bytes, UUID, datetime, date,
+                      time, timedelta, IPv4Address, IPv6Address, Decimal]
 
 
 class Cluster(metaclass=ABCMeta):

@@ -7,8 +7,7 @@ from datetime import date, datetime, time, timedelta
 from acsylla import (
     Consistency,
     create_statement,
-    errors,
-    types,
+    errors
 )
 
 import pytest
@@ -31,8 +30,12 @@ statement_str = ('''
             value_time,
             value_timestamp,
             value_duration,
-            value_map_text_bigint) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            value_map_text_bigint, 
+            value_set_text, 
+            value_list_text, 
+            value_tuple_text_bigint,
+            value_udt) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ''')
 
 class TestStatement:
@@ -42,7 +45,7 @@ class TestStatement:
     @pytest.fixture(params=["none_prepared", "prepared"])
     async def statement(self, request, session):
         if request.param == "none_prepared":
-            statement_ = create_statement(statement_str, parameters=15)
+            statement_ = create_statement(statement_str, parameters=19)
         elif request.param == "prepared":
             prepared = await session.create_prepared(statement_str)
             statement_ = prepared.bind()
@@ -77,7 +80,7 @@ class TestStatement:
 
     def test_bind_list(self, statement):
         statement.bind_list(
-            [1, None, 2, 10.0, True, "acsylla", b"acsylla", types.uuid("550e8400-e29b-41d4-a716-446655440000")]
+            [1, None, 2, 10.0, True, "acsylla", b"acsylla", uuid.UUID("550e8400-e29b-41d4-a716-446655440000")]
         )
 
     def test_bind_null(self, statement):
@@ -123,13 +126,12 @@ class TestStatement:
             statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, b"acsylla")
 
     def test_bind_uuid(self, statement):
-        statement.bind(7, types.uuid("550e8400-e29b-41d4-a716-446655440000"))
         statement.bind(7, "550e8400-e29b-41d4-a716-446655440000")
         statement.bind(7, uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_uuid_invalid_index(self, statement):
         with pytest.raises(errors.CassErrorLibIndexOutOfBounds):
-            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, types.uuid("550e8400-e29b-41d4-a716-446655440000"))
+            statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_decimal(self, statement):
         value = Decimal('3.141592653589793115997963468544185161590576171875')
@@ -156,9 +158,6 @@ class TestStatement:
                           hours=23432, weeks=12340)
         statement.bind(13, value)
 
-    def test_bind_map_text_bigint(self, statement):
-        value = {'key': 9223372036854775807}
-        statement.bind(14, value)
 
 class TestStatementOnlyPrepared:
     """Special tests for testing some methods that are only allowed for statements
@@ -180,7 +179,7 @@ class TestStatementOnlyPrepared:
                 "value_bool": True,
                 "value_text": "acsylla",
                 "value_blob": b"acsylla",
-                "value_uuid": types.uuid("550e8400-e29b-41d4-a716-446655440000"),
+                "value_uuid": uuid.UUID("550e8400-e29b-41d4-a716-446655440000"),
             }
         )
         statement.bind_dict(
@@ -218,18 +217,24 @@ class TestStatementOnlyPrepared:
     def test_bind_int_by_name(self, statement):
         statement.bind_by_name("value_int", 10)
 
+    def test_bind_int_by_name_value_error(self, statement):
+        with pytest.raises(OverflowError):
+            statement.bind_by_name("value_int", 2147483649)
+        with pytest.raises(OverflowError):
+            statement.bind_by_name("value_int", -2147483649)
+
+
     def test_bind_int_by_name_invalid_name(self, statement):
         with pytest.raises(errors.CassErrorLibNameDoesNotExist):
             statement.bind_by_name("invalid_field", 10)
 
     def test_bind_uuid_by_name(self, statement):
-        statement.bind_by_name("value_uuid", types.uuid("550e8400-e29b-41d4-a716-446655440000"))
         statement.bind_by_name("value_uuid", "550e8400-e29b-41d4-a716-446655440000")
         statement.bind_by_name("value_uuid", uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_uuid_by_name_invalid_name(self, statement):
         with pytest.raises(errors.CassErrorLibNameDoesNotExist):
-            statement.bind_by_name("invalid_field", types.uuid("550e8400-e29b-41d4-a716-446655440000"))
+            statement.bind_by_name("invalid_field", uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_float_by_name(self, statement):
         statement.bind_by_name("value_float", 10.0)
@@ -295,7 +300,44 @@ class TestStatementOnlyPrepared:
                           hours=23432, weeks=12340)
         statement.bind_by_name("value_duration", value)
 
+    def test_bind_map_text_bigint(self, statement):
+        value = {'key': 9223372036854775807}
+        statement.bind(14, value)
 
     def test_bind_map_text_bigint_by_name(self, statement):
         value = {'key': 9223372036854775807}
         statement.bind_by_name("value_map_text_bigint", value)
+
+    def test_bind_set_text(self, statement):
+        value = {'test', 'passed'}
+        statement.bind(15, value)
+
+    def test_bind_set_text_by_name(self, statement):
+        value = {'test', 'passed'}
+        statement.bind_by_name("value_set_text", value)
+
+    def test_bind_list_text(self, statement):
+        value = ['test', 'passed']
+        statement.bind(16, value)
+
+    def test_bind_list_text_by_name(self, statement):
+        value = ['test', 'passed']
+        statement.bind_by_name("value_list_text", value)
+
+    def test_bind_tuple_text_bigint(self, statement):
+        value = ('test', 9223372036854775807)
+        statement.bind(17, value)
+
+    def test_bind_tuple_text_bigint_by_name(self, statement):
+        value = ('key', 9223372036854775807)
+        statement.bind_by_name("value_tuple_text_bigint", value)
+
+    def test_bind_udt(self, statement):
+        value = {'value_ascii': 'John',
+                 'value_bigint': 9223372036854775807}
+        statement.bind(18, value)
+
+    def test_bind_udt_by_name(self, statement):
+        value = {'value_ascii': 'John',
+                 'value_bigint': 9223372036854775807}
+        statement.bind_by_name("value_udt", value)

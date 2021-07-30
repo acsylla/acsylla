@@ -14,8 +14,9 @@ cdef class Statement:
     cdef _set_timeout(self, object timeout)
     cdef _set_consistency(self, object consistency)
 
-    cdef CassValueType _get_data_type(self, int index)
-    cdef CassValueType _get_data_type_by_name(self, bytes name)
+    cdef const CassDataType* _get_data_type(self, int index)
+    cdef const CassDataType* _get_data_type_by_name(self, bytes name)
+    cdef CassValueType _get_value_type(self, const CassDataType* data_type)
 
     cpdef bind(self, int idx, object value)
     cpdef bind_by_name(self, str name, object value)

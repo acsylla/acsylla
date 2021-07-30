@@ -7,13 +7,14 @@ cdef class PreparedStatement:
         cass_prepared_free(self.cass_prepared)
 
     @staticmethod
-    cdef PreparedStatement new_(const CassPrepared* cass_prepared, object timeout, object consistency):
+    cdef PreparedStatement new_(const CassPrepared* cass_prepared, object timeout, object consistency, const CassKeyspaceMeta* keyspace_meta):
         cdef PreparedStatement prepared
 
         prepared = PreparedStatement()
         prepared.cass_prepared = cass_prepared
         prepared.timeout = timeout
         prepared.consistency = consistency
+        prepared.keyspace_meta = keyspace_meta
         return prepared
 
     def bind(self, object page_size=None, object page_state=None):

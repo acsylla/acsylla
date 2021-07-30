@@ -40,7 +40,7 @@ cdef class Row:
         cdef bytes_name = column_name.encode()
 
         cass_value = cass_row_get_column_by_name(self.cass_row, bytes_name)
-        if (cass_value == NULL):
+        if cass_value == NULL:
             raise ColumnNotFound(column_name)
 
         return self._get_cass_value(cass_value)
@@ -88,10 +88,16 @@ cdef class Row:
             return self._timestamp(cass_value)
         elif cass_type == CASS_VALUE_TYPE_DURATION:
             return self._duration(cass_value)
-        elif cass_type == CASS_VALUE_TYPE_UDT:
-            return self._udt(cass_value)
         elif cass_type == CASS_VALUE_TYPE_MAP:
             return self._map(cass_value)
+        elif cass_type == CASS_VALUE_TYPE_SET:
+            return self._set(cass_value)
+        elif cass_type == CASS_VALUE_TYPE_LIST:
+            return self._list(cass_value)
+        elif cass_type == CASS_VALUE_TYPE_TUPLE:
+            return self._tuple(cass_value)
+        elif cass_type == CASS_VALUE_TYPE_UDT:
+            return self._udt(cass_value)
         else:
             raise ValueError(f"Type not supported {cass_type}")
 
@@ -102,7 +108,10 @@ cdef class Row:
         cdef cass_int8_t output
         cdef CassError error
         error = cass_value_get_int8(cass_value, <cass_int8_t*> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         return output
 
     cdef object _int16(self, const CassValue* cass_value):
@@ -112,7 +121,10 @@ cdef class Row:
         cdef cass_int16_t output
         cdef CassError error
         error = cass_value_get_int16(cass_value, <cass_int16_t*> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         return output
 
     cdef object _int32(self, const CassValue* cass_value):
@@ -122,7 +134,10 @@ cdef class Row:
         cdef cass_int32_t output
         cdef CassError error
         error = cass_value_get_int32(cass_value, <cass_int32_t*> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         return output
 
     cdef object _int64(self, const CassValue* cass_value):
@@ -132,7 +147,10 @@ cdef class Row:
         cdef cass_int64_t output
         cdef CassError error
         error = cass_value_get_int64(cass_value, <cass_int64_t*> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         return output
 
     cdef object _uuid(self, const CassValue* cass_value):
@@ -284,7 +302,10 @@ cdef class Row:
         cdef cass_uint32_t output
         cdef CassError error
         error = cass_value_get_uint32(cass_value, <cass_uint32_t *> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         return datetime.utcfromtimestamp(cass_date_time_to_epoch(output, 0)).date()
 
     cdef object _time(self, const CassValue* cass_value):
@@ -295,7 +316,10 @@ cdef class Row:
         cdef CassError error
 
         error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         year_month_day = cass_date_from_epoch(0)
         epoch_secs = cass_date_time_to_epoch(year_month_day, output)
         return datetime.utcfromtimestamp(epoch_secs).time()
@@ -307,7 +331,10 @@ cdef class Row:
         cdef CassError error
 
         error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         epoch_secs = <double>output / 1000.0
         return datetime.utcfromtimestamp(epoch_secs)
 
@@ -319,7 +346,10 @@ cdef class Row:
         cdef CassError error
 
         error = cass_value_get_duration(cass_value, <cass_int32_t*>&months, <cass_int32_t*>&days, <cass_int64_t *>&nanos)
-        raise_if_error(error)
+        if error == CASS_ERROR_LIB_NULL_VALUE:
+            return None
+        else:
+            raise_if_error(error)
         if nanos:
             nanos = int(nanos / 1000)
         return timedelta(days=days, microseconds=nanos)
@@ -331,12 +361,48 @@ cdef class Row:
         data = {}
         if iterator == NULL:
             return None
-        while (cass_iterator_next(iterator) == cass_true):
+        while cass_iterator_next(iterator) == cass_true:
             key = cass_iterator_get_map_key(iterator)
             value = cass_iterator_get_map_value(iterator)
             data[self._get_cass_value(key)] = self._get_cass_value(value)
         cass_iterator_free(iterator)
         return data
+
+    cdef object _set(self, const CassValue* cass_value):
+        cdef const CassValue* value
+        cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
+        data = set()
+        if iterator == NULL:
+            return None
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.add(self._get_cass_value(value))
+        cass_iterator_free(iterator)
+        return data
+
+    cdef object _list(self, const CassValue* cass_value):
+        cdef const CassValue* value
+        cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
+        data = list()
+        if iterator == NULL:
+            return None
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.append(self._get_cass_value(value))
+        cass_iterator_free(iterator)
+        return data
+
+    cdef object _tuple(self, const CassValue* cass_value):
+        cdef const CassValue* value
+        cdef CassIterator* iterator = cass_iterator_from_tuple(cass_value);
+        data = list()
+        if iterator == NULL:
+            return None
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.append(self._get_cass_value(value))
+        cass_iterator_free(iterator)
+        return tuple(data)
 
     cdef object _udt(self, const CassValue* cass_value):
         cdef const char* field_name
@@ -344,7 +410,7 @@ cdef class Row:
         cdef const CassValue* field_value
         cdef CassIterator* iterator = cass_iterator_fields_from_user_type(cass_value);
         data = {}
-        while (cass_iterator_next(iterator) == cass_true):
+        while cass_iterator_next(iterator) == cass_true:
             cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
             field_value = cass_iterator_get_user_type_field_value(iterator)
             data[field_name.decode()] = self._get_cass_value(field_value)

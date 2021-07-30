@@ -141,7 +141,7 @@ cdef class Session:
                 keyspace = self.keyspace.encode()
                 self.keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta, keyspace)
 
-            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency, self.keyspace_meta)
+            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency)
         finally:
             cass_future_free(cass_future)
 

@@ -86,4 +86,14 @@ def create_batch_unlogged(timeout: Optional[float] = None) -> Batch:
     If `timeout` is provided, this will override the request timeout provided during the cluster
     creation. Value expected is in seconds.
     """
-    return _cython.cyacsylla.create_batch_logged(timeout)
+    return _cython.cyacsylla.create_batch_unlogged(timeout)
+
+
+def create_batch_counter(timeout: Optional[float] = None) -> Batch:
+    """
+    Creates a new batch counter.
+
+    If `timeout` is provided, this will override the request timeout provided during the cluster
+    creation. Value expected is in seconds.
+    """
+    return _cython.cyacsylla.create_batch_counter(timeout)

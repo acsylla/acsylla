@@ -16,14 +16,14 @@ thread_start = Condition()
 benchmark_start = Condition()
 
 
-def write(session, key, str_key):
+def write(session, prepared, key, str_key):
     start = time.monotonic()
     statement = "INSERT INTO test (id, value) values(" + str_key + ", " + str_key + ")"
     session.execute(statement)
     return time.monotonic() - start
 
 
-def read(session, key, str_key):
+def read(session, prepared, key, str_key):
     start = time.monotonic()
     statement = "SELECT id, value FROM test WHERE id =" + str_key
     result = session.execute(statement)
@@ -33,14 +33,20 @@ def read(session, key, str_key):
     return time.monotonic() - start
 
 
-def write_bind(session, key, str_key):
+def write_bind(session, prepared, key, str_key):
     start = time.monotonic()
     statement = "INSERT INTO test (id, value) values(%s, %s)"
     session.execute(statement, [key, key])
     return time.monotonic() - start
 
 
-def read_bind(session, key, str_key):
+def write_bind_prepared(session, prepared, key, str_key):
+    start = time.monotonic()
+    session.execute(prepared, [key, key])
+    return time.monotonic() - start
+
+
+def read_bind(session, prepared, key, str_key):
     start = time.monotonic()
     statement = "SELECT id, value FROM test WHERE id = %s"
     result = session.execute(statement, [key])
@@ -49,8 +55,16 @@ def read_bind(session, key, str_key):
         _ = row[0]
     return time.monotonic() - start
 
+def read_bind_prepared(session, prepared, key, str_key):
+    start = time.monotonic()
+    result = session.execute(prepared, [key])
+    row = result.one()
+    if row is not None:
+        _ = row[0]
+    return time.monotonic() - start
 
-def run(session, func) -> None:
+
+def run(session, prepared, func) -> None:
     global latencies, real_started, threads_started
 
     local_latencies = []
@@ -64,7 +78,7 @@ def run(session, func) -> None:
 
     while not finish_benchmark:
         key = random.randint(0, MAX_NUMBER_OF_KEYS)
-        latency = func(session, key, str(key))
+        latency = func(session, prepared, key, str(key))
         local_latencies.append(latency)
 
     lock_latencies.acquire()
@@ -72,7 +86,7 @@ def run(session, func) -> None:
     lock_latencies.release()
 
 
-def benchmark(desc, func, session, concurrency: int, duration: int) -> None:
+def benchmark(desc, func, session, prepared,  concurrency: int, duration: int) -> None:
     global finish_benchmark, real_started, threads_started, latencies
 
     finish_benchmark = False
@@ -82,7 +96,7 @@ def benchmark(desc, func, session, concurrency: int, duration: int) -> None:
     print("Starting benchmark {} ....".format(desc))
     threads = []
     for idx in range(concurrency):
-        thread = Thread(target=run, args=(session, func))
+        thread = Thread(target=run, args=(session, prepared, func))
         thread.start()
         threads.append(thread)
 
@@ -122,7 +136,7 @@ if __name__ == "__main__":
         "--concurrency", help="Number of concurrency clients, by default 32", type=int, default=32,
     )
     parser.add_argument(
-        "--duration", help="Test duration in seconds, by default 60", type=int, default=60,
+        "--duration", help="Test duration in seconds, by default 60", type=int, default=10,
     )
     args = parser.parse_args()
 
@@ -130,7 +144,12 @@ if __name__ == "__main__":
     session = cluster.connect("acsylla")
     session.row_factory = tuple_factory
 
-    benchmark("write", write, session, args.concurrency, args.duration)
-    benchmark("write_bind", write_bind, session, args.concurrency, args.duration)
-    benchmark("read", read, session, args.concurrency, args.duration)
-    benchmark("read_bind", read_bind, session, args.concurrency, args.duration)
+    prepared_write = session.prepare("INSERT INTO test (id, value) values(?, ?)")
+    prepared_read = session.prepare("SELECT id, value FROM test WHERE id = ?")
+
+    benchmark("write", write, session, prepared_write, args.concurrency, args.duration)
+    benchmark("write_bind", write_bind, session, prepared_write, args.concurrency, args.duration)
+    benchmark("write_bind_prepared", write_bind_prepared, session, prepared_write, args.concurrency, args.duration)
+    benchmark("read", read, session, prepared_read, args.concurrency, args.duration)
+    benchmark("read_bind", read_bind, session, prepared_read, args.concurrency, args.duration)
+    benchmark("read_bind_prepared", read_bind, session, prepared_read, args.concurrency, args.duration)

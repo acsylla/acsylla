@@ -13,6 +13,7 @@ from .base import (
 from .factories import (
     create_batch_logged,
     create_batch_unlogged,
+    create_batch_counter,
     create_cluster,
     create_statement,
 )
@@ -31,5 +32,6 @@ __all__ = (
     "create_statement",
     "create_batch_logged",
     "create_batch_unlogged",
+    "create_batch_counter",
     "errors",
 )

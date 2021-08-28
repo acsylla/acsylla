@@ -11,19 +11,12 @@ cdef inline bind_null_by_name(CassStatement* statement, bytes name):
 # CASS_VALUE_TYPE_BOOLEAN
 cdef inline bind_bool(CassStatement* statement, int index, object value):
     cdef CassError error
-    if value is True:
-        error = cass_statement_bind_bool(statement, index, cass_true)
-    else:
-        error = cass_statement_bind_bool(statement, index, cass_false)
+    error = cass_statement_bind_bool(statement, index, cass_true if value else cass_false)
     raise_if_error(error)
 
 cdef inline bind_bool_by_name(CassStatement* statement, bytes name, object value):
     cdef CassError error
-    if value is True:
-        error = cass_statement_bind_bool_by_name(statement, name, cass_true)
-    else:
-        error = cass_statement_bind_bool_by_name(statement, name, cass_false)
-    raise_if_error(error)
+    error = cass_statement_bind_bool_by_name(statement, name, cass_true if value else cass_false)
 
 # CASS_VALUE_TYPE_TINY_INT
 cdef get_int8(object value):

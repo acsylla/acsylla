@@ -7,14 +7,22 @@ from .base import (
 )
 from typing import List, Optional
 
+from .version import __version__
 
 def create_cluster(
     contact_points: List[str],
+    port: int = 19042,
     protocol_version: int = 3,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
     resolve_timeout: float = 1.0,
     consistency: Consistency = Consistency.LOCAL_ONE,
+    core_connections_per_host: int = 1,
+    local_port_range_min: int = 49152,
+    local_port_range_max: int = 65535,
+    application_name: str = 'acsylla',
+    application_version: str = __version__,
+    num_threads_io: int = 1
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -31,7 +39,19 @@ def create_cluster(
     by default that consistency level unless it is specificily configured at statement level.
     """
     return _cython.cyacsylla.Cluster(
-        contact_points, protocol_version, connect_timeout, request_timeout, resolve_timeout, consistency
+        contact_points,
+        port,
+        protocol_version,
+        connect_timeout,
+        request_timeout,
+        resolve_timeout,
+        consistency,
+        core_connections_per_host,
+        local_port_range_min,
+        local_port_range_max,
+        application_name,
+        application_version,
+        num_threads_io
     )
 
 

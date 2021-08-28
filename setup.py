@@ -13,7 +13,7 @@ if vi < (3, 7):
 
 CPP_CASSANDRA_DIR = os.path.join(os.path.dirname(__file__), "vendor", "cpp-driver")
 CPP_CASSANDRA_INCLUDE_DIR = os.path.join(CPP_CASSANDRA_DIR, "include")
-CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", "libcassandra_static.a")
+CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", "libscylla-cpp-driver_static.a")
 
 extensions = [
     Extension(

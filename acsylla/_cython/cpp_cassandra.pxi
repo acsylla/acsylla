@@ -238,11 +238,17 @@ cdef extern from "cassandra.h":
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
+  CassError cass_cluster_set_port(CassCluster * cluster, int port)
   CassError cass_cluster_set_protocol_version(CassCluster* cluster, int protocol_version)
   void cass_cluster_set_connect_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_request_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_resolve_timeout(CassCluster* cluster, unsigned timeout_ms)
   CassError cass_cluster_set_consistency(CassCluster* cluster, CassConsistency consistency)
+  CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi);
+  CassError cass_cluster_set_core_connections_per_host(CassCluster * cluster, unsigned num_connections)
+  CassError cass_cluster_set_num_threads_io(CassCluster * cluster, unsigned num_threads)
+  void cass_cluster_set_application_name(CassCluster * cluster, const char * application_name)
+  void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
 
   CassSession* cass_session_new()
   void cass_session_free(CassSession* session)

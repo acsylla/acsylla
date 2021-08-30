@@ -615,7 +615,7 @@ cdef CassTuple* get_tuple(object value, const CassDataType* cass_data_type):
     cdef size_t type_count
 
     type_count = cass_data_type_sub_type_count(cass_data_type)
-    if len(value) > type_count:
+    if <size_t>len(value) > type_count:
         raise ValueError(f'Wrong tuple size (must be {type_count}) for value {value}')
 
     cass_tuple = cass_tuple_new(len(value))

@@ -11,7 +11,7 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 .install-cython:
-	$(PIP) install Cython==0.29.18
+	$(PIP) install cython
 	touch .install-cython
 
 acsylla/_cython/cyacsylla.cpp: acsylla/_cython/cyacsylla.pyx

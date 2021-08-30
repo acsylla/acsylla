@@ -1,12 +1,29 @@
-ctypedef signed char cass_int8_t
-ctypedef short cass_int16_t
-ctypedef int cass_int32_t
-ctypedef unsigned int cass_uint32_t
-ctypedef long long cass_int64_t
+cdef extern from "stdint.h":
+  ctypedef   signed char  int8_t
+  ctypedef   signed short int16_t
+  ctypedef   signed int   int32_t
+  ctypedef   signed long  int64_t
+  ctypedef unsigned char  uint8_t
+  ctypedef unsigned short uint16_t
+  ctypedef unsigned int   uint32_t
+  ctypedef unsigned long  uint64_t
+
 ctypedef float cass_float_t
-ctypedef unsigned char cass_byte_t
-ctypedef double cass_uint64_t
 ctypedef double cass_double_t
+
+ctypedef int8_t cass_int8_t
+ctypedef uint8_t cass_uint8_t
+
+ctypedef int16_t cass_int16_t
+ctypedef uint16_t cass_uint16_t
+
+ctypedef int32_t cass_int32_t
+ctypedef uint32_t cass_uint32_t
+
+ctypedef int64_t cass_int64_t
+ctypedef uint64_t cass_uint64_t
+
+ctypedef cass_uint8_t cass_byte_t
 ctypedef cass_uint64_t cass_duration_t
 
 cdef extern from "cassandra.h":

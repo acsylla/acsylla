@@ -239,10 +239,8 @@ cdef class Statement:
 
         if self.prepared == 0:
             raise ValueError("Method only availabe for statements created from prepared statements")
-        # try:
+
         bind_null_by_name(self.cass_statement, name.encode())
-        # except CassErrorLibNameDoesNotExist:
-        #     raise CassErrorLibNameDoesNotExist(f'Column {name} does not exist!')
 
         if value is None:
             return

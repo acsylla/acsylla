@@ -4,7 +4,9 @@ set -x
 
 SCRIPT_DIR=`dirname $0`
 PYTHON_VERSION=${1:-3.9}
-BUILD_DIR=${2:-ACSYLLA_BUILD}
+BRANCH=${2:-master}
+BUILD_DIR=${3:-ACSYLLA_BUILD}
+
 
 echo Build driver for Python $PYTHON_VERSION working directory $BUILD_DIR
 
@@ -16,5 +18,4 @@ MOUNT_POINT="/build"
 NAME="acsylla_build"
 IMAGE="python:$PYTHON_VERSION-slim"
 
-BRANCH="use-scylladb-cpp-driver"
 $DOCKER_CMD run -it --rm -v $WORK_DIR:$MOUNT_POINT --name $NAME $IMAGE /bin/sh -c "cd ${MOUNT_POINT} && sh ./build.sh ${BRANCH}"

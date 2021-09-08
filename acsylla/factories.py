@@ -1,11 +1,12 @@
 from . import _cython
-from .base import Batch
-from .base import Cluster
-from .base import Consistency
-from .base import Statement
+from .base import (
+    Batch,
+    Cluster,
+    Consistency,
+    Statement,
+)
 from .version import __version__
-from typing import List
-from typing import Optional
+from typing import List, Optional
 
 
 def create_cluster(

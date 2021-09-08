@@ -1,5 +1,4 @@
-from acsylla import create_cluster
-from acsylla import create_statement
+from acsylla import create_cluster, create_statement
 
 import pytest
 

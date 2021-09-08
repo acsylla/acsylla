@@ -1,22 +1,24 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
-from abc import ABCMeta
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from acsylla._cython import cyacsylla
 from dataclasses import dataclass
-from datetime import date
-from datetime import datetime
-from datetime import time
-from datetime import timedelta
+from datetime import (
+    date,
+    datetime,
+    time,
+    timedelta,
+)
 from decimal import Decimal
 from enum import Enum
-from ipaddress import IPv4Address
-from ipaddress import IPv6Address
-from typing import Iterable
-from typing import Mapping
-from typing import Optional
-from typing import Sequence
-from typing import Union
+from ipaddress import IPv4Address, IPv6Address
+from typing import (
+    Iterable,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 from uuid import UUID
 
 SupportedType = Union[

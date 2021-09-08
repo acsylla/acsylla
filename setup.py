@@ -1,5 +1,4 @@
-from setuptools import Extension
-from setuptools import setup
+from setuptools import Extension, setup
 
 import os
 import re

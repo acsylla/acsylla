@@ -1,6 +1,4 @@
-from acsylla import create_batch_logged
-from acsylla import create_batch_unlogged
-from acsylla import create_statement
+from acsylla import create_batch_logged, create_batch_unlogged, create_statement
 
 import pytest
 

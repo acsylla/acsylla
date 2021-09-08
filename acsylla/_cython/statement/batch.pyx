@@ -41,3 +41,9 @@ def create_batch_unlogged(timeout=None):
     cdef Batch batch
     batch = Batch.new_(CASS_BATCH_TYPE_UNLOGGED, timeout)
     return batch
+
+
+def create_batch_counter(timeout=None):
+    cdef Batch batch
+    batch = Batch.new_(CASS_BATCH_TYPE_COUNTER, timeout)
+    return batch

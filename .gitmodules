@@ -1,3 +1,4 @@
 [submodule "vendor/cpp-driver"]
 	path = vendor/cpp-driver
-	url = git@github.com:datastax/cpp-driver.git
+	url = https://github.com/scylladb/cpp-driver.git
+	branch = master

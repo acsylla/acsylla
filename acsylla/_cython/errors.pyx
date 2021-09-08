@@ -2,131 +2,132 @@ class ColumnNotFound(CassException):
     pass
 
 
-cdef inline raise_if_error(CassError cass_error):
+cdef inline raise_if_error(CassError cass_error, bytes error_message = b''):
     # Note: consider to use `cass_future_get_error_result` instead to fill the
     #       exception with metadata.
     if cass_error == CASS_OK:
         return
-
+    error_desc = cass_error_desc(cass_error)
+    message = (f'{error_desc.decode()}: {error_message.decode()}')
     if cass_error == CASS_ERROR_LIB_BAD_PARAMS:
-        raise CassErrorLibBadParams()
+        raise CassErrorLibBadParams(message)
     elif cass_error == CASS_ERROR_LIB_NO_STREAMS:
-        raise CassErrorLibNoStreams()
+        raise CassErrorLibNoStreams(message)
     elif cass_error == CASS_ERROR_LIB_UNABLE_TO_INIT:
-        raise CassErrorLibUnableToInit()
+        raise CassErrorLibUnableToInit(message)
     elif cass_error == CASS_ERROR_LIB_MESSAGE_ENCODE:
-        raise CassErrorLibMessageEncode()
+        raise CassErrorLibMessageEncode(message)
     elif cass_error == CASS_ERROR_LIB_HOST_RESOLUTION:
-        raise CassErrorLibHostResolution()
+        raise CassErrorLibHostResolution(message)
     elif cass_error == CASS_ERROR_LIB_UNEXPECTED_RESPONSE:
-        raise CassErrorLibUnexpectedResponse()
+        raise CassErrorLibUnexpectedResponse(message)
     elif cass_error == CASS_ERROR_LIB_REQUEST_QUEUE_FULL:
-        raise CassErrorLibRequestQueueFull()
+        raise CassErrorLibRequestQueueFull(message)
     elif cass_error == CASS_ERROR_LIB_NO_AVAILABLE_IO_THREAD:
-        raise CassErrorLibNoAvailableIoThread()
+        raise CassErrorLibNoAvailableIoThread(message)
     elif cass_error == CASS_ERROR_LIB_WRITE_ERROR:
-        raise CassErrorLibWriteError()
+        raise CassErrorLibWriteError(message)
     elif cass_error == CASS_ERROR_LIB_NO_HOSTS_AVAILABLE:
-        raise CassErrorLibNoHostsAvailable()
+        raise CassErrorLibNoHostsAvailable(message)
     elif cass_error == CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS:
-        raise CassErrorLibIndexOutOfBounds()
+        raise CassErrorLibIndexOutOfBounds(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_ITEM_COUNT:
-        raise CassErrorLibInvalidItemCount()
+        raise CassErrorLibInvalidItemCount(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_VALUE_TYPE:
-        raise CassErrorLibInvalidValueType()
+        raise CassErrorLibInvalidValueType(message)
     elif cass_error == CASS_ERROR_LIB_REQUEST_TIMED_OUT:
-        raise CassErrorLibRequestTimedOut()
+        raise CassErrorLibRequestTimedOut(message)
     elif cass_error == CASS_ERROR_LIB_UNABLE_TO_SET_KEYSPACE:
-        raise CassErrorLibUnableToSetKeyspace()
+        raise CassErrorLibUnableToSetKeyspace(message)
     elif cass_error == CASS_ERROR_LIB_CALLBACK_ALREADY_SET:
-        raise CassErrorLibCallbackAlreadySet()
+        raise CassErrorLibCallbackAlreadySet(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_STATEMENT_TYPE:
-        raise CassErrorLibInvalidStatementType()
+        raise CassErrorLibInvalidStatementType(message)
     elif cass_error == CASS_ERROR_LIB_NAME_DOES_NOT_EXIST:
-        raise CassErrorLibNameDoesNotExist()
+        raise CassErrorLibNameDoesNotExist(message)
     elif cass_error == CASS_ERROR_LIB_UNABLE_TO_DETERMINE_PROTOCOL:
-        raise CassErrorLibUnableToDetermineProtocol()
+        raise CassErrorLibUnableToDetermineProtocol(message)
     elif cass_error == CASS_ERROR_LIB_NULL_VALUE:
-        raise CassErrorLibNullValue()
+        raise CassErrorLibNullValue(message)
     elif cass_error == CASS_ERROR_LIB_NOT_IMPLEMENTED:
-        raise CassErrorLibNotImplemented()
+        raise CassErrorLibNotImplemented(message)
     elif cass_error == CASS_ERROR_LIB_UNABLE_TO_CONNECT:
-        raise CassErrorLibUnableToConnect()
+        raise CassErrorLibUnableToConnect(message)
     elif cass_error == CASS_ERROR_LIB_UNABLE_TO_CLOSE:
-        raise CassErrorLibUnableToClose()
+        raise CassErrorLibUnableToClose(message)
     elif cass_error == CASS_ERROR_LIB_NO_PAGING_STATE:
-        raise CassErrorLibNoPagingState()
+        raise CassErrorLibNoPagingState(message)
     elif cass_error == CASS_ERROR_LIB_PARAMETER_UNSET:
-        raise CassErrorLibParameterUnset()
+        raise CassErrorLibParameterUnset(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_ERROR_RESULT_TYPE:
-        raise CassErrorLibInvalidErrorResultType()
+        raise CassErrorLibInvalidErrorResultType(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_FUTURE_TYPE:
-        raise CassErrorLibInvalidFutureType()
+        raise CassErrorLibInvalidFutureType(message)
     elif cass_error == CASS_ERROR_LIB_INTERNAL_ERROR:
-        raise CassErrorLibInternalError()
+        raise CassErrorLibInternalError(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_CUSTOM_TYPE:
-        raise CassErrorLibInvalidCustomType()
+        raise CassErrorLibInvalidCustomType(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_DATA:
-        raise CassErrorLibInvalidData()
+        raise CassErrorLibInvalidData(message)
     elif cass_error == CASS_ERROR_LIB_NOT_ENOUGH_DATA:
-        raise CassErrorLibNotEnoughData()
+        raise CassErrorLibNotEnoughData(message)
     elif cass_error == CASS_ERROR_LIB_INVALID_STATE:
-        raise CassErrorLibInvalidState()
+        raise CassErrorLibInvalidState(message)
     elif cass_error == CASS_ERROR_LIB_NO_CUSTOM_PAYLOAD:
-        raise CassErrorLibNoCustomPayload()
+        raise CassErrorLibNoCustomPayload(message)
     elif cass_error == CASS_ERROR_LIB_EXECUTION_PROFILE_INVALID:
-        raise CassErrorLibExecutionProfileInvalid()
+        raise CassErrorLibExecutionProfileInvalid(message)
     elif cass_error == CASS_ERROR_LIB_NO_TRACING_ID:
-        raise CassErrorLibNoTracingId()
+        raise CassErrorLibNoTracingId(message)
     elif cass_error == CASS_ERROR_SERVER_SERVER_ERROR:
-        raise CassErrorServerServerError()
+        raise CassErrorServerServerError(message)
     elif cass_error == CASS_ERROR_SERVER_PROTOCOL_ERROR:
-        raise CassErrorServerProtocolError()
+        raise CassErrorServerProtocolError(message)
     elif cass_error == CASS_ERROR_SERVER_BAD_CREDENTIALS:
-        raise CassErrorServerBadCredentials()
+        raise CassErrorServerBadCredentials(message)
     elif cass_error == CASS_ERROR_SERVER_UNAVAILABLE:
-        raise CassErrorServerUnavailable()
+        raise CassErrorServerUnavailable(message)
     elif cass_error == CASS_ERROR_SERVER_OVERLOADED:
-        raise CassErrorServerOverloaded()
+        raise CassErrorServerOverloaded(message)
     elif cass_error == CASS_ERROR_SERVER_IS_BOOTSTRAPPING:
-        raise CassErrorServerIsBootstrapping()
+        raise CassErrorServerIsBootstrapping(message)
     elif cass_error == CASS_ERROR_SERVER_TRUNCATE_ERROR:
-        raise CassErrorServerTruncateError()
+        raise CassErrorServerTruncateError(message)
     elif cass_error == CASS_ERROR_SERVER_WRITE_TIMEOUT:
-        raise CassErrorServerWriteTimeout()
+        raise CassErrorServerWriteTimeout(message)
     elif cass_error == CASS_ERROR_SERVER_READ_TIMEOUT:
-        raise CassErrorServerReadTimeout()
+        raise CassErrorServerReadTimeout(message)
     elif cass_error == CASS_ERROR_SERVER_READ_FAILURE:
-        raise CassErrorServerReadFailure()
+        raise CassErrorServerReadFailure(message)
     elif cass_error == CASS_ERROR_SERVER_FUNCTION_FAILURE:
-        raise CassErrorServerFunctionFailure()
+        raise CassErrorServerFunctionFailure(message)
     elif cass_error == CASS_ERROR_SERVER_WRITE_FAILURE:
-        raise CassErrorServerWriteFailure()
+        raise CassErrorServerWriteFailure(message)
     elif cass_error == CASS_ERROR_SERVER_SYNTAX_ERROR:
-        raise CassErrorServerSyntaxError()
+        raise CassErrorServerSyntaxError(message)
     elif cass_error == CASS_ERROR_SERVER_UNAUTHORIZED:
-        raise CassErrorServerUnauthorized()
+        raise CassErrorServerUnauthorized(message)
     elif cass_error == CASS_ERROR_SERVER_INVALID_QUERY:
-        raise CassErrorServerInvalidQuery()
+        raise CassErrorServerInvalidQuery(message)
     elif cass_error == CASS_ERROR_SERVER_CONFIG_ERROR:
-        raise CassErrorServerConfigError()
+        raise CassErrorServerConfigError(message)
     elif cass_error == CASS_ERROR_SERVER_ALREADY_EXISTS:
-        raise CassErrorServerAlreadyExists()
+        raise CassErrorServerAlreadyExists(message)
     elif cass_error == CASS_ERROR_SERVER_UNPREPARED:
-        raise CassErrorServerUnprepared()
+        raise CassErrorServerUnprepared(message)
     elif cass_error == CASS_ERROR_SSL_INVALID_CERT:
-        raise CassErrorSslInvalidCert()
+        raise CassErrorSslInvalidCert(message)
     elif cass_error == CASS_ERROR_SSL_INVALID_PRIVATE_KEY:
-        raise CassErrorSslInvalidPrivateKey()
+        raise CassErrorSslInvalidPrivateKey(message)
     elif cass_error == CASS_ERROR_SSL_NO_PEER_CERT:
-        raise CassErrorSslNoPeerCert()
+        raise CassErrorSslNoPeerCert(message)
     elif cass_error == CASS_ERROR_SSL_INVALID_PEER_CERT:
-        raise CassErrorSslInvalidPeerCert()
+        raise CassErrorSslInvalidPeerCert(message)
     elif cass_error == CASS_ERROR_SSL_IDENTITY_MISMATCH:
-        raise CassErrorSslIdentityMismatch()
+        raise CassErrorSslIdentityMismatch(message)
     elif cass_error == CASS_ERROR_SSL_PROTOCOL_ERROR:
-        raise CassErrorSslProtocolError()
+        raise CassErrorSslProtocolError(message)
     elif cass_error == CASS_ERROR_SSL_CLOSED:
-        raise CassErrorSslClosed()
+        raise CassErrorSslClosed(message)
     else:
         raise CassException(cass_error)

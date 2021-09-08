@@ -1,4 +1,4 @@
-from . import errors, types
+from . import errors
 from .base import (
     Batch,
     Cluster,
@@ -11,6 +11,7 @@ from .base import (
     Statement,
 )
 from .factories import (
+    create_batch_counter,
     create_batch_logged,
     create_batch_unlogged,
     create_cluster,
@@ -31,6 +32,6 @@ __all__ = (
     "create_statement",
     "create_batch_logged",
     "create_batch_unlogged",
+    "create_batch_counter",
     "errors",
-    "types",
 )

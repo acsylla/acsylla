@@ -36,17 +36,84 @@ async def session(event_loop, cluster, keyspace):
     # table changed is used during the tests.
     create_table_statement = create_statement("DROP TABLE IF EXISTS test")
     await session.execute(create_table_statement)
+    create_table_statement = create_statement("DROP TYPE IF EXISTS udt_type")
+    await session.execute(create_table_statement)
+    create_table_statement = create_statement("DROP TYPE IF EXISTS udt_nested_type")
+    await session.execute(create_table_statement)
+    create_table_statement = create_statement(
+        """
+    CREATE TYPE udt_nested_type (
+        value_ascii ascii,
+        value_bigint bigint
+    );
+    """
+    )
+    await session.execute(create_table_statement)
+    create_table_statement = create_statement(
+        """
+    CREATE TYPE udt_type (
+            value_ascii ascii,
+            value_bigint bigint,
+            value_blob blob,
+            value_boolean boolean,
+            value_date date,
+            value_decimal decimal,
+            value_double double,
+            value_duration duration,
+            value_float float,
+            value_inet inet,
+            value_int int,
+            value_smallint smallint,
+            value_text text,
+            value_time time,
+            value_timestamp timestamp,
+            value_timeuuid timeuuid,
+            value_tinyint tinyint,
+            value_varchar varchar,
+            value_varint varint,
+            value_map_text_bigint map<text, bigint>,
+            value_set_text set<text>,
+            value_list_text list<text>,
+            value_tuple_text_bigint tuple<text, bigint>,
+            value_nested_udt frozen<udt_nested_type>
+    );
+    """
+    )
+    await session.execute(create_table_statement)
 
     # Create the table test in the acsylla keyspace
     create_table_statement = create_statement(
-        "CREATE TABLE test(id int PRIMARY KEY,"
-        + "value int,"
-        + "value_int int,"
-        + "value_float float,"
-        + "value_bool boolean,"
-        + "value_text text,"
-        + "value_blob blob,"
-        + "value_uuid uuid)"
+        """
+        CREATE TABLE test (
+            id int PRIMARY KEY,
+            value int,
+            value_int int,
+            value_float float,
+            value_bool boolean,
+            value_text text,
+            value_blob blob,
+            value_uuid uuid,
+            value_ascii ascii,
+            value_bigint bigint,
+            value_date date,
+            value_decimal decimal,
+            value_double double,
+            value_duration duration,
+            value_inet inet,
+            value_smallint smallint,
+            value_time time,
+            value_timestamp timestamp,
+            value_timeuuid timeuuid,
+            value_tinyint tinyint,
+            value_varchar varchar,
+            value_varint varint,
+            value_map_text_bigint map<text, bigint>,
+            value_set_text set<text>,
+            value_list_text list<text>,
+            value_tuple_text_bigint tuple<text, bigint>,
+            value_udt frozen<udt_type>
+        );
+    """
     )
     await session.execute(create_table_statement)
 

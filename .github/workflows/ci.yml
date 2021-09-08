@@ -61,5 +61,5 @@ jobs:
         run: |
           # wait till casssandra server is up, to be improved
           # by checking the readiness of the serivce
-          sleep 30
+          sleep 90
           make test

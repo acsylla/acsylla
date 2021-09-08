@@ -8,6 +8,8 @@ cdef class Session:
 
     def __dealloc__(self):
         cass_session_free(self.cass_session)
+        if self.schema_meta:
+            cass_schema_meta_free(self.schema_meta)
 
     def __init__(self, cass_cluster, keyspace=None):
         self.loop = asyncio.get_running_loop()
@@ -18,6 +20,8 @@ cdef class Session:
     async def _connect(self):
         cdef CassFuture* cass_future
         cdef CassError cass_error
+        cdef size_t length = 0
+        cdef char* error_message = NULL
 
         cdef bytes keyspace
         cdef CallbackWrapper cb_wrapper
@@ -38,13 +42,16 @@ cdef class Session:
         try:
             await cb_wrapper.__await__()
             cass_error = cass_future_error_code(cass_future)
-            raise_if_error(cass_error)
+            cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
+            raise_if_error(cass_error, error_message)
         finally:
             cass_future_free(cass_future)
 
     async def close(self):
         cdef CassFuture* cass_future
         cdef CassError cass_error
+        cdef size_t length = 0
+        cdef char* error_message = NULL
 
         cdef CallbackWrapper cb_wrapper
 
@@ -61,7 +68,8 @@ cdef class Session:
         try:
             await cb_wrapper.__await__()
             cass_error = cass_future_error_code(cass_future)
-            raise_if_error(cass_error)
+            cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
+            raise_if_error(cass_error, error_message)
         finally:
             cass_future_free(cass_future)
 
@@ -74,6 +82,8 @@ cdef class Session:
         """
         cdef CassFuture* cass_future
         cdef CassError cass_error
+        cdef size_t length = 0
+        cdef char* error_message = NULL
         cdef const CassResult* cass_result = NULL
 
         cdef Result result
@@ -90,7 +100,8 @@ cdef class Session:
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)
-                raise_if_error(cass_error)
+                cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
+                raise_if_error(cass_error, error_message)
 
             result = Result.new_(cass_result)
         finally:
@@ -102,6 +113,8 @@ cdef class Session:
         """ Prepares an statement."""
         cdef CassFuture* cass_future
         cdef CassError cass_error
+        cdef size_t length = 0
+        cdef char* error_message = NULL
         cdef const CassPrepared* cass_prepared
 
         cdef bytes encoded_statement
@@ -121,7 +134,12 @@ cdef class Session:
             cass_prepared = cass_future_get_prepared(cass_future)
             if cass_prepared == NULL:
                 cass_error = cass_future_error_code(cass_future)
-                raise_if_error(cass_error)
+                cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
+                raise_if_error(cass_error, error_message)
+            self.schema_meta = cass_session_get_schema_meta(self.cass_session)
+            if self.keyspace is not None:
+                keyspace = self.keyspace.encode()
+                self.keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta, keyspace)
 
             prepared = PreparedStatement.new_(cass_prepared, timeout, consistency)
         finally:
@@ -137,6 +155,8 @@ cdef class Session:
         """
         cdef CassFuture* cass_future
         cdef CassError cass_error
+        cdef size_t length = 0
+        cdef char* error_message = NULL
         cdef const CassResult* cass_result = NULL
 
         cdef CallbackWrapper cb_wrapper
@@ -152,7 +172,8 @@ cdef class Session:
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)
-                raise_if_error(cass_error)
+                cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
+                raise_if_error(cass_error, error_message)
         finally:
             cass_future_free(cass_future)
 

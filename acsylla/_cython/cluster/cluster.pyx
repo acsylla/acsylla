@@ -15,11 +15,19 @@ cdef class Cluster:
     def __init__(
         self,
         list contact_points,
+        int port,
         int protocol_version,
         float connect_timeout,
         float request_timeout,
         float resolve_timeout,
-        object consistency):
+        object consistency,
+        int core_connections_per_host,
+        int local_port_range_min,
+        int local_port_range_max,
+        str application_name,
+        str application_version,
+        int num_threads_io,
+    ):
 
         cdef CassProtocolVersion cass_protocol_version
         cdef str contact_points_csv
@@ -66,6 +74,19 @@ cdef class Cluster:
         cass_consistency = consistency.value
         error = cass_cluster_set_consistency(self.cass_cluster, cass_consistency)
         raise_if_error(error)
+
+        error = cass_cluster_set_port(self.cass_cluster, port)
+        raise_if_error(error)
+
+        error = cass_cluster_set_core_connections_per_host(self.cass_cluster, core_connections_per_host)
+        raise_if_error(error)
+
+        error = cass_cluster_set_num_threads_io(self.cass_cluster, num_threads_io)
+        raise_if_error(error)
+
+        cass_cluster_set_application_name(self.cass_cluster, application_name.encode())
+        cass_cluster_set_application_version(self.cass_cluster, application_version.encode())
+
 
     async def create_session(self, keyspace=None):
         session = Session(self, keyspace=keyspace)

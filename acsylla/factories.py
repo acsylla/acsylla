@@ -11,7 +11,7 @@ from .version import __version__
 
 def create_cluster(
     contact_points: List[str],
-    port: int = 19042,
+    port: int = 9042,
     protocol_version: int = 3,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,

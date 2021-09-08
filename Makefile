@@ -43,7 +43,7 @@ format:
 
 lint:
 	isort --check-only --recursive .
-	black --check .
+	black --exclude vendor --check .
 	flake8 --config setup.cfg
 
 mypy:

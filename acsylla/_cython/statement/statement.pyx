@@ -121,10 +121,14 @@ cdef class Statement:
         return cass_value_type
 
     cpdef bind(self, int idx, object value):
-        from uuid import UUID
+        from datetime import date
+        from datetime import datetime
+        from datetime import time
+        from datetime import timedelta
         from decimal import Decimal
-        from ipaddress import IPv4Address, IPv6Address
-        from datetime import date, datetime, time, timedelta
+        from ipaddress import IPv4Address
+        from ipaddress import IPv6Address
+        from uuid import UUID
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
 

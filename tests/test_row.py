@@ -1,18 +1,20 @@
-import pytest
-
-import uuid
+from acsylla import create_statement
+from datetime import (
+    date,
+    datetime,
+    time,
+    timedelta,
+)
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
-from datetime import date, datetime, time, timedelta
 
-from acsylla import create_statement
-
+import pytest
+import uuid
 
 pytestmark = pytest.mark.asyncio
 
 
 class TestRow:
-
     async def test_bool(self, session, id_generation):
         id_ = next(id_generation)
         value = True
@@ -135,7 +137,7 @@ class TestRow:
 
     async def test_decimal(self, session, id_generation):
         id_ = next(id_generation)
-        value = '3.141592653589793115997963468544185161590576171875'
+        value = "3.141592653589793115997963468544185161590576171875"
 
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_decimal) values (?, ?)")
         prepared = insert_statement.bind()
@@ -150,7 +152,7 @@ class TestRow:
         assert row.column_value("value_decimal") == Decimal(value)
 
         id_ = next(id_generation)
-        value = Decimal('3.141592653589793115997963468544185161590576171875')
+        value = Decimal("3.141592653589793115997963468544185161590576171875")
 
         insert_statement = create_statement("INSERT INTO test (id, value_decimal) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
@@ -163,7 +165,6 @@ class TestRow:
         row = result.first()
 
         assert row.column_value("value_decimal") == value
-
 
     async def test_uuid(self, session, id_generation):
         id_ = next(id_generation)
@@ -200,7 +201,7 @@ class TestRow:
 
         assert row.column_value("value_timeuuid") == value
 
-        value = '2a901afe-e8c4-11eb-9b07-acde48001122'
+        value = "2a901afe-e8c4-11eb-9b07-acde48001122"
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
         await session.execute(prepared)
@@ -215,7 +216,7 @@ class TestRow:
 
     async def test_ascii(self, session, id_generation):
         id_ = next(id_generation)
-        value = 'ascii string'
+        value = "ascii string"
 
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_ascii) values (?, ?)")
         prepared = insert_statement.bind()
@@ -264,7 +265,7 @@ class TestRow:
 
     async def test_varchar(self, session, id_generation):
         id_ = next(id_generation)
-        value = 'unicode string'
+        value = "unicode string"
 
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_varchar) values (?, ?)")
         prepared = insert_statement.bind()
@@ -297,7 +298,7 @@ class TestRow:
 
     async def test_inet4(self, session, id_generation):
         id_ = next(id_generation)
-        value = IPv4Address('127.0.0.1')
+        value = IPv4Address("127.0.0.1")
         insert_statement = create_statement("INSERT INTO test (id, value_inet) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
@@ -309,7 +310,7 @@ class TestRow:
 
     async def test_inet6(self, session, id_generation):
         id_ = next(id_generation)
-        value = IPv6Address('::1')
+        value = IPv6Address("::1")
         insert_statement = create_statement("INSERT INTO test (id, value_inet) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
@@ -334,7 +335,7 @@ class TestRow:
 
     async def test_date_from_str(self, session, id_generation):
         id_ = next(id_generation)
-        value = '2021-07-20'
+        value = "2021-07-20"
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_date) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -345,11 +346,11 @@ class TestRow:
         prepared.bind(0, id_)
         result = await session.execute(prepared)
         row = result.first()
-        assert row.column_value("value_date") == datetime.strptime('2021-07-20', "%Y-%m-%d").date()
+        assert row.column_value("value_date") == datetime.strptime("2021-07-20", "%Y-%m-%d").date()
 
     async def test_date_from_datetime(self, session, id_generation):
         id_ = next(id_generation)
-        value = datetime.strptime('2021-07-20', "%Y-%m-%d")
+        value = datetime.strptime("2021-07-20", "%Y-%m-%d")
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_date) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -364,7 +365,7 @@ class TestRow:
 
     async def test_time(self, session, id_generation):
         id_ = next(id_generation)
-        value = time.fromisoformat('16:34:56')
+        value = time.fromisoformat("16:34:56")
         insert_statement = create_statement("INSERT INTO test (id, value_time) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
@@ -377,7 +378,7 @@ class TestRow:
 
     async def test_time_from_str(self, session, id_generation):
         id_ = next(id_generation)
-        value = '12:34:59'
+        value = "12:34:59"
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_time) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -388,11 +389,11 @@ class TestRow:
         prepared.bind(0, id_)
         result = await session.execute(prepared)
         row = result.first()
-        assert row.column_value("value_time") == time.fromisoformat('12:34:59')
+        assert row.column_value("value_time") == time.fromisoformat("12:34:59")
 
     async def test_time_from_datetime(self, session, id_generation):
         id_ = next(id_generation)
-        value = datetime.strptime('2021-07-20 12:24', "%Y-%m-%d %H:%M")
+        value = datetime.strptime("2021-07-20 12:24", "%Y-%m-%d %H:%M")
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_time) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -407,7 +408,7 @@ class TestRow:
 
     async def test_timestamp(self, session, id_generation):
         id_ = next(id_generation)
-        value = datetime.fromisoformat('2021-07-21 15:24:31')
+        value = datetime.fromisoformat("2021-07-21 15:24:31")
         insert_statement = create_statement("INSERT INTO test (id, value_timestamp) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
@@ -420,7 +421,7 @@ class TestRow:
 
     async def test_timestamp_from_str(self, session, id_generation):
         id_ = next(id_generation)
-        value = '2021-07-21 15:24:31'
+        value = "2021-07-21 15:24:31"
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_timestamp) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -431,7 +432,7 @@ class TestRow:
         prepared.bind(0, id_)
         result = await session.execute(prepared)
         row = result.first()
-        print('ZZZZ', row.column_value("value_timestamp"))
+        print("ZZZZ", row.column_value("value_timestamp"))
         assert row.column_value("value_timestamp") == datetime.fromisoformat(value)
 
     async def test_timestamp_from_unixtime(self, session, id_generation):
@@ -451,9 +452,9 @@ class TestRow:
 
     async def test_duration(self, session, id_generation):
         id_ = next(id_generation)
-        value = timedelta(days=720, seconds=560, microseconds=3444,
-                          milliseconds=21324, minutes=123424,
-                          hours=23432, weeks=12340)
+        value = timedelta(
+            days=720, seconds=560, microseconds=3444, milliseconds=21324, minutes=123424, hours=23432, weeks=12340
+        )
         insert_statement = create_statement("INSERT INTO test (id, value_duration) values (?, ?)", parameters=2)
         insert_statement.bind_list([id_, value])
         await session.execute(insert_statement)
@@ -466,11 +467,11 @@ class TestRow:
 
     async def test_map(self, session, id_generation):
         id_ = next(id_generation)
-        value = {'key': 123}
+        value = {"key": 123}
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_map_text_bigint) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
-        res = await session.execute(prepared)
+        await session.execute(prepared)
 
         select_statement = await session.create_prepared("SELECT value_map_text_bigint FROM test WHERE ( id = ? )")
         prepared = select_statement.bind()
@@ -481,7 +482,7 @@ class TestRow:
 
     async def test_set(self, session, id_generation):
         id_ = next(id_generation)
-        value = {'12', '123'}
+        value = {"12", "123"}
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_set_text) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -496,7 +497,7 @@ class TestRow:
 
     async def test_list(self, session, id_generation):
         id_ = next(id_generation)
-        value = ['test', 'passed']
+        value = ["test", "passed"]
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_list_text) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -511,7 +512,7 @@ class TestRow:
 
     async def test_tuple(self, session, id_generation):
         id_ = next(id_generation)
-        value = ('test', 9223372036854775807)
+        value = ("test", 9223372036854775807)
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_tuple_text_bigint) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])
@@ -526,33 +527,32 @@ class TestRow:
 
     async def test_udt(self, session, id_generation):
         id_ = next(id_generation)
-        value = {'value_ascii': 'John',
-                 'value_bigint': 9223372036854775807,
-                 'value_blob': b'blob',
-                 'value_boolean': True,
-                 'value_date': date.fromisoformat('2020-01-01'),
-                 'value_decimal': Decimal('3.141592653589793'),
-                 'value_double': 3.1415927410125732,
-                 'value_duration': timedelta(days=7),
-                 'value_float': 3.141590118408203,
-                 'value_inet': IPv4Address('127.0.0.1'),
-                 'value_int': -2147483648,
-                 'value_smallint': -32768,
-                 'value_text': 'text',
-                 'value_time': time.fromisoformat('10:48:59'),
-                 'value_timestamp': datetime.fromisoformat('2021-07-21 15:24:31'),
-                 'value_timeuuid': uuid.uuid1(),
-                 'value_tinyint': -127,
-                 'value_varchar': 'varchar value',
-                 'value_varint': b'varint',
-                 'value_map_text_bigint': {'text bigint': 9223372036854775807},
-                 'value_set_text': {'set', 'text'},
-                 'value_list_text': ['list', 'of', 'text'],
-                 'value_tuple_text_bigint': ('tuple text and bigint', 9223372036854775807),
-                 'value_nested_udt': {
-                     'value_ascii': 'John',
-                     'value_bigint': 9223372036854775807}
-                 }
+        value = {
+            "value_ascii": "John",
+            "value_bigint": 9223372036854775807,
+            "value_blob": b"blob",
+            "value_boolean": True,
+            "value_date": date.fromisoformat("2020-01-01"),
+            "value_decimal": Decimal("3.141592653589793"),
+            "value_double": 3.1415927410125732,
+            "value_duration": timedelta(days=7),
+            "value_float": 3.141590118408203,
+            "value_inet": IPv4Address("127.0.0.1"),
+            "value_int": -2147483648,
+            "value_smallint": -32768,
+            "value_text": "text",
+            "value_time": time.fromisoformat("10:48:59"),
+            "value_timestamp": datetime.fromisoformat("2021-07-21 15:24:31"),
+            "value_timeuuid": uuid.uuid1(),
+            "value_tinyint": -127,
+            "value_varchar": "varchar value",
+            "value_varint": b"varint",
+            "value_map_text_bigint": {"text bigint": 9223372036854775807},
+            "value_set_text": {"set", "text"},
+            "value_list_text": ["list", "of", "text"],
+            "value_tuple_text_bigint": ("tuple text and bigint", 9223372036854775807),
+            "value_nested_udt": {"value_ascii": "John", "value_bigint": 9223372036854775807},
+        }
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_udt) values (?, ?)")
         prepared = insert_statement.bind()
         prepared.bind_list([id_, value])

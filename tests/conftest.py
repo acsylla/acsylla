@@ -1,4 +1,5 @@
-from acsylla import create_cluster, create_statement
+from acsylla import create_cluster
+from acsylla import create_statement
 
 import pytest
 
@@ -40,14 +41,17 @@ async def session(event_loop, cluster, keyspace):
     await session.execute(create_table_statement)
     create_table_statement = create_statement("DROP TYPE IF EXISTS udt_nested_type")
     await session.execute(create_table_statement)
-    create_table_statement = create_statement('''
+    create_table_statement = create_statement(
+        """
     CREATE TYPE udt_nested_type (
         value_ascii ascii,
-        value_bigint bigint 
+        value_bigint bigint
     );
-    ''')
+    """
+    )
     await session.execute(create_table_statement)
-    create_table_statement = create_statement('''
+    create_table_statement = create_statement(
+        """
     CREATE TYPE udt_type (
             value_ascii ascii,
             value_bigint bigint,
@@ -74,11 +78,13 @@ async def session(event_loop, cluster, keyspace):
             value_tuple_text_bigint tuple<text, bigint>,
             value_nested_udt frozen<udt_nested_type>
     );
-    ''')
+    """
+    )
     await session.execute(create_table_statement)
 
     # Create the table test in the acsylla keyspace
-    create_table_statement = create_statement('''
+    create_table_statement = create_statement(
+        """
         CREATE TABLE test (
             id int PRIMARY KEY,
             value int,
@@ -88,7 +94,6 @@ async def session(event_loop, cluster, keyspace):
             value_text text,
             value_blob blob,
             value_uuid uuid,
-            
             value_ascii ascii,
             value_bigint bigint,
             value_date date,
@@ -109,7 +114,8 @@ async def session(event_loop, cluster, keyspace):
             value_tuple_text_bigint tuple<text, bigint>,
             value_udt frozen<udt_type>
         );
-    ''')
+    """
+    )
     await session.execute(create_table_statement)
 
     try:

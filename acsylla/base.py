@@ -1,24 +1,27 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
+from abc import abstractmethod
 from acsylla._cython import cyacsylla
 from dataclasses import dataclass
-from enum import Enum
-from typing import (
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    Union,
-)
-
-from uuid import UUID
+from datetime import date
+from datetime import datetime
+from datetime import time
+from datetime import timedelta
 from decimal import Decimal
-from datetime import datetime, date, time, timedelta
-from ipaddress import IPv4Address, IPv6Address
+from enum import Enum
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
+from typing import Iterable
+from typing import Mapping
+from typing import Optional
+from typing import Sequence
+from typing import Union
+from uuid import UUID
 
-SupportedType = Union[None, int, float, bool, str, bytes, UUID, datetime, date,
-                      time, timedelta, IPv4Address, IPv6Address, Decimal]
+SupportedType = Union[
+    None, int, float, bool, str, bytes, UUID, datetime, date, time, timedelta, IPv4Address, IPv6Address, Decimal
+]
 
 
 class Cluster(metaclass=ABCMeta):
@@ -42,7 +45,7 @@ class Session(metaclass=ABCMeta):
 
     @abstractmethod
     async def close(self):
-        """ Closes a session.
+        """Closes a session.
 
         After calling this method no more executions will be allowed
         raising the proper excetion if this is the case.
@@ -50,11 +53,11 @@ class Session(metaclass=ABCMeta):
 
     @abstractmethod
     async def execute(self, statement: "Statement") -> "Result":
-        """ Executes an statement and returns the result."""
+        """Executes an statement and returns the result."""
 
     @abstractmethod
     async def create_prepared(self, statement: str, timeout: Optional[float] = None) -> "PreparedStatement":
-        """ Prepares an statement.
+        """Prepares an statement.
 
         By providing a `timeout` all requests built by the prepared statement will use it,
         otherwise timeout provided during the Cluster instantantation will be used. Value expected is seconds.
@@ -62,11 +65,11 @@ class Session(metaclass=ABCMeta):
 
     @abstractmethod
     async def execute_batch(self, batch: "Batch") -> None:
-        """ Executes a batch of statements."""
+        """Executes a batch of statements."""
 
     @abstractmethod
     async def metrics(self) -> "SessionMetrics":
-        """ Returns the metrics related to the session."""
+        """Returns the metrics related to the session."""
 
 
 class Statement(metaclass=ABCMeta):
@@ -75,7 +78,7 @@ class Statement(metaclass=ABCMeta):
 
     @abstractmethod
     def bind(self, index: int, value: SupportedType) -> None:
-        """ Binds the value to a specific index parameter.
+        """Binds the value to a specific index parameter.
 
         Types support for now: None, bool, int, float, str, bytes, and UUID.
 
@@ -88,7 +91,7 @@ class Statement(metaclass=ABCMeta):
 
     @abstractmethod
     def bind_list(self, values: Sequence[SupportedType]) -> None:
-        """ Binds the values into all parameters from left to right.
+        """Binds the values into all parameters from left to right.
 
         For types supported and errors that this function might raise take
         a look at the `Statement.bind` function.
@@ -99,7 +102,7 @@ class Statement(metaclass=ABCMeta):
 
     @abstractmethod
     def bind_by_name(self, name: str, value: SupportedType) -> None:
-        """ Binds the the value to a specific parameter by name.
+        """Binds the the value to a specific parameter by name.
 
         Types support for now: None, bool, int, float, str, bytes, and UUID.
 
@@ -109,7 +112,7 @@ class Statement(metaclass=ABCMeta):
 
     @abstractmethod
     def bind_dict(self, values: Mapping[str, SupportedType]) -> None:
-        """ Binds the values into all parameter names. Names are the keys
+        """Binds the values into all parameter names. Names are the keys
         of the mapping provided.
 
         For types supported and errors that this function might raise take
@@ -123,7 +126,7 @@ class PreparedStatement(metaclass=ABCMeta):
 
     @abstractmethod
     def bind(self, page_size: Optional[int] = None, page_state: Optional[bytes] = None) -> Statement:
-        """ Returns a new statment using the prepared."""
+        """Returns a new statment using the prepared."""
 
 
 class Batch(metaclass=ABCMeta):
@@ -133,7 +136,7 @@ class Batch(metaclass=ABCMeta):
 
     @abstractmethod
     def add_statement(self, statement: Statement) -> None:
-        """ Adds a new statement to the batch."""
+        """Adds a new statement to the batch."""
 
 
 class Result(metaclass=ABCMeta):
@@ -143,21 +146,21 @@ class Result(metaclass=ABCMeta):
 
     @abstractmethod
     def count(self) -> int:
-        """ Returns the total rows of the result"""
+        """Returns the total rows of the result"""
 
     @abstractmethod
     def column_count(self) -> int:
-        """ Returns the total columns returned"""
+        """Returns the total columns returned"""
 
     @abstractmethod
     def first(self) -> Optional["Row"]:
-        """ Return the first result, if there is no row
+        """Return the first result, if there is no row
         returns None.
         """
 
     @abstractmethod
     def all(self) -> Iterable["Row"]:
-        """ Return the all rows using of a result, using an
+        """Return the all rows using of a result, using an
         iterator.
 
         If there is no rows iterator returns no rows.
@@ -165,11 +168,11 @@ class Result(metaclass=ABCMeta):
 
     @abstractmethod
     def has_more_pages(self) -> bool:
-        """ Returns true if there is still pages to be fetched"""
+        """Returns true if there is still pages to be fetched"""
 
     @abstractmethod
     def page_state(self) -> bytes:
-        """ Returns a token with the page state for continuing fetching
+        """Returns a token with the page state for continuing fetching
         new results.
 
         Before calling this method you must first checks if there are more
@@ -184,11 +187,11 @@ class Row(metaclass=ABCMeta):
 
     @abstractmethod
     def as_dict(self) -> dict:
-        """ Returns the row as dict."""
+        """Returns the row as dict."""
 
     @abstractmethod
     def column_value(self, name: str) -> SupportedType:
-        """ Returns the row column value called by `name`.
+        """Returns the row column value called by `name`.
 
         Raises a `CassException` derived exception if the column can not be found
 
@@ -202,7 +205,7 @@ class Row(metaclass=ABCMeta):
 
 @dataclass
 class SessionMetrics:
-    """ Provides basic metrics for the Session."""
+    """Provides basic metrics for the Session."""
 
     # requests time statistics in microseconds.
     requests_min: int

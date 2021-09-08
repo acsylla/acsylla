@@ -55,6 +55,7 @@ def read_bind(session, prepared, key, str_key):
         _ = row[0]
     return time.monotonic() - start
 
+
 def read_bind_prepared(session, prepared, key, str_key):
     start = time.monotonic()
     result = session.execute(prepared, [key])
@@ -86,7 +87,7 @@ def run(session, prepared, func) -> None:
     lock_latencies.release()
 
 
-def benchmark(desc, func, session, prepared,  concurrency: int, duration: int) -> None:
+def benchmark(desc, func, session, prepared, concurrency: int, duration: int) -> None:
     global finish_benchmark, real_started, threads_started, latencies
 
     finish_benchmark = False
@@ -133,10 +134,16 @@ def benchmark(desc, func, session, prepared,  concurrency: int, duration: int) -
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--concurrency", help="Number of concurrency clients, by default 32", type=int, default=32,
+        "--concurrency",
+        help="Number of concurrency clients, by default 32",
+        type=int,
+        default=32,
     )
     parser.add_argument(
-        "--duration", help="Test duration in seconds, by default 60", type=int, default=10,
+        "--duration",
+        help="Test duration in seconds, by default 60",
+        type=int,
+        default=10,
     )
     args = parser.parse_args()
 

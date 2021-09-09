@@ -38,7 +38,7 @@ jobs:
         cassandra
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
-        sleep 30
+        sleep 90
         cqlsh -e "describe keyspaces"
     - name: Test generated macos-wheel
       if: ${{ matrix.os == 'macos-latest' }}
@@ -68,6 +68,9 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         docker-compose up -d
+        # wait till casssandra server is up, to be improved
+        # by checking the readiness of the serivce
+        sleep 90
     - name: Test generated manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |

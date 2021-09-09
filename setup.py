@@ -11,9 +11,16 @@ vi = sys.version_info
 if vi < (3, 7):
     raise RuntimeError("acsylla requires Python 3.7 or greater")
 
-CPP_CASSANDRA_DIR = os.path.join(os.path.dirname(__file__), "vendor", "cpp-driver")
+# Set environment variable for build specific driver (scylladb or datastax)
+# default scylladb
+CPP_DRIVER = os.environ.get('CPP_DRIVER', 'scylladb')
+CPP_LIB_NAME = "libscylla-cpp-driver_static.a"
+if CPP_DRIVER == 'datastax':
+    CPP_LIB_NAME = "libcassandra_static.a"
+CPP_VENDOR_PATH = os.path.join(os.path.dirname(__file__), "vendor")
+CPP_CASSANDRA_DIR = os.path.join(CPP_VENDOR_PATH, f"{CPP_DRIVER}-cpp-driver")
 CPP_CASSANDRA_INCLUDE_DIR = os.path.join(CPP_CASSANDRA_DIR, "include")
-CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", "libscylla-cpp-driver_static.a")
+CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", CPP_LIB_NAME)
 
 extensions = [
     Extension(

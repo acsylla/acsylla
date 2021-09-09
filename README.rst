@@ -6,7 +6,7 @@ WORK IN PROGRESS, use only for developing
 Install
 ==========
 
-There is an Alpha realease compabitble with Python 3.7 and Python 3.8 for Linux and MacOS environments uploaded as a Pypi package. Use the following
+There is an Alpha realease compabitble with Python 3.7, 3.8 and 3.9 for Linux and MacOS environments uploaded as a Pypi package. Use the following
 command for installing it:
 
 .. code-block:: bash

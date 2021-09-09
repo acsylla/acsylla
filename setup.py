@@ -13,9 +13,9 @@ if vi < (3, 7):
 
 # Set environment variable for build specific driver (scylladb or datastax)
 # default scylladb
-CPP_DRIVER = os.environ.get('CPP_DRIVER', 'scylladb')
+CPP_DRIVER = os.environ.get("CPP_DRIVER", "scylladb")
 CPP_LIB_NAME = "libscylla-cpp-driver_static.a"
-if CPP_DRIVER == 'datastax':
+if CPP_DRIVER == "datastax":
     CPP_LIB_NAME = "libcassandra_static.a"
 CPP_VENDOR_PATH = os.path.join(os.path.dirname(__file__), "vendor")
 CPP_CASSANDRA_DIR = os.path.join(CPP_VENDOR_PATH, f"{CPP_DRIVER}-cpp-driver")

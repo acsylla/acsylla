@@ -2,6 +2,13 @@ NOT RELEASED YET
 ================
 - Support only Pythonic methods for binding and gathering column values
 
+0.1.5a0
+========
+- Support for for all native types.
+- Method `as_dict` to row object
+- Add support for collections types, tuple and udt
+- Add batch counter
+
 0.1.4a0
 ========
 -  Support for Python 3.9

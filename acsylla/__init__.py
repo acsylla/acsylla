@@ -11,9 +11,9 @@ from .base import (
     Statement,
 )
 from .factories import (
+    create_batch_counter,
     create_batch_logged,
     create_batch_unlogged,
-    create_batch_counter,
     create_cluster,
     create_statement,
 )

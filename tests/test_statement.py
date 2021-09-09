@@ -1,42 +1,42 @@
-import uuid
-
+from acsylla import Consistency, create_statement, errors
+from datetime import (
+    date,
+    datetime,
+    time,
+    timedelta,
+)
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
-from datetime import date, datetime, time, timedelta
-
-from acsylla import (
-    Consistency,
-    create_statement,
-    errors
-)
 
 import pytest
+import uuid
 
 pytestmark = pytest.mark.asyncio
 
-statement_str = ('''
+statement_str = """
     INSERT INTO test (
-            id, 
-            value, 
-            value_int, 
-            value_float, 
-            value_bool, 
-            value_text, 
-            value_blob, 
-            value_uuid, 
-            value_decimal, 
+            id,
+            value,
+            value_int,
+            value_float,
+            value_bool,
+            value_text,
+            value_blob,
+            value_uuid,
+            value_decimal,
             value_inet,
             value_date,
             value_time,
             value_timestamp,
             value_duration,
-            value_map_text_bigint, 
-            value_set_text, 
-            value_list_text, 
+            value_map_text_bigint,
+            value_set_text,
+            value_list_text,
             value_tuple_text_bigint,
-            value_udt) 
+            value_udt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-''')
+"""
+
 
 class TestStatement:
 
@@ -134,28 +134,28 @@ class TestStatement:
             statement.bind(TestStatement.OUT_OF_BAND_PARAMETER, uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
     def test_bind_decimal(self, statement):
-        value = Decimal('3.141592653589793115997963468544185161590576171875')
+        value = Decimal("3.141592653589793115997963468544185161590576171875")
         statement.bind(8, value)
 
     def test_bind_inet(self, statement):
-        value = IPv4Address('127.0.0.1')
+        value = IPv4Address("127.0.0.1")
         statement.bind(9, value)
-        value = IPv6Address('::1')
+        value = IPv6Address("::1")
         statement.bind(9, value)
 
     def test_bind_date(self, statement):
         statement.bind(10, date.today())
 
     def test_bind_time(self, statement):
-        statement.bind(11, time.fromisoformat('15:24:31'))
+        statement.bind(11, time.fromisoformat("15:24:31"))
 
     def test_bind_timestamp(self, statement):
         statement.bind(12, datetime.now())
 
     def test_bind_duration(self, statement):
-        value = timedelta(days=720, seconds=560, microseconds=3444,
-                          milliseconds=21324, minutes=123424,
-                          hours=23432, weeks=12340)
+        value = timedelta(
+            days=720, seconds=560, microseconds=3444, milliseconds=21324, minutes=123424, hours=23432, weeks=12340
+        )
         statement.bind(13, value)
 
 
@@ -223,7 +223,6 @@ class TestStatementOnlyPrepared:
         with pytest.raises(OverflowError):
             statement.bind_by_name("value_int", -2147483649)
 
-
     def test_bind_int_by_name_invalid_name(self, statement):
         with pytest.raises(errors.CassErrorLibNameDoesNotExist):
             statement.bind_by_name("invalid_field", 10)
@@ -265,79 +264,77 @@ class TestStatementOnlyPrepared:
             statement.bind_by_name("invalid_field", b"acsylla")
 
     def test_bind_decimal_by_name(self, statement):
-        value = Decimal('3.141592653589793115997963468544185161590576171875')
+        value = Decimal("3.141592653589793115997963468544185161590576171875")
         statement.bind_by_name("value_decimal", value)
-        value = '3.141592653589793115997963468544185161590576171875'
+        value = "3.141592653589793115997963468544185161590576171875"
         statement.bind_by_name("value_decimal", value)
 
     def test_bind_inet_by_name(self, statement):
-        value = IPv4Address('127.0.0.1')
+        value = IPv4Address("127.0.0.1")
         statement.bind_by_name("value_inet", value)
-        value = IPv6Address('::1')
+        value = IPv6Address("::1")
         statement.bind_by_name("value_inet", value)
-        value = '127.0.0.1'
+        value = "127.0.0.1"
         statement.bind_by_name("value_inet", value)
-        value = '::1'
+        value = "::1"
         statement.bind_by_name("value_inet", value)
 
     def test_bind_date_by_name(self, statement):
         statement.bind_by_name("value_date", date.today())
         statement.bind_by_name("value_date", datetime.now())
-        statement.bind_by_name("value_date", '2011-07-20')
+        statement.bind_by_name("value_date", "2011-07-20")
         statement.bind_by_name("value_date", 1626728400)
 
     def test_bind_time_by_name(self, statement):
-        statement.bind_by_name("value_time", time.fromisoformat('15:24:31'))
+        statement.bind_by_name("value_time", time.fromisoformat("15:24:31"))
 
     def test_bind_timestamp_by_name(self, statement):
-        statement.bind_by_name("value_timestamp", datetime.fromisoformat('2021-07-21 15:24:31'))
-        statement.bind_by_name("value_timestamp", '2021-07-21 15:24:31')
+        statement.bind_by_name("value_timestamp", datetime.fromisoformat("2021-07-21 15:24:31"))
+        statement.bind_by_name("value_timestamp", "2021-07-21 15:24:31")
         statement.bind_by_name("value_timestamp", 1626870271.32)
 
     def test_bind_duration_by_name(self, statement):
-        value = timedelta(days=720, seconds=560, microseconds=3444,
-                          milliseconds=21324, minutes=123424,
-                          hours=23432, weeks=12340)
+        value = timedelta(
+            days=720, seconds=560, microseconds=3444, milliseconds=21324, minutes=123424, hours=23432, weeks=12340
+        )
         statement.bind_by_name("value_duration", value)
 
     def test_bind_map_text_bigint(self, statement):
-        value = {'key': 9223372036854775807}
+        value = {"key": 9223372036854775807}
         statement.bind(14, value)
 
     def test_bind_map_text_bigint_by_name(self, statement):
-        value = {'key': 9223372036854775807}
+        value = {"key": 9223372036854775807}
         statement.bind_by_name("value_map_text_bigint", value)
 
     def test_bind_set_text(self, statement):
-        value = {'test', 'passed'}
+        value = {"test", "passed"}
         statement.bind(15, value)
 
     def test_bind_set_text_by_name(self, statement):
-        value = {'test', 'passed'}
+        value = {"test", "passed"}
         statement.bind_by_name("value_set_text", value)
 
     def test_bind_list_text(self, statement):
-        value = ['test', 'passed']
+        value = ["test", "passed"]
         statement.bind(16, value)
 
     def test_bind_list_text_by_name(self, statement):
-        value = ['test', 'passed']
+        value = ["test", "passed"]
         statement.bind_by_name("value_list_text", value)
 
     def test_bind_tuple_text_bigint(self, statement):
-        value = ('test', 9223372036854775807)
+        value = ("test", 9223372036854775807)
         statement.bind(17, value)
 
     def test_bind_tuple_text_bigint_by_name(self, statement):
-        value = ('key', 9223372036854775807)
+        value = ("key", 9223372036854775807)
         statement.bind_by_name("value_tuple_text_bigint", value)
 
     def test_bind_udt(self, statement):
-        value = {'value_ascii': 'John',
-                 'value_bigint': 9223372036854775807}
+        value = {"value_ascii": "John", "value_bigint": 9223372036854775807}
         statement.bind(18, value)
 
     def test_bind_udt_by_name(self, statement):
-        value = {'value_ascii': 'John',
-                 'value_bigint': 9223372036854775807}
+        value = {"value_ascii": "John", "value_bigint": 9223372036854775807}
         statement.bind_by_name("value_udt", value)

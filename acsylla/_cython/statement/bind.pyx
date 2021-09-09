@@ -227,7 +227,8 @@ cdef inline bind_uuid_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_INET
 cdef CassInet get_cass_inet(object value):
-    from ipaddress import IPv4Address, IPv6Address
+    from ipaddress import IPv4Address
+    from ipaddress import IPv6Address
     cdef CassInet cass_inet
     cdef bytes bytes_value
     cdef CassError error
@@ -252,7 +253,9 @@ cdef inline bind_inet_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_DATE
 cdef get_cass_date(object value):
-    from datetime import date, datetime, timezone
+    from datetime import date
+    from datetime import datetime
+    from datetime import timezone
     cdef CassError error
     cdef cass_uint32_t cass_date
     cdef cass_int64_t epoch_secs
@@ -284,7 +287,9 @@ cdef inline bind_date_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_TIME
 cdef get_cass_time(object value):
-    from datetime import datetime, timezone, time
+    from datetime import datetime
+    from datetime import time
+    from datetime import timezone
     cdef CassError error
     cdef cass_int64_t time_of_day
     cdef cass_int64_t epoch_secs
@@ -321,7 +326,8 @@ cdef inline bind_time_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_TIMESTAMP
 cdef get_cass_timestamp(object value):
-    from datetime import datetime, timezone
+    from datetime import datetime
+    from datetime import timezone
     cdef CassError error
     cdef cass_int64_t timestamp
 

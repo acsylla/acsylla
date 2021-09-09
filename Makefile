@@ -26,7 +26,6 @@ compile: clean cythonize setup-build
 
 install-driver:
 	git submodule update --init --recursive
-	git submodule update --remote --merge
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \
 		cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC .. && \
@@ -44,7 +43,7 @@ format:
 
 lint:
 	isort --check-only --recursive .
-	black --check .
+	black --exclude vendor --check .
 	flake8 --config setup.cfg
 
 mypy:

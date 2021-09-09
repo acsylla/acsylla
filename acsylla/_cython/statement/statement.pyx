@@ -121,10 +121,14 @@ cdef class Statement:
         return cass_value_type
 
     cpdef bind(self, int idx, object value):
-        from uuid import UUID
+        from datetime import date
+        from datetime import datetime
+        from datetime import time
+        from datetime import timedelta
         from decimal import Decimal
-        from ipaddress import IPv4Address, IPv6Address
-        from datetime import date, datetime, time, timedelta
+        from ipaddress import IPv4Address
+        from ipaddress import IPv6Address
+        from uuid import UUID
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
 
@@ -239,10 +243,8 @@ cdef class Statement:
 
         if self.prepared == 0:
             raise ValueError("Method only availabe for statements created from prepared statements")
-        # try:
+
         bind_null_by_name(self.cass_statement, name.encode())
-        # except CassErrorLibNameDoesNotExist:
-        #     raise CassErrorLibNameDoesNotExist(f'Column {name} does not exist!')
 
         if value is None:
             return

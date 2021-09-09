@@ -5,13 +5,13 @@ from .base import (
     Consistency,
     Statement,
 )
+from .version import __version__
 from typing import List, Optional
 
-from .version import __version__
 
 def create_cluster(
     contact_points: List[str],
-    port: int = 19042,
+    port: int = 9042,
     protocol_version: int = 3,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
@@ -20,9 +20,9 @@ def create_cluster(
     core_connections_per_host: int = 1,
     local_port_range_min: int = 49152,
     local_port_range_max: int = 65535,
-    application_name: str = 'acsylla',
+    application_name: str = "acsylla",
     application_version: str = __version__,
-    num_threads_io: int = 1
+    num_threads_io: int = 1,
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -51,7 +51,7 @@ def create_cluster(
         local_port_range_max,
         application_name,
         application_version,
-        num_threads_io
+        num_threads_io,
     )
 
 

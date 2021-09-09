@@ -9,7 +9,9 @@
 # CPP driver we do not have any chance of initalizing that thread.
 import socket
 import threading
+
 from posix cimport unistd
+
 
 cdef void _socket_write(int fd) nogil:
     unistd.write(fd, b"1", 1)

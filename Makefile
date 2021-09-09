@@ -58,4 +58,10 @@ stress:
 certs:
 	bin/make_test_certs.sh
 
+install-doc:
+	$(PIP) install -r docs/requirements.txt
+
+doc:
+	make -C docs/ html
+
 .PHONY: clean setup-build install install-dev compile test stress mypy lint format certs

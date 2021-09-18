@@ -432,7 +432,6 @@ class TestRow:
         prepared.bind(0, id_)
         result = await session.execute(prepared)
         row = result.first()
-        print("ZZZZ", row.column_value("value_timestamp"))
         assert row.column_value("value_timestamp") == datetime.fromisoformat(value)
 
     async def test_timestamp_from_unixtime(self, session, id_generation):
@@ -551,7 +550,7 @@ class TestRow:
             "value_set_text": {"set", "text"},
             "value_list_text": ["list", "of", "text"],
             "value_tuple_text_bigint": ("tuple text and bigint", 9223372036854775807),
-            "value_nested_udt": {"value_ascii": "John", "value_bigint": 9223372036854775807},
+            "value_nested_udt": {"value_ascii": "John", "value_bigint": None},
         }
         insert_statement = await session.create_prepared("INSERT INTO test (id, value_udt) values (?, ?)")
         prepared = insert_statement.bind()
@@ -564,3 +563,63 @@ class TestRow:
         result = await session.execute(prepared)
         row = result.first()
         assert row.column_value("value_udt") == value
+
+    async def test_list_of_udt(self, session, id_generation):
+        id_ = next(id_generation)
+        value = [{"value_ascii": "John", "value_bigint": None}, {"value_ascii": "John", "value_bigint": 123}]
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_list_udt) values (?, ?)")
+        prepared = insert_statement.bind()
+        prepared.bind_list([id_, value])
+        await session.execute(prepared)
+
+        select_statement = await session.create_prepared("SELECT * FROM test WHERE ( id = ? )")
+        prepared = select_statement.bind()
+        prepared.bind(0, id_)
+        result = await session.execute(prepared)
+        row = result.first()
+        assert row.column_value("id") == id_
+
+    async def test_set_of_udt(self, session, id_generation):
+        id_ = next(id_generation)
+        value = ({"value_ascii": "John", "value_bigint": None}, {"value_ascii": "John", "value_bigint": 123})
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_set_udt) values (?, ?)")
+        prepared = insert_statement.bind()
+        prepared.bind_list([id_, value])
+        await session.execute(prepared)
+
+        select_statement = await session.create_prepared("SELECT * FROM test WHERE ( id = ? )")
+        prepared = select_statement.bind()
+        prepared.bind(0, id_)
+        result = await session.execute(prepared)
+        row = result.first()
+        assert row.column_value("id") == id_
+
+    async def test_map_of_udt(self, session, id_generation):
+        id_ = next(id_generation)
+        value = {1: {"value_ascii": "John", "value_bigint": None}, 2: {"value_ascii": "John", "value_bigint": 123}}
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_map_udt) values (?, ?)")
+        prepared = insert_statement.bind()
+        prepared.bind_list([id_, value])
+        await session.execute(prepared)
+
+        select_statement = await session.create_prepared("SELECT * FROM test WHERE ( id = ? )")
+        prepared = select_statement.bind()
+        prepared.bind(0, id_)
+        result = await session.execute(prepared)
+        row = result.first()
+        assert row.column_value("id") == id_
+
+    async def test_tuple_of_udt(self, session, id_generation):
+        id_ = next(id_generation)
+        value = ({"value_ascii": "John", "value_bigint": None}, {"value_ascii": "John", "value_bigint": 123})
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_tuple_udt) values (?, ?)")
+        prepared = insert_statement.bind()
+        prepared.bind_list([id_, value])
+        await session.execute(prepared)
+
+        select_statement = await session.create_prepared("SELECT * FROM test WHERE ( id = ? )")
+        prepared = select_statement.bind()
+        prepared.bind(0, id_)
+        result = await session.execute(prepared)
+        row = result.first()
+        assert row.column_value("id") == id_

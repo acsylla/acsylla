@@ -124,7 +124,7 @@ cdef tuple get_cass_decimal(object value):
     cdef object t
     cdef cass_int32_t scale
     if not isinstance(value, Decimal):
-        value = Decimal(value)
+        value = Decimal(str(value))
     t = value.as_tuple()
     scale = len(t.digits[len(t.digits[:t.exponent]):])
     value = str(value).encode()
@@ -477,22 +477,27 @@ cdef bind_collection_by_value_type(CassCollection* collection, object value, con
 cdef CassCollection* get_collection(object value, const CassDataType* cass_data_type):
     cdef CassCollection* collection = NULL
     cdef CassError error
+    cdef const CassDataType* sub_data_type
+    cdef CassValueType sub_value_type
 
     collection_type = cass_data_type_type(cass_data_type)
     collection = cass_collection_new_from_data_type(cass_data_type, len(value))
-
-    sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
-    sub_value_type = cass_data_type_type(sub_data_type)
 
     if collection_type == CASS_VALUE_TYPE_MAP:
         if not isinstance(value, dict):
             raise ValueError('Value type "map" must be dict')
         for k, v in value.items():
+            if v is None:
+                continue
+            sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
+            sub_value_type = cass_data_type_type(sub_data_type)
             bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type)
             sub_data_type = cass_data_type_sub_data_type(cass_data_type, 1)
             sub_value_type = cass_data_type_type(sub_data_type)
             bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
     else:
+        sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
+        sub_value_type = cass_data_type_type(sub_data_type)
         for i, el in enumerate(value):
             bind_collection_by_value_type(collection, el, sub_data_type, sub_value_type)
 

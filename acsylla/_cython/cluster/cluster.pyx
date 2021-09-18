@@ -81,6 +81,9 @@ cdef class Cluster:
         error = cass_cluster_set_core_connections_per_host(self.cass_cluster, core_connections_per_host)
         raise_if_error(error)
 
+        error = cass_cluster_set_local_port_range(self.cass_cluster, local_port_range_min, local_port_range_max)
+        raise_if_error(error)
+
         error = cass_cluster_set_num_threads_io(self.cass_cluster, num_threads_io)
         raise_if_error(error)
 

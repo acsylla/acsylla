@@ -367,7 +367,10 @@ cdef extern from "cassandra.h":
   CassError cass_iterator_get_user_type_field_name(const CassIterator* iterator, const char** name, size_t* name_length)
   CassValue* cass_iterator_get_user_type_field_value(const CassIterator* iterator)
 
+  cass_bool_t cass_value_is_null(const CassValue * value)
+
   CassValueType cass_value_type(const CassValue* value)
+
   CassError cass_value_get_int8(const CassValue* value, cass_int8_t* output)
   CassError cass_value_get_int16(const CassValue* value, cass_int16_t* output)
   CassError cass_value_get_int32(const CassValue* value, cass_int32_t* output)

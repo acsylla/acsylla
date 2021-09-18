@@ -48,6 +48,10 @@ cdef class Row:
     cdef object _get_cass_value(self, const CassValue* cass_value):
         cdef CassValueType cass_type
 
+        cdef cass_bool_t value_is_null = cass_value_is_null(cass_value)
+        if value_is_null:
+            return None
+
         cass_type = cass_value_type(cass_value)
 
         if cass_type == CASS_VALUE_TYPE_UNKNOWN:
@@ -413,6 +417,9 @@ cdef class Row:
         while cass_iterator_next(iterator) == cass_true:
             cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
             field_value = cass_iterator_get_user_type_field_value(iterator)
+            # if cass_value_is_null(cass_value):
+            #     data[field_name.decode()] = None
+            # else:
             data[field_name.decode()] = self._get_cass_value(field_value)
         cass_iterator_free(iterator)
         return data

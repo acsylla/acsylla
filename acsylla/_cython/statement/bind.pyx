@@ -1,3 +1,13 @@
+from uuid import UUID
+from decimal import Decimal
+from datetime import date
+from datetime import time
+from datetime import datetime
+from datetime import timezone
+from datetime import timedelta
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
+
 cdef inline bind_null(CassStatement* statement, int index):
     cdef CassError error
     error = cass_statement_bind_null(statement, index)
@@ -25,7 +35,7 @@ cdef get_int8(object value):
     elif not isinstance(value, int):
         raise ValueError(f'Value "{value}" is not int8')
     if value < -128 or value > 127:
-        raise OverflowError(f'Value int8 must be between -128 and 127 got {value}')
+        raise ValueError(f'Value int8 must be between -128 and 127 got {value}')
     return <cass_int8_t>value
 
 cdef inline bind_int8(CassStatement* statement, int index, object value):
@@ -45,7 +55,7 @@ cdef get_int16(object value):
     elif not isinstance(value, int):
         raise ValueError(f'Value "{value}" is not int16')
     if value < -32768 or value > 32767:
-        raise OverflowError(f'Value int16 must be between -32768 and 32767 got {value}')
+        raise ValueError(f'Value int16 must be between -32768 and 32767 got {value}')
     return <cass_int16_t>value
 
 cdef inline bind_int16(CassStatement* statement, int index, object value):
@@ -65,7 +75,7 @@ cdef get_int32(object value):
     elif not isinstance(value, int):
         raise ValueError(f'Value "{value}" is not int32')
     if value < -2147483648 or value > 2147483647:
-        raise OverflowError(f'Value int32 must be between -2147483648 and 2147483647 got {value}')
+        raise ValueError(f'Value int32 must be between -2147483648 and 2147483647 got {value}')
     return value
 
 cdef bind_int32(CassStatement* statement, int index, object value):
@@ -85,7 +95,7 @@ cdef get_int64(object value):
     elif not isinstance(value, int):
         raise ValueError(f'Value "{value}" is not int64')
     if value < -9223372036854775808 or value > 9223372036854775807:
-        raise OverflowError(f'Value int64 must be between -9223372036854775808 and 9223372036854775807 got {value}')
+        raise ValueError(f'Value int64 must be between -9223372036854775808 and 9223372036854775807 got {value}')
 
     return value
 
@@ -101,7 +111,6 @@ cdef inline bind_int64_by_name(CassStatement* statement, bytes name, object valu
 
 # CASS_VALUE_TYPE_FLOAT
 cdef get_float(object value):
-    from decimal import Decimal
     if isinstance(value, (int, Decimal)) or (isinstance(value, str) and value.isdigit()):
         value = float(value)
     elif not isinstance(value, float):
@@ -120,7 +129,6 @@ cdef inline bind_float_by_name(CassStatement* statement, bytes name, object valu
 
 # CASS_VALUE_TYPE_DECIMAL
 cdef tuple get_cass_decimal(object value):
-    from decimal import Decimal
     cdef object t
     cdef cass_int32_t scale
     if not isinstance(value, Decimal):
@@ -201,7 +209,6 @@ cdef inline bind_bytes_by_name(CassStatement* statement, bytes name, bytes value
 
 # CASS_VALUE_TYPE_UUID
 cdef CassUuid get_cass_uuid(object value):
-    from uuid import UUID
     cdef bytes bytes_value
     cdef CassUuid cass_uuid
     cdef CassError error
@@ -227,8 +234,6 @@ cdef inline bind_uuid_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_INET
 cdef CassInet get_cass_inet(object value):
-    from ipaddress import IPv4Address
-    from ipaddress import IPv6Address
     cdef CassInet cass_inet
     cdef bytes bytes_value
     cdef CassError error
@@ -253,9 +258,6 @@ cdef inline bind_inet_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_DATE
 cdef get_cass_date(object value):
-    from datetime import date
-    from datetime import datetime
-    from datetime import timezone
     cdef CassError error
     cdef cass_uint32_t cass_date
     cdef cass_int64_t epoch_secs
@@ -287,9 +289,6 @@ cdef inline bind_date_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_TIME
 cdef get_cass_time(object value):
-    from datetime import datetime
-    from datetime import time
-    from datetime import timezone
     cdef CassError error
     cdef cass_int64_t time_of_day
     cdef cass_int64_t epoch_secs
@@ -326,8 +325,6 @@ cdef inline bind_time_by_name(CassStatement* statement, bytes name, object value
 
 # CASS_VALUE_TYPE_TIMESTAMP
 cdef get_cass_timestamp(object value):
-    from datetime import datetime
-    from datetime import timezone
     cdef CassError error
     cdef cass_int64_t timestamp
 
@@ -336,10 +333,10 @@ cdef get_cass_timestamp(object value):
     elif isinstance(value, str):
         value = datetime.fromisoformat(value)
         timestamp = int(value.replace(hour=value.hour,
-                                                minute=value.minute,
-                                                second=value.second,
-                                                microsecond=value.microsecond,
-                                                tzinfo=timezone.utc).timestamp()*1000)
+                                      minute=value.minute,
+                                      second=value.second,
+                                      microsecond=value.microsecond,
+                                      tzinfo=timezone.utc).timestamp()*1000)
     else:
         timestamp = int(value*1000)
     return timestamp
@@ -356,7 +353,6 @@ cdef inline bind_timestamp_by_name(CassStatement* statement, bytes name, object 
 
 # CASS_VALUE_TYPE_DURATION
 cdef tuple get_cass_duration(object value):
-    from datetime import timedelta
     cdef cass_int64_t NANOS_IN_A_SEC = 1000 * 1000 * 1000
     cdef cass_int64_t NANOS_IN_A_US = 1000
     cdef cass_int32_t month = 0
@@ -367,7 +363,7 @@ cdef tuple get_cass_duration(object value):
         days = value.days
         nanos = value.seconds * NANOS_IN_A_SEC + value.microseconds * NANOS_IN_A_US
     else:
-        raise NotImplementedError("Only instance of datetime.timedelta supported")
+        raise ValueError("Only instance of datetime.timedelta supported")
     return month, days, nanos
 
 cdef inline bind_duration(CassStatement* statement, int index, object value):

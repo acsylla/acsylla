@@ -218,9 +218,9 @@ class TestStatementOnlyPrepared:
         statement.bind_by_name("value_int", 10)
 
     def test_bind_int_by_name_value_error(self, statement):
-        with pytest.raises(OverflowError):
+        with pytest.raises(ValueError):
             statement.bind_by_name("value_int", 2147483649)
-        with pytest.raises(OverflowError):
+        with pytest.raises(ValueError):
             statement.bind_by_name("value_int", -2147483649)
 
     def test_bind_int_by_name_invalid_name(self, statement):

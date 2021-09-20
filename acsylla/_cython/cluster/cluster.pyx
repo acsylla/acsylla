@@ -17,6 +17,8 @@ cdef class Cluster:
         list contact_points,
         int port,
         int protocol_version,
+        const char* username,
+        const char* password,
         float connect_timeout,
         float request_timeout,
         float resolve_timeout,
@@ -70,6 +72,8 @@ cdef class Cluster:
         cass_cluster_set_request_timeout(self.cass_cluster, request_timeout_ms)
         cass_cluster_set_resolve_timeout(self.cass_cluster, resolve_timeout_ms)
 
+        if len(username):
+            cass_cluster_set_credentials(self.cass_cluster, username, password)
 
         cass_consistency = consistency.value
         error = cass_cluster_set_consistency(self.cass_cluster, cass_consistency)

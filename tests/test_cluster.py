@@ -35,3 +35,11 @@ class Testcreate_cluster:
     )
     async def test_cluster_override_consistency(self, host, consistency):
         create_cluster([host], consistency=consistency)
+
+    async def test_cluster_authentication(self, host):
+        with pytest.raises(ValueError):
+            create_cluster([host], username="cassandra", password=None)
+        with pytest.raises(ValueError):
+            create_cluster([host], username=None, password="cassandra")
+
+        create_cluster([host], username="cassandra", password="cassandra")

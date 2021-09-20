@@ -40,17 +40,12 @@ def create_cluster(
     If `consistency` is provided the default value would be override, any statment will use
     by default that consistency level unless it is specificily configured at statement level.
     """
-    if username is None:
-        username = ""
-    if password is None:
-        password = ""
-
     return _cython.cyacsylla.Cluster(
         contact_points,
         port,
         protocol_version,
-        username.encode(),
-        password.encode(),
+        username,
+        password,
         connect_timeout,
         request_timeout,
         resolve_timeout,

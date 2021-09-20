@@ -12,6 +12,8 @@ from typing import List, Optional
 def create_cluster(
     contact_points: List[str],
     port: int = 9042,
+    username: str = None,
+    password: str = None,
     protocol_version: int = 3,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
@@ -42,6 +44,8 @@ def create_cluster(
         contact_points,
         port,
         protocol_version,
+        username,
+        password,
         connect_timeout,
         request_timeout,
         resolve_timeout,

@@ -48,6 +48,10 @@ cdef class Row:
     cdef object _get_cass_value(self, const CassValue* cass_value):
         cdef CassValueType cass_type
 
+        cdef cass_bool_t value_is_null = cass_value_is_null(cass_value)
+        if value_is_null:
+            return None
+
         cass_type = cass_value_type(cass_value)
 
         if cass_type == CASS_VALUE_TYPE_UNKNOWN:

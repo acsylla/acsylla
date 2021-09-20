@@ -17,6 +17,8 @@ cdef class Cluster:
         list contact_points,
         int port,
         int protocol_version,
+        object username,
+        object password,
         float connect_timeout,
         float request_timeout,
         float resolve_timeout,
@@ -70,6 +72,10 @@ cdef class Cluster:
         cass_cluster_set_request_timeout(self.cass_cluster, request_timeout_ms)
         cass_cluster_set_resolve_timeout(self.cass_cluster, resolve_timeout_ms)
 
+        if username is not None and password is not None:
+            cass_cluster_set_credentials(self.cass_cluster, username.encode(), password.encode())
+        elif username is not None or password is not None:
+            raise ValueError("For using credentials both parametres (username and password) need to be set")
 
         cass_consistency = consistency.value
         error = cass_cluster_set_consistency(self.cass_cluster, cass_consistency)
@@ -79,6 +85,9 @@ cdef class Cluster:
         raise_if_error(error)
 
         error = cass_cluster_set_core_connections_per_host(self.cass_cluster, core_connections_per_host)
+        raise_if_error(error)
+
+        error = cass_cluster_set_local_port_range(self.cass_cluster, local_port_range_min, local_port_range_max)
         raise_if_error(error)
 
         error = cass_cluster_set_num_threads_io(self.cass_cluster, num_threads_io)

@@ -20,3 +20,5 @@ cdef class Statement:
 
     cpdef bind(self, int idx, object value)
     cpdef bind_by_name(self, str name, object value)
+    cpdef set_page_state(self, object py_page_state)
+

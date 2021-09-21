@@ -61,6 +61,18 @@ cdef class Result:
         count = cass_result_column_count(self.cass_result)
         return count
 
+    def columns_names(self):
+        """ Returns the columns names"""
+        cdef size_t length = 0
+        cdef char* name = NULL
+        cdef CassError error
+        columns = []
+        for i in range(self.column_count()):
+            error = cass_result_column_name(self.cass_result, i, <const char**> &name, <size_t*> &length)
+            raise_if_error(error)
+            columns.append(name.decode())
+        return columns
+
     def first(self):
         """ Return the first result, if there is no row
         returns None.
@@ -68,7 +80,7 @@ cdef class Result:
         cdef const CassRow* cass_row
 
         cass_row = cass_result_first_row(self.cass_result)
-        if (cass_row == NULL):
+        if cass_row == NULL:
             return None
 
         return Row.new_(cass_row, self)
@@ -84,8 +96,11 @@ cdef class Result:
 
         try:
             cass_iterator = cass_iterator_from_result(self.cass_result)
-            while (cass_iterator_next(cass_iterator) == cass_true):
+            while cass_iterator_next(cass_iterator) == cass_true:
                 cass_row = cass_iterator_get_row(cass_iterator)
                 yield Row.new_(cass_row, self)
         finally:
             cass_iterator_free(cass_iterator)
+
+    def __iter__(self):
+        return self.all()

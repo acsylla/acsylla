@@ -72,6 +72,17 @@ cdef class Statement:
             if error != CASS_OK:
                 raise RuntimeError("Error {} trying to set page token state".format(error))
 
+    cpdef set_page_state(self, object py_page_state):
+        cdef CassError error
+        cdef int length
+        cdef char* page_state = NULL
+
+        if py_page_state is not None:
+            page_state = py_page_state
+            length = len(py_page_state)
+            error = cass_statement_set_paging_state_token(self.cass_statement, page_state, length)
+            raise_if_error(error)
+
     cdef _set_timeout(self, object timeout):
         cdef CassError error
         cdef int timeout_ms

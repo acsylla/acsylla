@@ -17,25 +17,42 @@ cdef class Row:
 
         return row
 
+    def __iter__(self):
+        return self.as_named_tuple()
+
     def column_count(self):
         return self.result.column_count()
 
     def as_dict(self):
-        cdef Py_ssize_t length = 0
-        cdef char* name = NULL
-        cdef CassError error
-        ret = {}
-        for i in range(self.result.column_count()):
-            error = cass_result_column_name(self.result.cass_result, i, <const char**> &name, <size_t*> &length)
-            raise_if_error(error)
-            ret[name.decode()] = self.column_value(name.decode())
-        return ret
+        return dict(self.as_named_tuple())
+
+    def as_list(self):
+        result = []
+        for index in range(self.result.column_count()):
+            result.append(self.column_value_by_index(index))
+        return result
+
+    def as_tuple(self):
+        return tuple(self.as_list())
+
+    def as_named_tuple(self):
+        for column in self.result.columns_names():
+            yield column, self.column_value(column)
+
+    def column_value_by_index(self, size_t index):
+        """ Returns the column value by `column index`.
+        Raises an exception if the column can not be found"""
+        cdef const CassValue* cass_value
+        cass_value = cass_row_get_column(self.cass_row, index)
+        if cass_value == NULL:
+            raise ColumnNotFound(f'ColumnNotFound with index {index}')
+
+        return self._get_cass_value(cass_value)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
 
         Raises an exception if the column can not be found"""
-        cdef CassValueType cass_type
         cdef const CassValue* cass_value
         cdef bytes_name = column_name.encode()
 

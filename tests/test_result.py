@@ -172,3 +172,33 @@ class TestResult:
             page_state = result.page_state()
 
         assert pages_fetched == pages_fetched_expected
+
+    async def test_result_row_as_types(self, session, insert_statement, select_statement, id_generation):
+        id_ = next(id_generation)
+        value = 100
+
+        # insert a new value into the table
+        insert_statement.bind_list([id_, value])
+        await session.execute(insert_statement)
+
+        # read the new inserted value
+        select_statement.bind(0, id_)
+        result = await session.execute(select_statement)
+
+        assert result.count() == 1
+        assert result.column_count() == 2
+
+        row_as_dict = {"id": id_, "value": value}
+        row_as_list = list(row_as_dict.values())
+        row_as_tuple = tuple(row_as_dict.values())
+        row_as_named_tuple = list(row_as_dict.items())
+
+        assert result.columns_names() == list(row_as_dict.keys())
+
+        for row in result:
+            assert list(row) == row_as_named_tuple
+            assert [k for k in row.as_named_tuple()] == row_as_named_tuple
+            assert dict(row) == row_as_dict
+            assert row.as_dict() == row_as_dict
+            assert row.as_list() == row_as_list
+            assert row.as_tuple() == row_as_tuple

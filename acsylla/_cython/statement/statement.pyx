@@ -13,7 +13,8 @@ cdef class Statement:
         object page_size,
         object page_state,
         object timeout,
-        object consistency):
+        object consistency,
+        object serial_consistency):
 
         cdef Statement statement
         cdef bytes encoded_statement
@@ -27,9 +28,11 @@ cdef class Statement:
             len(encoded_statement),
             parameters
         )
-        statement._set_paging(page_size, page_state)
-        statement._set_timeout(timeout)
-        statement._set_consistency(consistency)
+        statement.set_page_size(page_size)
+        statement.set_page_state(page_state)
+        statement.set_timeout(timeout)
+        statement.set_consistency(consistency)
+        statement.set_serial_consistency(serial_consistency)
         return statement
 
     @staticmethod
@@ -39,7 +42,8 @@ cdef class Statement:
             object page_size,
             object page_state,
             object timeout,
-            object consistency):
+            object consistency,
+            object serial_consistency):
 
         cdef Statement statement
 
@@ -47,12 +51,14 @@ cdef class Statement:
         statement.cass_statement = cass_statement
         statement.cass_prepared = cass_prepared
         statement.prepared = 1
-        statement._set_paging(page_size, page_state)
-        statement._set_timeout(timeout)
-        statement._set_consistency(consistency)
+        statement.set_page_size(page_size)
+        statement.set_page_state(page_state)
+        statement.set_timeout(timeout)
+        statement.set_consistency(consistency)
+        statement.set_serial_consistency(serial_consistency)
         return statement
 
-    cdef _set_paging(self, object py_page_size, object py_page_state):
+    cpdef set_page_size(self, object py_page_size):
         cdef CassError error
         cdef int page_size
         cdef int length
@@ -61,16 +67,7 @@ cdef class Statement:
         if py_page_size is not None:
             page_size = py_page_size
             error = cass_statement_set_paging_size(self.cass_statement, page_size)
-            if error != CASS_OK:
-                raise RuntimeError("Error {} trying to set page size".format(error))
-
-        if py_page_state is not None:
-            page_state = py_page_state
-            length = len(py_page_state)
-            error = cass_statement_set_paging_state_token(
-                self.cass_statement, page_state, length);
-            if error != CASS_OK:
-                raise RuntimeError("Error {} trying to set page token state".format(error))
+            raise_if_error(error)
 
     cpdef set_page_state(self, object py_page_state):
         cdef CassError error
@@ -83,7 +80,7 @@ cdef class Statement:
             error = cass_statement_set_paging_state_token(self.cass_statement, page_state, length)
             raise_if_error(error)
 
-    cdef _set_timeout(self, object timeout):
+    cpdef set_timeout(self, object timeout):
         cdef CassError error
         cdef int timeout_ms
 
@@ -92,10 +89,9 @@ cdef class Statement:
 
         timeout_ms = int(timeout * 1000)
         error = cass_statement_set_request_timeout(self.cass_statement, timeout_ms)
-        if error != CASS_OK:
-            raise RuntimeError("Error {} trying to set the timeout".format(error))
+        raise_if_error(error)
 
-    cdef _set_consistency(self, object consistency):
+    cpdef set_consistency(self, object consistency):
         cdef CassError error
         cdef CassConsistency cass_consistency
 
@@ -104,6 +100,17 @@ cdef class Statement:
 
         cass_consistency = consistency.value
         error = cass_statement_set_consistency(self.cass_statement, cass_consistency)
+        raise_if_error(error)
+
+    cpdef set_serial_consistency(self, object consistency):
+        cdef CassError error
+        cdef CassConsistency cass_consistency
+
+        if consistency is None:
+            return
+
+        cass_consistency = consistency.value
+        error = cass_statement_set_serial_consistency(self.cass_statement, cass_consistency)
         raise_if_error(error)
 
     cdef const CassDataType* _get_data_type(self, int index):
@@ -332,7 +339,8 @@ def create_statement(
     object page_size=None,
     object page_state=None,
     object timeout=None,
-    object consistency=None):
+    object consistency=None,
+    object serial_consistency=None):
     cdef Statement statement
     statement = Statement.new_from_string(
         statement_str,
@@ -340,6 +348,7 @@ def create_statement(
         page_size,
         page_state,
         timeout,
-        consistency
+        consistency,
+        serial_consistency
     )
     return statement

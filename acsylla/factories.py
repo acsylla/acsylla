@@ -66,6 +66,7 @@ def create_statement(
     page_state: Optional[bytes] = None,
     timeout: Optional[float] = None,
     consistency: Optional[Consistency] = None,
+    serial_consistency: Optional[Consistency] = None,
 ) -> Statement:
     """
     Creates a new statment.
@@ -90,6 +91,7 @@ def create_statement(
         page_state=page_state,
         timeout=timeout,
         consistency=consistency,
+        serial_consistency=serial_consistency,
     )
 
 

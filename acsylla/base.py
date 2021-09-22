@@ -22,7 +22,24 @@ from typing import (
 from uuid import UUID
 
 SupportedType = Union[
-    None, int, float, bool, str, bytes, UUID, datetime, date, time, timedelta, IPv4Address, IPv6Address, Decimal
+    None,
+    int,
+    float,
+    bool,
+    str,
+    bytes,
+    list,
+    set,
+    dict,
+    tuple,
+    UUID,
+    datetime,
+    date,
+    time,
+    timedelta,
+    IPv4Address,
+    IPv6Address,
+    Decimal,
 ]
 
 
@@ -92,6 +109,16 @@ class Statement(metaclass=ABCMeta):
         """
 
     @abstractmethod
+    def bind_by_name(self, name: str, value: SupportedType) -> None:
+        """Binds the the value to a specific parameter by name.
+
+        Types support for now: None, bool, int, float, str, bytes, and UUID.
+
+        If an invalid type is used for this will raise immediately an error. If an
+        invalid name is used this will raise immediately an error
+        """
+
+    @abstractmethod
     def bind_list(self, values: Sequence[SupportedType]) -> None:
         """Binds the values into all parameters from left to right.
 
@@ -103,16 +130,6 @@ class Statement(metaclass=ABCMeta):
     # created using prepared statements
 
     @abstractmethod
-    def bind_by_name(self, name: str, value: SupportedType) -> None:
-        """Binds the the value to a specific parameter by name.
-
-        Types support for now: None, bool, int, float, str, bytes, and UUID.
-
-        If an invalid type is used for this will raise immediately an error. If an
-        invalid name is used this will raise immediately an error
-        """
-
-    @abstractmethod
     def bind_dict(self, values: Mapping[str, SupportedType]) -> None:
         """Binds the values into all parameter names. Names are the keys
         of the mapping provided.
@@ -120,6 +137,35 @@ class Statement(metaclass=ABCMeta):
         For types supported and errors that this function might raise take
         a look at the `Statement.bind_dict` function.
         """
+
+    @abstractmethod
+    def set_page_size(self, page_size: int) -> None:
+        """Sets the statement's page size."""
+
+    @abstractmethod
+    def set_page_state(self, page_state: bytes) -> None:
+        """Sets the statement's paging state. This can be used to get the next
+        page of data in a multi-page query.
+
+        Warning: The paging state should not be exposed to or come from
+        untrusted environments. The paging state could be spoofed and potentially
+        used to gain access to other data.
+        """
+
+    @abstractmethod
+    def set_timeout(self, timeout: float) -> None:
+        """Sets the statement's timeout in seconds for waiting for a response from a node.
+        Default: Disabled (use the cluster-level request timeout)"""
+
+    @abstractmethod
+    def set_consistency(self, timeout: float) -> None:
+        """Sets the statement’s consistency level.
+        Default: LOCAL_ONE"""
+
+    @abstractmethod
+    def set_serial_consistency(self, timeout: float) -> None:
+        """Sets the statement’s serial consistency level.
+        Default: Not set"""
 
 
 class PreparedStatement(metaclass=ABCMeta):

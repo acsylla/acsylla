@@ -332,6 +332,8 @@ cdef extern from "cassandra.h":
   CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
   CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
+  CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
+
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)

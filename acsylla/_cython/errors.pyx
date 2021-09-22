@@ -1,3 +1,4 @@
+
 class ColumnNotFound(CassException):
     pass
 

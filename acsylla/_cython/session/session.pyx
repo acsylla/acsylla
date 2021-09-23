@@ -74,7 +74,7 @@ cdef class Session:
             cass_future_free(cass_future)
 
 
-    async def execute(self, Statement statement, object return_all_pages=False):
+    async def execute(self, Statement statement):
         """ Execute an statement and returns the result.
 
         Is responsability of the caller to know what to do with

@@ -20,6 +20,9 @@ cdef class Row:
     def __iter__(self):
         return self.as_named_tuple()
 
+    def __len__(self):
+        return self.result.column_count()
+
     def column_count(self):
         return self.result.column_count()
 
@@ -434,6 +437,6 @@ cdef class Row:
         while cass_iterator_next(iterator) == cass_true:
             cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
             field_value = cass_iterator_get_user_type_field_value(iterator)
-            data[field_name.decode()] = self._get_cass_value(field_value)
+            data[field_name[:field_name_length].decode()] = self._get_cass_value(field_value)
         cass_iterator_free(iterator)
         return data

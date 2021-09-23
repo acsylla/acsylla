@@ -70,7 +70,7 @@ cdef class Result:
         for i in range(self.column_count()):
             error = cass_result_column_name(self.cass_result, i, <const char**> &name, <size_t*> &length)
             raise_if_error(error)
-            columns.append(name.decode())
+            columns.append(name[:length].decode())
         return columns
 
     def first(self):
@@ -104,3 +104,6 @@ cdef class Result:
 
     def __iter__(self):
         return self.all()
+
+    def __len__(self):
+        return self.count()

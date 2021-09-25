@@ -17,7 +17,7 @@ cdef class PreparedStatement:
         prepared.serial_consistency = serial_consistency
         return prepared
 
-    def bind(self, object page_size=None, object page_state=None):
+    def bind(self, object page_size=None, object page_state=None, timeout=None, consistency=None, serial_consistency=None):
         cdef CassStatement* cass_statement
         cdef Statement statement
 
@@ -27,8 +27,8 @@ cdef class PreparedStatement:
             self.cass_prepared,
             page_size,
             page_state,
-            self.timeout,
-            self.consistency,
-            self.serial_consistency,
+            timeout or self.timeout,
+            consistency or self.consistency,
+            serial_consistency or self.serial_consistency,
         )
         return statement

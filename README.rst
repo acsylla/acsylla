@@ -32,7 +32,7 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
     async def main():
         cluster = acsylla.create_cluster([host])
         session = await cluster.create_session(keyspace="acsylla")
-        statement = ascylla.create_statement("SELECT id, value FROM test")
+        statement = ascylla.create_statement("SELECT id, value FROM test WHERE id=100")
         result = await session.execute(statement)
         row = result.first()
         value = row.column_value("value")

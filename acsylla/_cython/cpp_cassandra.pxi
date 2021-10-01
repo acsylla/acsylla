@@ -332,6 +332,8 @@ cdef extern from "cassandra.h":
   CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
   CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
+  CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
+
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)
@@ -351,10 +353,11 @@ cdef extern from "cassandra.h":
   CassIterator* cass_iterator_from_result(const CassResult* result)
   cass_bool_t cass_result_has_more_pages(const CassResult* result)
   CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size)
-  CassError cass_result_column_name(const CassResult *result, size_t index,  const char** name,size_t* name_length)
+  CassError cass_result_column_name(const CassResult* result, size_t index,  const char** name,size_t* name_length)
   void cass_result_free(CassResult* result)
 
-  CassValueType cass_data_type_type(const CassDataType * data_type)
+  CassValueType cass_data_type_type(const CassDataType* data_type)
+  const CassValue* cass_row_get_column(const CassRow* row, size_t index)
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
   CassIterator* cass_iterator_from_map(const CassValue* value)
@@ -362,7 +365,7 @@ cdef extern from "cassandra.h":
   CassValue* cass_iterator_get_map_value(const CassIterator* iterator)
 
   CassIterator* cass_iterator_from_collection(const CassValue* value)
-  CassIterator* cass_iterator_from_tuple(const CassValue * value)
+  CassIterator* cass_iterator_from_tuple(const CassValue* value)
 
   CassIterator* cass_iterator_fields_from_user_type(const CassValue* value)
   CassError cass_iterator_get_user_type_field_name(const CassIterator* iterator, const char** name, size_t* name_length)

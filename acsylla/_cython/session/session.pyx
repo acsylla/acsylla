@@ -109,7 +109,7 @@ cdef class Session:
 
         return result
 
-    async def create_prepared(self, str statement, object timeout=None, object consistency=None):
+    async def create_prepared(self, str statement, object timeout=None, object consistency=None, object serial_consistency=None):
         """ Prepares an statement."""
         cdef CassFuture* cass_future
         cdef CassError cass_error
@@ -141,7 +141,7 @@ cdef class Session:
                 keyspace = self.keyspace.encode()
                 self.keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta, keyspace)
 
-            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency)
+            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency, serial_consistency)
         finally:
             cass_future_free(cass_future)
 

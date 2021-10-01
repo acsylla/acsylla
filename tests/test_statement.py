@@ -57,6 +57,7 @@ class TestStatement:
     def test_create_with_timeout(self):
         statement = create_statement("INSERT INTO test (id) values (1)", timeout=1.0)
         assert statement is not None
+        statement.set_timeout(0.01)
 
     @pytest.mark.parametrize(
         "consistency",
@@ -77,6 +78,15 @@ class TestStatement:
     async def test_create_with_consistency(self, consistency):
         statement = create_statement("INSERT INTO test (id) values (1)", consistency=consistency)
         assert statement is not None
+        statement.set_consistency(consistency)
+
+    @pytest.mark.parametrize(
+        "serial_consistency", [Consistency.SERIAL, Consistency.LOCAL_SERIAL],
+    )
+    async def test_create_with_serial_consistency(self, serial_consistency):
+        statement = create_statement("INSERT INTO test (id) values (1)", serial_consistency=serial_consistency)
+        assert statement is not None
+        statement.set_serial_consistency(serial_consistency)
 
     def test_bind_list(self, statement):
         statement.bind_list(

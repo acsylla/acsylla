@@ -7,10 +7,13 @@ cdef class Cluster:
         # but would be initalize only once.
         _initialize_posix_to_python_thread()
 
-        self.cass_cluster = cass_cluster_new() 
+        self.cass_cluster = cass_cluster_new()
+        self.ssl = NULL
 
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
+        if self.ssl != NULL:
+            cass_ssl_free(self.ssl)
 
     def __init__(
         self,
@@ -29,6 +32,12 @@ cdef class Cluster:
         str application_name,
         str application_version,
         int num_threads_io,
+        object ssl_enabled,
+        object ssl_cert,
+        object ssl_private_key,
+        object ssl_private_key_password,
+        object ssl_trusted_cert,
+        object ssl_verify_flags,
     ):
 
         cdef CassProtocolVersion cass_protocol_version
@@ -75,7 +84,7 @@ cdef class Cluster:
         if username is not None and password is not None:
             cass_cluster_set_credentials(self.cass_cluster, username.encode(), password.encode())
         elif username is not None or password is not None:
-            raise ValueError("For using credentials both parametres (username and password) need to be set")
+            raise ValueError("For using credentials both parameters (username and password) need to be set")
 
         cass_consistency = consistency.value
         error = cass_cluster_set_consistency(self.cass_cluster, cass_consistency)
@@ -96,6 +105,28 @@ cdef class Cluster:
         cass_cluster_set_application_name(self.cass_cluster, application_name.encode())
         cass_cluster_set_application_version(self.cass_cluster, application_version.encode())
 
+        if ssl_enabled:
+            if ssl_cert is None or ssl_private_key is None:
+                raise ValueError("For using SSL ssl_cert and ssl_private_key parameters need to be set")
+
+            self.ssl = cass_ssl_new()
+
+            error = cass_ssl_set_cert(self.ssl, ssl_cert.encode())
+            raise_if_error(error)
+
+            error = cass_ssl_set_private_key(self.ssl, ssl_private_key.encode(), ssl_private_key_password.encode())
+            raise_if_error(error)
+
+            if ssl_verify_flags.value == CASS_SSL_VERIFY_PEER_IDENTITY_DNS:
+                error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, cass_true)
+                raise_if_error(error)
+
+            if ssl_trusted_cert is not None:
+                error = cass_ssl_add_trusted_cert(self.ssl, ssl_trusted_cert.encode())
+                raise_if_error(error)
+
+            cass_ssl_set_verify_flags(self.ssl, ssl_verify_flags.value)
+            cass_cluster_set_ssl(self.cass_cluster, self.ssl)
 
     async def create_session(self, keyspace=None):
         session = Session(self, keyspace=keyspace)

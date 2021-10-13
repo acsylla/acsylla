@@ -2,5 +2,8 @@ version: '2'
 services:
   cassandra:
     image: cassandra:latest
+    volumes:
+      - ./certs:/certs
+      - ./conf/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml
     ports:
       - "9042:9042"

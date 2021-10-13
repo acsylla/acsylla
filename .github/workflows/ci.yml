@@ -30,7 +30,7 @@ jobs:
       - name: Install Linux driver dependencies
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          sudo apt-get install libuv1 libuv1-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libuv1 libuv1-dev default-jre
       - name: Install Mac driver dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
@@ -51,12 +51,14 @@ jobs:
       - name: Linux Test dependencies
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
+          make certs
           docker-compose up -d
       - name: Mac Test dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
           brew install cassandra
-          cassandra
+          make certs
+          cassandra -Dcassandra.config=./conf/cassandra
       - name: Test
         run: |
           # wait till casssandra server is up, to be improved

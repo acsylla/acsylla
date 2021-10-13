@@ -92,6 +92,28 @@ Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/ma
         local_port_range_max=65535  # default: 65535
     )
 
+SSL Connection example
+
+.. code-block:: python
+
+    import acsylla
+
+    with open('./certs/client.cert.pem') as f:
+        ssl_cert = f.read()
+    with open('./certs/client.key.pem') as f:
+        ssl_private_key = f.read()
+    with open('./certs/trusted.cert.pem') as f:
+        ssl_trusted_cert = f.read()
+
+    cluster = create_cluster(['localhost'],
+                             ssl_enabled=True,
+                             ssl_cert=ssl_cert,
+                             ssl_private_key=ssl_private_key,
+                             ssl_trusted_cert=ssl_trusted_cert,
+                             ssl_verify_flags=acsylla.SSLVerifyFlags.PEER_IDENTITY)
+
+
+
 Developing
 ============
 

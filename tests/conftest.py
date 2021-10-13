@@ -1,5 +1,6 @@
 from acsylla import create_cluster, create_statement
 
+import os
 import pytest
 
 
@@ -136,3 +137,16 @@ def id_generation():
             cnt += 1
 
     return _()
+
+
+@pytest.fixture
+def certificates():
+    path = os.path.join(os.path.dirname(__file__), "../certs")
+    with open(f"{path}/client.cert.pem") as f:
+        ssl_cert = f.read()
+    with open(f"{path}/client.key.pem") as f:
+        ssl_private_key = f.read()
+    with open(f"{path}/trusted.cert.pem") as f:
+        ssl_trusted_cert = f.read()
+
+    return ssl_cert, ssl_private_key, ssl_trusted_cert

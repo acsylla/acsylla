@@ -58,7 +58,8 @@ jobs:
         run: |
           brew install cassandra
           make certs
-          cassandra -Dcassandra.config=./conf/cassandra
+          sed -i '' -e 's/\/certs/\.\/certs/g' ./conf/cassandra/cassandra.yaml
+          cassandra -Dcassandra.config=./conf/cassandra/cassandra.yaml
       - name: Test
         run: |
           # wait till casssandra server is up, to be improved

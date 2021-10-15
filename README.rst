@@ -6,7 +6,7 @@ WORK IN PROGRESS, use only for developing
 Install
 ==========
 
-There is an Alpha realease compabitble with Python 3.7 and Python 3.8 for Linux and MacOS environments uploaded as a Pypi package. Use the following
+There is an Alpha realease compabitble with Python 3.7, 3.8 and 3.9 for Linux and MacOS environments uploaded as a Pypi package. Use the following
 command for installing it:
 
 .. code-block:: bash
@@ -32,7 +32,7 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
     async def main():
         cluster = acsylla.create_cluster([host])
         session = await cluster.create_session(keyspace="acsylla")
-        statement = ascylla.create_statement("SELECT id, value FROM test WHERE id = 100")
+        statement = ascylla.create_statement("SELECT id, value FROM test WHERE id=100")
         result = await session.execute(statement)
         row = result.first()
         value = row.column_value("value")
@@ -42,6 +42,76 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
 
 Acsylla comes with a minimal support for the following objects: ``Cluster``, ``Session``,
 ``Statement``, ``PreparedStatement``, ``Batch``, ``Result``, ``Row``.
+
+Acsylla supports all native datatypes including `Collections` and `UDT`
+
+Example for use prepared statement and paging.
+
+.. code-block:: python
+
+    import asyncio
+    import acsylla
+
+    async def main()
+        cluster = acsylla.create_cluster(['localhost'])
+        session = await cluster.create_session(keyspace="acsylla")
+        prepared = await session.create_prepared("SELECT id, value FROM test")
+        statement = prepared.bind(page_size=10, timeout=0.01)
+        while True:
+            result = await session.execute(statement)
+            print(result.columns_names())
+            # ['id', 'value']
+            for row in result:
+                print(dict(row))
+                # {'id': 1, 'value': 'test'}
+                print(list(row))
+                # [('id', 1), ('value', 'test')]
+                print(row.as_list())
+                # [1, 'test']
+                print(row.as_tuple())
+                # (1, 'test')
+            if result.has_more_pages():
+                statement.set_page_size(100) # you can change statement settings on the fly
+                statement.set_page_state(result.page_state())
+            else:
+                break
+
+    asyncio.run(main())
+
+Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific>`__ connection to `Scylla` cluster.
+
+.. code-block:: python
+
+    import acsylla
+
+    cluster = acsylla.create_cluster(['node1', 'node2', 'node3'],
+        port=19042,                 # default: 9042
+        protocol_version=4,         # default: 3
+        core_connections_per_host=8,# default: 1
+        local_port_range_min=49152, # default: 49152
+        local_port_range_max=65535  # default: 65535
+    )
+
+SSL Connection example
+
+.. code-block:: python
+
+    import acsylla
+
+    with open('./certs/client.cert.pem') as f:
+        ssl_cert = f.read()
+    with open('./certs/client.key.pem') as f:
+        ssl_private_key = f.read()
+    with open('./certs/trusted.cert.pem') as f:
+        ssl_trusted_cert = f.read()
+
+    cluster = create_cluster(['localhost'],
+                             ssl_enabled=True,
+                             ssl_cert=ssl_cert,
+                             ssl_private_key=ssl_private_key,
+                             ssl_trusted_cert=ssl_trusted_cert,
+                             ssl_verify_flags=acsylla.SSLVerifyFlags.PEER_IDENTITY)
+
 
 
 Developing

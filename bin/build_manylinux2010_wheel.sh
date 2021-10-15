@@ -29,7 +29,7 @@ yum install wget -y
 yum install openssl openssl-devel -y
 
 # We need to download the libuv library and compile it
-wget https://dist.libuv.org/dist/v1.9.1/libuv-v1.9.1.tar.gz
+wget --no-check-certificate https://dist.libuv.org/dist/v1.9.1/libuv-v1.9.1.tar.gz
 tar -xzvf libuv-v1.9.1.tar.gz
 cd libuv-v1.9.1
 sh autogen.sh

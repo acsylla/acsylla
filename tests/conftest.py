@@ -1,5 +1,6 @@
 from acsylla import create_cluster, create_statement
 
+import os
 import pytest
 
 
@@ -44,7 +45,7 @@ async def session(event_loop, cluster, keyspace):
         """
     CREATE TYPE udt_nested_type (
         value_ascii ascii,
-        value_bigint bigint
+        value_bigint bigint,
     );
     """
     )
@@ -111,7 +112,11 @@ async def session(event_loop, cluster, keyspace):
             value_set_text set<text>,
             value_list_text list<text>,
             value_tuple_text_bigint tuple<text, bigint>,
-            value_udt frozen<udt_type>
+            value_udt frozen<udt_type>,
+            value_list_udt list<frozen<udt_type>>,
+            value_set_udt set<frozen<udt_type>>,
+            value_map_udt map<bigint, frozen<udt_type>>,
+            value_tuple_udt tuple<frozen<udt_type>, frozen<udt_nested_type>>,
         );
     """
     )
@@ -132,3 +137,16 @@ def id_generation():
             cnt += 1
 
     return _()
+
+
+@pytest.fixture
+def certificates():
+    path = os.path.join(os.path.dirname(__file__), "../certs")
+    with open(f"{path}/client.cert.pem") as f:
+        ssl_cert = f.read()
+    with open(f"{path}/client.key.pem") as f:
+        ssl_private_key = f.read()
+    with open(f"{path}/trusted.cert.pem") as f:
+        ssl_trusted_cert = f.read()
+
+    return ssl_cert, ssl_private_key, ssl_trusted_cert

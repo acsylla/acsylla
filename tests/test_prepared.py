@@ -29,7 +29,7 @@ class TestPreparedStatement:
     )
     async def test_create_with_consistency(self, session, consistency):
         statement_str = "INSERT INTO test (id, value) values( ?, ?)"
-        prepared = await session.create_prepared(statement_str, consistency=consistency)
+        prepared = await session.create_prepared(statement_str, consistency=consistency, serial_consistency=consistency)
         assert prepared is not None
 
     async def test_bind(self, session):

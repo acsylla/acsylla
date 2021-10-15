@@ -17,25 +17,45 @@ cdef class Row:
 
         return row
 
+    def __iter__(self):
+        return self.as_named_tuple()
+
+    def __len__(self):
+        return self.result.column_count()
+
     def column_count(self):
         return self.result.column_count()
 
     def as_dict(self):
-        cdef Py_ssize_t length = 0
-        cdef char* name = NULL
-        cdef CassError error
-        ret = {}
-        for i in range(self.result.column_count()):
-            error = cass_result_column_name(self.result.cass_result, i, <const char**> &name, <size_t*> &length)
-            raise_if_error(error)
-            ret[name.decode()] = self.column_value(name.decode())
-        return ret
+        return dict(self.as_named_tuple())
+
+    def as_list(self):
+        result = []
+        for index in range(self.result.column_count()):
+            result.append(self.column_value_by_index(index))
+        return result
+
+    def as_tuple(self):
+        return tuple(self.as_list())
+
+    def as_named_tuple(self):
+        for column in self.result.columns_names():
+            yield column, self.column_value(column)
+
+    def column_value_by_index(self, size_t index):
+        """ Returns the column value by `column index`.
+        Raises an exception if the column can not be found"""
+        cdef const CassValue* cass_value
+        cass_value = cass_row_get_column(self.cass_row, index)
+        if cass_value == NULL:
+            raise ColumnNotFound(f'ColumnNotFound with index {index}')
+
+        return self._get_cass_value(cass_value)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
 
         Raises an exception if the column can not be found"""
-        cdef CassValueType cass_type
         cdef const CassValue* cass_value
         cdef bytes_name = column_name.encode()
 
@@ -47,6 +67,10 @@ cdef class Row:
 
     cdef object _get_cass_value(self, const CassValue* cass_value):
         cdef CassValueType cass_type
+
+        cdef cass_bool_t value_is_null = cass_value_is_null(cass_value)
+        if value_is_null:
+            return None
 
         cass_type = cass_value_type(cass_value)
 
@@ -413,6 +437,6 @@ cdef class Row:
         while cass_iterator_next(iterator) == cass_true:
             cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
             field_value = cass_iterator_get_user_type_field_value(iterator)
-            data[field_name.decode()] = self._get_cass_value(field_value)
+            data[field_name[:field_name_length].decode()] = self._get_cass_value(field_value)
         cass_iterator_free(iterator)
         return data

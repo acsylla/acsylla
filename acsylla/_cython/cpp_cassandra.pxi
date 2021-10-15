@@ -161,6 +161,15 @@ cdef extern from "cassandra.h":
     CASS_COLLECTION_TYPE_MAP
     CASS_COLLECTION_TYPE_SET
 
+  ctypedef enum CassSslVerifyFlags:
+    CASS_SSL_VERIFY_NONE
+    CASS_SSL_VERIFY_PEER_CERT
+    CASS_SSL_VERIFY_PEER_IDENTITY
+    CASS_SSL_VERIFY_PEER_IDENTITY_DNS
+
+  ctypedef struct CassSsl:
+    pass
+
   ctypedef struct CassCluster:
     pass
 
@@ -251,21 +260,30 @@ cdef extern from "cassandra.h":
     _errors errors
 
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
-
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
-  CassError cass_cluster_set_port(CassCluster * cluster, int port)
+  CassError cass_cluster_set_port(CassCluster* cluster, int port)
   CassError cass_cluster_set_protocol_version(CassCluster* cluster, int protocol_version)
   void cass_cluster_set_connect_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_request_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_resolve_timeout(CassCluster* cluster, unsigned timeout_ms)
+  void cass_cluster_set_credentials(CassCluster* cluster, const char* username, const char* password)
   CassError cass_cluster_set_consistency(CassCluster* cluster, CassConsistency consistency)
   CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi);
   CassError cass_cluster_set_core_connections_per_host(CassCluster * cluster, unsigned num_connections)
   CassError cass_cluster_set_num_threads_io(CassCluster * cluster, unsigned num_threads)
   void cass_cluster_set_application_name(CassCluster * cluster, const char * application_name)
   void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
+  void cass_cluster_set_ssl(CassCluster* cluster, CassSsl * ssl)
+  CassError cass_cluster_set_use_hostname_resolution(CassCluster* cluster, cass_bool_t enabled)
+
+  CassSsl* cass_ssl_new()
+  void cass_ssl_free(CassSsl * ssl)
+  CassError cass_ssl_add_trusted_cert(CassSsl * ssl, const char * cert)
+  void cass_ssl_set_verify_flags(CassSsl * ssl, int flags)
+  CassError cass_ssl_set_cert(CassSsl * ssl, const char * cert)
+  CassError cass_ssl_set_private_key(CassSsl * ssl, const char * key, const char * password)
 
   CassSession* cass_session_new()
   void cass_session_free(CassSession* session)
@@ -331,6 +349,8 @@ cdef extern from "cassandra.h":
   CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
   CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
+  CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
+
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)
@@ -350,10 +370,11 @@ cdef extern from "cassandra.h":
   CassIterator* cass_iterator_from_result(const CassResult* result)
   cass_bool_t cass_result_has_more_pages(const CassResult* result)
   CassError cass_result_paging_state_token(const CassResult* result, const char** paging_state, size_t* paging_state_size)
-  CassError cass_result_column_name(const CassResult *result, size_t index,  const char** name,size_t* name_length)
+  CassError cass_result_column_name(const CassResult* result, size_t index,  const char** name,size_t* name_length)
   void cass_result_free(CassResult* result)
 
-  CassValueType cass_data_type_type(const CassDataType * data_type)
+  CassValueType cass_data_type_type(const CassDataType* data_type)
+  const CassValue* cass_row_get_column(const CassRow* row, size_t index)
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
 
   CassIterator* cass_iterator_from_map(const CassValue* value)
@@ -361,13 +382,16 @@ cdef extern from "cassandra.h":
   CassValue* cass_iterator_get_map_value(const CassIterator* iterator)
 
   CassIterator* cass_iterator_from_collection(const CassValue* value)
-  CassIterator* cass_iterator_from_tuple(const CassValue * value)
+  CassIterator* cass_iterator_from_tuple(const CassValue* value)
 
   CassIterator* cass_iterator_fields_from_user_type(const CassValue* value)
   CassError cass_iterator_get_user_type_field_name(const CassIterator* iterator, const char** name, size_t* name_length)
   CassValue* cass_iterator_get_user_type_field_value(const CassIterator* iterator)
 
+  cass_bool_t cass_value_is_null(const CassValue * value)
+
   CassValueType cass_value_type(const CassValue* value)
+
   CassError cass_value_get_int8(const CassValue* value, cass_int8_t* output)
   CassError cass_value_get_int16(const CassValue* value, cass_int16_t* output)
   CassError cass_value_get_int32(const CassValue* value, cass_int32_t* output)

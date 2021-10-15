@@ -3,6 +3,7 @@ from .base import (
     Batch,
     Cluster,
     Consistency,
+    SSLVerifyFlags,
     Statement,
 )
 from .version import __version__
@@ -12,6 +13,8 @@ from typing import List, Optional
 def create_cluster(
     contact_points: List[str],
     port: int = 9042,
+    username: str = None,
+    password: str = None,
     protocol_version: int = 3,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
@@ -23,6 +26,12 @@ def create_cluster(
     application_name: str = "acsylla",
     application_version: str = __version__,
     num_threads_io: int = 1,
+    ssl_enabled: bool = False,
+    ssl_cert: str = None,
+    ssl_private_key: str = None,
+    ssl_private_key_password: str = "",
+    ssl_trusted_cert: str = None,
+    ssl_verify_flags: SSLVerifyFlags = SSLVerifyFlags.PEER_CERT,
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -37,11 +46,34 @@ def create_cluster(
 
     If `consistency` is provided the default value would be override, any statment will use
     by default that consistency level unless it is specificily configured at statement level.
+
+    Set `ssl_enable` for use SSL
+
+    `ssl_cert` Set client-side certificate chain. This is used to authenticate the client on the server-side.
+        This should contain the entire Certificate chain starting with the certificate itself
+
+    `ssl_private_key` Set client-side private key. This is used to authenticate the client on the server-side.
+
+    `ssl_private_key_password` Password for `ssl_private_key`
+
+    `ssl_trusted_cert` Adds a trusted certificate. This is used to verify the peer’s certificate.
+
+    `ssl_verify_flags` Sets verification performed on the peer’s certificate.
+        SSLVerifyFlags.NONE - No verification is performed
+        SSLVerifyFlags.PEER_CERT - Certificate is present and valid
+        SSLVerifyFlags.PEER_IDENTITY - IP address matches the certificate’s common name or one
+            of its subject alternative names. This implies the certificate is also present.
+        SSLVerifyFlags.PEER_IDENTITY_DNS - Hostname matches the certificate’s common name or
+            one of its subject alternative names. This implies the certificate is
+            also present. Hostname resolution must also be enabled.
+        Default: SSLVerifyFlags.PEER_CERT
     """
     return _cython.cyacsylla.Cluster(
         contact_points,
         port,
         protocol_version,
+        username,
+        password,
         connect_timeout,
         request_timeout,
         resolve_timeout,
@@ -52,6 +84,12 @@ def create_cluster(
         application_name,
         application_version,
         num_threads_io,
+        ssl_enabled,
+        ssl_cert,
+        ssl_private_key,
+        ssl_private_key_password,
+        ssl_trusted_cert,
+        ssl_verify_flags,
     )
 
 
@@ -62,6 +100,7 @@ def create_statement(
     page_state: Optional[bytes] = None,
     timeout: Optional[float] = None,
     consistency: Optional[Consistency] = None,
+    serial_consistency: Optional[Consistency] = None,
 ) -> Statement:
     """
     Creates a new statment.
@@ -86,6 +125,7 @@ def create_statement(
         page_state=page_state,
         timeout=timeout,
         consistency=consistency,
+        serial_consistency=serial_consistency,
     )
 
 

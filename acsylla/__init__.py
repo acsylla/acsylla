@@ -8,6 +8,7 @@ from .base import (
     Row,
     Session,
     SessionMetrics,
+    SSLVerifyFlags,
     Statement,
 )
 from .factories import (
@@ -21,6 +22,7 @@ from .factories import (
 __all__ = (
     "Cluster",
     "Consistency",
+    "SSLVerifyFlags",
     "Session",
     "Statement",
     "PreparedStatement",

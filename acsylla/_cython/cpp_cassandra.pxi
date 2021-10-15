@@ -161,6 +161,15 @@ cdef extern from "cassandra.h":
     CASS_COLLECTION_TYPE_MAP
     CASS_COLLECTION_TYPE_SET
 
+  ctypedef enum CassSslVerifyFlags:
+    CASS_SSL_VERIFY_NONE
+    CASS_SSL_VERIFY_PEER_CERT
+    CASS_SSL_VERIFY_PEER_IDENTITY
+    CASS_SSL_VERIFY_PEER_IDENTITY_DNS
+
+  ctypedef struct CassSsl:
+    pass
+
   ctypedef struct CassCluster:
     pass
 
@@ -251,7 +260,6 @@ cdef extern from "cassandra.h":
     _errors errors
 
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
-
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
@@ -267,6 +275,15 @@ cdef extern from "cassandra.h":
   CassError cass_cluster_set_num_threads_io(CassCluster * cluster, unsigned num_threads)
   void cass_cluster_set_application_name(CassCluster * cluster, const char * application_name)
   void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
+  void cass_cluster_set_ssl(CassCluster* cluster, CassSsl * ssl)
+  CassError cass_cluster_set_use_hostname_resolution(CassCluster* cluster, cass_bool_t enabled)
+
+  CassSsl* cass_ssl_new()
+  void cass_ssl_free(CassSsl * ssl)
+  CassError cass_ssl_add_trusted_cert(CassSsl * ssl, const char * cert)
+  void cass_ssl_set_verify_flags(CassSsl * ssl, int flags)
+  CassError cass_ssl_set_cert(CassSsl * ssl, const char * cert)
+  CassError cass_ssl_set_private_key(CassSsl * ssl, const char * key, const char * password)
 
   CassSession* cass_session_new()
   void cass_session_free(CassSession* session)

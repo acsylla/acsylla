@@ -294,3 +294,22 @@ class Consistency(Enum):
     SERIAL = cyacsylla.Consistency.SERIAL
     LOCAL_SERIAL = cyacsylla.Consistency.LOCAL_SERIAL
     LOCAL_ONE = cyacsylla.Consistency.LOCAL_ONE
+
+
+class SSLVerifyFlags(Enum):
+    """
+    Sets verification performed on the peer’s certificate.
+
+    NONE - No verification is performed
+    PEER_CERT - Certificate is present and valid
+    PEER_IDENTITY - IP address matches the certificate’s common name or one of its
+      subject alternative names. This implies the certificate is also present.
+    PEER_IDENTITY_DNS - Hostname matches the certificate’s common name or
+      one of its subject alternative names. This implies the certificate is
+      also present. Hostname resolution must also be enabled.
+    """
+
+    NONE = cyacsylla.SSLVerifyFlags.NONE
+    PEER_CERT = cyacsylla.SSLVerifyFlags.PEER_CERT
+    PEER_IDENTITY = cyacsylla.SSLVerifyFlags.PEER_IDENTITY
+    PEER_IDENTITY_DNS = cyacsylla.SSLVerifyFlags.PEER_IDENTITY_DNS

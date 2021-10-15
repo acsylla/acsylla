@@ -6,7 +6,7 @@ current_dir = $(shell pwd)
 _default: compile
 
 clean:
-	rm -fr acsylla/_cython/*.c acsylla/_cython/*.cpp acsylla/_cython/*.so build dist
+	rm -fr acsylla/_cython/*.c acsylla/_cython/*.cpp acsylla/_cython/*.so build dist certs
 	find . -name '__pycache__' | xargs rm -rf
 	find . -type f -name "*.pyc" -delete
 
@@ -49,11 +49,13 @@ lint:
 mypy:
 	mypy -p acsylla -p tests.test_typing
 
-test: 
+test:
 	pytest -v tests
 
 stress: 
 	python benchmark/acsylla_benchmark.py --duration 10 --concurrency 32
 
+certs:
+	bin/make_test_certs.sh
 
-.PHONY: clean setup-build install install-dev compile test stress mypy lint format
+.PHONY: clean setup-build install install-dev compile test stress mypy lint format certs

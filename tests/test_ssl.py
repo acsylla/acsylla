@@ -8,12 +8,7 @@ pytestmark = pytest.mark.asyncio
 
 class TestSSL:
     async def test_ssl_no_cert(self, host):
-        with pytest.raises(ValueError):
-            create_cluster([host], ssl_enabled=True)
-        with pytest.raises(ValueError):
-            create_cluster([host], ssl_enabled=True, ssl_cert="")
-        with pytest.raises(ValueError):
-            create_cluster([host], ssl_enabled=True, ssl_private_key="")
+        create_cluster([host], ssl_enabled=True)
 
     async def test_ssl(self, host, certificates):
         ssl_cert, ssl_private_key, ssl_trusted_cert = certificates

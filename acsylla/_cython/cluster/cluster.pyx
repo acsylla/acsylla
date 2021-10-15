@@ -106,16 +106,15 @@ cdef class Cluster:
         cass_cluster_set_application_version(self.cass_cluster, application_version.encode())
 
         if ssl_enabled:
-            if ssl_cert is None or ssl_private_key is None:
-                raise ValueError("For using SSL ssl_cert and ssl_private_key parameters need to be set")
-
             self.ssl = cass_ssl_new()
 
-            error = cass_ssl_set_cert(self.ssl, ssl_cert.encode())
-            raise_if_error(error)
+            if ssl_cert is not None:
+                error = cass_ssl_set_cert(self.ssl, ssl_cert.encode())
+                raise_if_error(error)
 
-            error = cass_ssl_set_private_key(self.ssl, ssl_private_key.encode(), ssl_private_key_password.encode())
-            raise_if_error(error)
+            if ssl_private_key is not None:
+                error = cass_ssl_set_private_key(self.ssl, ssl_private_key.encode(), ssl_private_key_password.encode())
+                raise_if_error(error)
 
             if ssl_verify_flags.value == CASS_SSL_VERIFY_PEER_IDENTITY_DNS:
                 error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, cass_true)

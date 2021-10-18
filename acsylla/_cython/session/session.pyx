@@ -1,5 +1,6 @@
 import asyncio
 
+
 cdef class Session:
     def __cinit__(self, Cluster cluster, object keyspace):
         self.cass_cluster = cluster.cass_cluster
@@ -39,7 +40,7 @@ cdef class Session:
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
 
         try:
-            await asyncio.shield(cb_wrapper.__await__())
+            await cb_wrapper.__await__()
             cass_error = cass_future_error_code(cass_future)
             cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
             raise_if_error(cass_error, error_message)
@@ -65,7 +66,7 @@ cdef class Session:
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
 
         try:
-            await asyncio.shield(cb_wrapper.__await__())
+            await cb_wrapper.__await__()
             cass_error = cass_future_error_code(cass_future)
             cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
             raise_if_error(cass_error, error_message)
@@ -95,7 +96,7 @@ cdef class Session:
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
 
         try:
-            await asyncio.shield(cb_wrapper.__await__())
+            await cb_wrapper.__await__()
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)
@@ -128,7 +129,7 @@ cdef class Session:
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
 
         try:
-            await asyncio.shield(cb_wrapper.__await__())
+            await cb_wrapper.__await__()
             cass_prepared = cass_future_get_prepared(cass_future)
             if cass_prepared == NULL:
                 cass_error = cass_future_error_code(cass_future)
@@ -166,7 +167,7 @@ cdef class Session:
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
 
         try:
-            await asyncio.shield(cb_wrapper.__await__())
+            await cb_wrapper.__await__()
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)

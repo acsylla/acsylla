@@ -1,3 +1,7 @@
+cdef extern from "Python.h":
+    void Py_INCREF(object o)
+    void Py_DECREF(object o)
+
 cdef extern from "stdint.h":
   ctypedef   signed char  int8_t
   ctypedef   signed short int16_t

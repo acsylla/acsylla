@@ -54,6 +54,7 @@ def _handle_events():
 
         cb_wrapper = <CallbackWrapper> data
         cb_wrapper.set_result()
+        Py_DECREF(cb_wrapper)
 
 _lock = threading.Lock()
 

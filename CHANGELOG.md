@@ -1,6 +1,13 @@
 NOT RELEASED YET
 ================
 
+0.1.7a0
+========
+- Fixed issue with `execute_batch`
+- Fixed issue with cancelled tasks which impacted comunication between Python Asyncio and CPP Driver
+- Add support for SSL
+
+
 0.1.6a0
 ========
 - Add plain text authentication create_cluster(…, username=“test”, password=“test”)

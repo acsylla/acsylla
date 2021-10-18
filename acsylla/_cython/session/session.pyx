@@ -102,7 +102,6 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-
             result = Result.new_(cass_result)
         finally:
             cass_future_free(cass_future)

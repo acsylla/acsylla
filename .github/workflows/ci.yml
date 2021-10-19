@@ -43,6 +43,7 @@ jobs:
           python -m pip install --upgrade pip
           export LDFLAGS="-L/usr/local/opt/openssl/lib"
           export CPPFLAGS="-I/usr/local/opt/openssl/include"
+          export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
           make compile
           make install-dev
       - name: Lint with flake8

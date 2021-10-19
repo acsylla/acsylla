@@ -1,4 +1,5 @@
 from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext as build_ext
 
 import os
 import re
@@ -11,20 +12,30 @@ vi = sys.version_info
 if vi < (3, 7):
     raise RuntimeError("acsylla requires Python 3.7 or greater")
 
-CPP_CASSANDRA_DIR = os.path.join(os.path.dirname(__file__), "vendor", "cpp-driver")
+CPP_CASSANDRA_DIR = os.path.join("vendor", "cpp-driver")
 CPP_CASSANDRA_INCLUDE_DIR = os.path.join(CPP_CASSANDRA_DIR, "include")
 CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", "libscylla-cpp-driver_static.a")
 
-extensions = [
-    Extension(
-        "acsylla._cython.cyacsylla",
-        sources=["acsylla/_cython/cyacsylla.cpp"],
-        include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
-        extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
-        extra_compile_args=["-std=c++11"],
-        libraries=["crypto", "ssl", "uv", "z"],
-    )
-]
+extension = Extension(
+    "acsylla._cython.cyacsylla",
+    sources=["acsylla/_cython/cyacsylla.cpp"],
+    include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
+    extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
+    extra_compile_args=["-std=c++11"],
+    libraries=["crypto", "ssl", "uv", "z"],
+)
+
+
+class acsylla_build_ext(build_ext):
+    def build_extensions(self):
+        ssl_path = os.environ.get("SSL_LIBRARY_PATH")
+        if os.sys.platform == "darwin" and ssl_path is not None:
+            extension.extra_objects.append(os.path.join(ssl_path, "libssl.a"))
+            extension.extra_objects.append(os.path.join(ssl_path, "libcrypto.a"))
+            extension.libraries.remove("ssl")
+            extension.libraries.remove("crypto")
+        super().build_extensions()
+
 
 dev_requires = [
     "Cython==0.29.18",
@@ -61,7 +72,8 @@ setup(
     author_email="pfreixes@gmail.com",
     platforms=["*nix"],
     packages=["acsylla"],
-    ext_modules=extensions,
+    cmdclass={"build_ext": acsylla_build_ext},
+    ext_modules=[extension],
     extras_require={"dev": dev_requires},
     classifiers=[
         "Development Status :: 3 - Alpha",

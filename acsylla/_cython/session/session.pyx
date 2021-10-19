@@ -73,7 +73,6 @@ cdef class Session:
         finally:
             cass_future_free(cass_future)
 
-
     async def execute(self, Statement statement):
         """ Execute an statement and returns the result.
 
@@ -102,7 +101,6 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-
             result = Result.new_(cass_result)
         finally:
             cass_future_free(cass_future)
@@ -159,6 +157,7 @@ cdef class Session:
         cdef char* error_message = NULL
         cdef const CassResult* cass_result = NULL
 
+        cdef Result result
         cdef CallbackWrapper cb_wrapper
 
         if self.closed == 1:
@@ -174,8 +173,11 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
+            result = Result.new_(cass_result)
         finally:
             cass_future_free(cass_future)
+
+        return result
 
     def metrics(self):
         """ Returns performance metrics gathered by the driver.

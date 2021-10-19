@@ -17,12 +17,15 @@ cdef class CallbackWrapper:
         cb_wrapper = CallbackWrapper()
         cb_wrapper.future = loop.create_future()
 
+        Py_INCREF(cb_wrapper)
+
         error = cass_future_set_callback(
             cass_future,
             cb_cass_future,
             <void*> cb_wrapper
         ) 
         if error != CASS_OK:
-            raise RuntimeError(error)
+            Py_DECREF(cb_wrapper)
+            raise_if_error(error)
 
         return cb_wrapper

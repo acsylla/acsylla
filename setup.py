@@ -28,10 +28,10 @@ extension = Extension(
 
 class acsylla_build_ext(build_ext):
     def build_extensions(self):
-        ssl_path = [k for k in self.library_dirs if "openssl" in k]
-        if os.sys.platform == "darwin" and len(ssl_path):
-            extension.extra_objects.append(os.path.join(ssl_path[0], "libssl.a"))
-            extension.extra_objects.append(os.path.join(ssl_path[0], "libcrypto.a"))
+        ssl_path = os.environ.get("SSL_LIBRARY_PATH")
+        if os.sys.platform == "darwin" and ssl_path is not None:
+            extension.extra_objects.append(os.path.join(ssl_path, "libssl.a"))
+            extension.extra_objects.append(os.path.join(ssl_path, "libcrypto.a"))
             extension.libraries.remove("ssl")
             extension.libraries.remove("crypto")
         super().build_extensions()

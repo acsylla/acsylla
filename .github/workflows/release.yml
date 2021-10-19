@@ -28,6 +28,7 @@ jobs:
         python -m pip install --upgrade pip
         export LDFLAGS="-L/usr/local/opt/openssl/lib"
         export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
         pip install wheel
         make compile
         python setup.py bdist_wheel
@@ -54,6 +55,7 @@ jobs:
         rm -f .install-cython
         export LDFLAGS="-L/usr/local/opt/openssl/lib"
         export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
         make install-driver
         make install-dev
         rm -r acsylla

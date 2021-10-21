@@ -47,7 +47,6 @@ jobs:
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
         mkdir test_wheel
-        cp -r ./certs test_wheel
         cp dist/acsylla-*.whl test_wheel
         pip install virtualenv
         python -m virtualenv env
@@ -60,6 +59,9 @@ jobs:
         make install-dev
         rm -r acsylla
         pip install test_wheel/acsylla-*.whl --upgrade
+        pwd
+        ls
+        ls certs
         make test
     - name: Generate manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -81,7 +83,6 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         mkdir test_wheel
-        cp -r ./certs test_wheel
         cp dist/acsylla-*.whl test_wheel
         pip install virtualenv
         python -m virtualenv env
@@ -93,6 +94,9 @@ jobs:
         sudo apt-get remove libuv1 libuv1-dev
         rm -r acsylla
         pip install test_wheel/acsylla-*.whl --upgrade
+        pwd
+        ls
+        ls certs
         make test
     - name: Get the version
       id: get_version

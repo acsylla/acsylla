@@ -117,6 +117,24 @@ class TestRow:
 
         assert row.column_value("value_float") == value
 
+    async def test_float_as_string(self, session, id_generation):
+        id_ = next(id_generation)
+        value = "123.0"
+
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_float) values (?, ?)")
+        statement = insert_statement.bind()
+        statement.bind_list([id_, value])
+        await session.execute(statement)
+
+        select_statement = await session.create_prepared("SELECT value_float FROM test WHERE ( id = ? )")
+        statement = select_statement.bind()
+        statement.bind(0, id_)
+        result = await session.execute(statement)
+
+        row = result.first()
+
+        assert row.column_value("value_float") == float(value)
+
     async def test_double(self, session, id_generation):
         id_ = next(id_generation)
         value = 3.0999999046325684
@@ -134,6 +152,24 @@ class TestRow:
         row = result.first()
 
         assert row.column_value("value_double") == value
+
+    async def test_double_as_string(self, session, id_generation):
+        id_ = next(id_generation)
+        value = "3.0999999046325684"
+
+        insert_statement = await session.create_prepared("INSERT INTO test (id, value_double) values (?, ?)")
+        prepared = insert_statement.bind()
+        prepared.bind_list([id_, value])
+        await session.execute(prepared)
+
+        select_statement = await session.create_prepared("SELECT value_double FROM test WHERE ( id = ? )")
+        prepared = select_statement.bind()
+        prepared.bind(0, id_)
+        result = await session.execute(prepared)
+
+        row = result.first()
+
+        assert row.column_value("value_double") == float(value)
 
     async def test_decimal(self, session, id_generation):
         id_ = next(id_generation)

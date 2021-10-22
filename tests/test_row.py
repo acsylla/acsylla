@@ -1,12 +1,11 @@
 from acsylla import create_statement
-from datetime import (
-    date,
-    datetime,
-    time,
-    timedelta,
-)
+from datetime import date
+from datetime import datetime
+from datetime import time
+from datetime import timedelta
 from decimal import Decimal
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
 
 import pytest
 import uuid

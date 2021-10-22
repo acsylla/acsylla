@@ -1,12 +1,13 @@
-from acsylla import Consistency, create_statement, errors
-from datetime import (
-    date,
-    datetime,
-    time,
-    timedelta,
-)
+from acsylla import Consistency
+from acsylla import create_statement
+from acsylla import errors
+from datetime import date
+from datetime import datetime
+from datetime import time
+from datetime import timedelta
 from decimal import Decimal
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
 
 import pytest
 import uuid
@@ -81,7 +82,8 @@ class TestStatement:
         statement.set_consistency(consistency)
 
     @pytest.mark.parametrize(
-        "serial_consistency", [Consistency.SERIAL, Consistency.LOCAL_SERIAL],
+        "serial_consistency",
+        [Consistency.SERIAL, Consistency.LOCAL_SERIAL],
     )
     async def test_create_with_serial_consistency(self, serial_consistency):
         statement = create_statement("INSERT INTO test (id) values (1)", serial_consistency=serial_consistency)

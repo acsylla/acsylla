@@ -1,5 +1,9 @@
-from acsylla import create_batch_unlogged, create_cluster, create_statement
-from acsylla.errors import CassErrorLibNoHostsAvailable, CassErrorServerInvalidQuery, CassErrorServerSyntaxError
+from acsylla import create_batch_unlogged
+from acsylla import create_cluster
+from acsylla import create_statement
+from acsylla.errors import CassErrorLibNoHostsAvailable
+from acsylla.errors import CassErrorServerInvalidQuery
+from acsylla.errors import CassErrorServerSyntaxError
 
 import pytest
 

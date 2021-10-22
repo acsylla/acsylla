@@ -116,9 +116,9 @@ cdef inline bind_int64_by_name(CassStatement* statement, bytes name, object valu
 
 # CASS_VALUE_TYPE_FLOAT
 cdef get_float(object value):
-    if isinstance(value, (int, str, Decimal)):
+    try:
         value = float(value)
-    elif not isinstance(value, float):
+    except ValueError:
         raise ValueError(f'Value "{value}" is not float')
     return <cass_float_t>value
 
@@ -156,9 +156,9 @@ cdef inline bind_decimal_by_name(CassStatement* statement, bytes name, object va
 
 # CASS_VALUE_TYPE_DOUBLE
 cdef get_double(object value):
-    if isinstance(value, (int, str, Decimal)):
+    try:
         value = float(value)
-    elif not isinstance(value, float):
+    except ValueError:
         raise ValueError(f'Value "{value}" is not float')
     return <cass_double_t>value
 

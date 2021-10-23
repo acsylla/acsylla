@@ -1,12 +1,13 @@
-from uuid import UUID
-from decimal import Decimal
 from datetime import date
-from datetime import time
 from datetime import datetime
-from datetime import timezone
+from datetime import time
 from datetime import timedelta
+from datetime import timezone
+from decimal import Decimal
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
+from uuid import UUID
+
 
 cdef inline bind_null(CassStatement* statement, int index):
     cdef CassError error

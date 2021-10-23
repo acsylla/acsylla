@@ -1,5 +1,6 @@
-from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext as build_ext
+from setuptools import Extension
+from setuptools import setup
+from setuptools.command.build_ext import build_ext
 
 import os
 import re
@@ -38,16 +39,16 @@ class acsylla_build_ext(build_ext):
 
 
 dev_requires = [
-    "Cython==0.29.18",
-    "pytest==5.4.1",
-    "pytest-mock==3.1.0",
-    "pytest-asyncio==0.11.0",
+    "Cython==0.29.24",
+    "pytest==6.2.5",
+    "pytest-mock==3.6.1",
+    "pytest-asyncio==0.16.0",
     "asynctest==0.13.0",
-    "pytest-cov==2.8.1",
-    "black==19.10b0",
-    "isort==4.3.21",
-    "flake8==3.7.9",
-    "mypy==0.782",
+    "pytest-cov==3.0.0",
+    "black==21.9b0",
+    "isort==5.9.3",
+    "flake8==4.0.1",
+    "mypy==0.910",
 ]
 
 

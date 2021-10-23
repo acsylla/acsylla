@@ -1,13 +1,11 @@
-from acsylla import (
-    Cluster,
-    create_cluster,
-    create_statement,
-    PreparedStatement,
-    Result,
-    Row,
-    Session,
-    Statement,
-)
+from acsylla import Cluster
+from acsylla import create_cluster
+from acsylla import create_statement
+from acsylla import PreparedStatement
+from acsylla import Result
+from acsylla import Row
+from acsylla import Session
+from acsylla import Statement
 
 import pytest
 

@@ -78,7 +78,7 @@ jobs:
         docker-compose up -d
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
-        sleep 120
+        sleep 300
     - name: Test generated manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |

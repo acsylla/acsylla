@@ -41,7 +41,7 @@ jobs:
         cassandra -Dcassandra.config=./conf/cassandra/cassandra.yaml
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
-        sleep 90
+        sleep 120
         cqlsh -e "describe keyspaces"
     - name: Test generated macos-wheel
       if: ${{ matrix.os == 'macos-latest' }}
@@ -78,7 +78,7 @@ jobs:
         docker-compose up -d
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
-        sleep 90
+        sleep 120
     - name: Test generated manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |

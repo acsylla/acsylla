@@ -1,4 +1,5 @@
-from acsylla import create_cluster, SSLVerifyFlags
+from acsylla import create_cluster
+from acsylla import SSLVerifyFlags
 
 import acsylla.errors
 import pytest

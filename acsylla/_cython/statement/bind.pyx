@@ -1,12 +1,13 @@
-from uuid import UUID
-from decimal import Decimal
 from datetime import date
-from datetime import time
 from datetime import datetime
-from datetime import timezone
+from datetime import time
 from datetime import timedelta
+from datetime import timezone
+from decimal import Decimal
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
+from uuid import UUID
+
 
 cdef inline bind_null(CassStatement* statement, int index):
     cdef CassError error
@@ -19,14 +20,19 @@ cdef inline bind_null_by_name(CassStatement* statement, bytes name):
     raise_if_error(error)
 
 # CASS_VALUE_TYPE_BOOLEAN
+cdef get_bool(object value):
+    if value:
+        return cass_true
+    return cass_false
+
 cdef inline bind_bool(CassStatement* statement, int index, object value):
     cdef CassError error
-    error = cass_statement_bind_bool(statement, index, cass_true if value else cass_false)
+    error = cass_statement_bind_bool(statement, index, get_bool(value))
     raise_if_error(error)
 
 cdef inline bind_bool_by_name(CassStatement* statement, bytes name, object value):
     cdef CassError error
-    error = cass_statement_bind_bool_by_name(statement, name, cass_true if value else cass_false)
+    error = cass_statement_bind_bool_by_name(statement, name, get_bool(value))
 
 # CASS_VALUE_TYPE_TINY_INT
 cdef get_int8(object value):
@@ -76,11 +82,11 @@ cdef get_int32(object value):
         raise ValueError(f'Value "{value}" is not int32')
     if value < -2147483648 or value > 2147483647:
         raise ValueError(f'Value int32 must be between -2147483648 and 2147483647 got {value}')
-    return value
+    return <cass_int32_t>value
 
 cdef bind_int32(CassStatement* statement, int index, object value):
     cdef CassError error
-    error = cass_statement_bind_int32(statement, index, <cass_int32_t>get_int32(value))
+    error = cass_statement_bind_int32(statement, index, get_int32(value))
     raise_if_error(error)
 
 cdef bind_int32_by_name(CassStatement* statement, bytes name, object value):
@@ -97,7 +103,7 @@ cdef get_int64(object value):
     if value < -9223372036854775808 or value > 9223372036854775807:
         raise ValueError(f'Value int64 must be between -9223372036854775808 and 9223372036854775807 got {value}')
 
-    return value
+    return <cass_int64_t>value
 
 cdef inline bind_int64(CassStatement* statement, int index, object value):
     cdef CassError error
@@ -111,9 +117,9 @@ cdef inline bind_int64_by_name(CassStatement* statement, bytes name, object valu
 
 # CASS_VALUE_TYPE_FLOAT
 cdef get_float(object value):
-    if isinstance(value, (int, Decimal)) or (isinstance(value, str) and value.isdigit()):
+    try:
         value = float(value)
-    elif not isinstance(value, float):
+    except ValueError:
         raise ValueError(f'Value "{value}" is not float')
     return <cass_float_t>value
 
@@ -150,14 +156,21 @@ cdef inline bind_decimal_by_name(CassStatement* statement, bytes name, object va
     raise_if_error(error)
 
 # CASS_VALUE_TYPE_DOUBLE
+cdef get_double(object value):
+    try:
+        value = float(value)
+    except ValueError:
+        raise ValueError(f'Value "{value}" is not float')
+    return <cass_double_t>value
+
 cdef inline bind_double(CassStatement* statement, int index, object value):
     cdef CassError error
-    error = cass_statement_bind_double(statement, index, <cass_double_t>get_float(value))
+    error = cass_statement_bind_double(statement, index, get_double(value))
     raise_if_error(error)
 
-cdef inline bind_double_by_name(CassStatement* statement, bytes name, double value):
+cdef inline bind_double_by_name(CassStatement* statement, bytes name, object value):
     cdef CassError error
-    error = cass_statement_bind_double_by_name(statement, name, value)
+    error = cass_statement_bind_double_by_name(statement, name, get_double(value))
     raise_if_error(error)
 
 # CASS_VALUE_TYPE_ASCII
@@ -386,8 +399,7 @@ cdef bind_collection_by_value_type(CassCollection* collection, object value, con
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise ValueError(f"Unknown type for collection value {value}")
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        cass_value = cass_true if value else cass_false
-        error = cass_collection_append_bool(collection, cass_value)
+        error = cass_collection_append_bool(collection, get_bool(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
         error = cass_collection_append_int8(collection, get_int8(value))
@@ -406,7 +418,7 @@ cdef bind_collection_by_value_type(CassCollection* collection, object value, con
         error = cass_collection_append_float(collection, get_float(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_collection_append_double(collection, <cass_double_t>get_float(value))
+        error = cass_collection_append_double(collection, get_double(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_collection_append_string(collection, get_ascii(value))
@@ -533,8 +545,7 @@ cdef inline bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object
         error = cass_tuple_set_null(cass_tuple, index)
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        cass_value = cass_true if value else cass_false
-        error = cass_tuple_set_bool(cass_tuple, index, cass_value)
+        error = cass_tuple_set_bool(cass_tuple, index, get_bool(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
         error = cass_tuple_set_int8(cass_tuple, index, get_int8(value))
@@ -553,7 +564,7 @@ cdef inline bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object
         error = cass_tuple_set_float(cass_tuple, index, get_float(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_tuple_set_double(cass_tuple, index, <cass_double_t>get_float(value))
+        error = cass_tuple_set_double(cass_tuple, index, get_double(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_tuple_set_string(cass_tuple, index, get_ascii(value))
@@ -663,7 +674,7 @@ cdef bind_udt_by_value_type(CassUserType* user_type, bytes name, object value, c
         error = cass_user_type_set_null_by_name(user_type, name)
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        error = cass_user_type_set_bool_by_name(user_type, name, cass_true if value else cass_false)
+        error = cass_user_type_set_bool_by_name(user_type, name, get_bool(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
         error = cass_user_type_set_int8_by_name(user_type, name, get_int8(value))
@@ -682,7 +693,7 @@ cdef bind_udt_by_value_type(CassUserType* user_type, bytes name, object value, c
         error = cass_user_type_set_float_by_name(user_type, name, get_float(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_user_type_set_double_by_name(user_type, name, <cass_double_t>get_float(value))
+        error = cass_user_type_set_double_by_name(user_type, name, get_double(value))
         raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
         value, scale = get_cass_decimal(value)

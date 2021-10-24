@@ -6,7 +6,7 @@ current_dir = $(shell pwd)
 _default: compile
 
 clean:
-	rm -fr acsylla/_cython/*.c acsylla/_cython/*.cpp acsylla/_cython/*.so build dist certs
+	rm -fr acsylla/_cython/*.c acsylla/_cython/*.cpp acsylla/_cython/*.so build dist
 	find . -name '__pycache__' | xargs rm -rf
 	find . -type f -name "*.pyc" -delete
 
@@ -38,11 +38,11 @@ install: compile
 	$(PIP) install -e .
 
 format:
-	isort --recursive .
+	isort .
 	black .
 
 lint:
-	isort --check-only --recursive .
+	isort --check-only  .
 	black --exclude vendor --check .
 	flake8 --config setup.cfg
 

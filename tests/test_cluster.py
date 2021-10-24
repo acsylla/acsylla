@@ -1,4 +1,5 @@
-from acsylla import Consistency, create_cluster
+from acsylla import Consistency
+from acsylla import create_cluster
 
 import pytest
 

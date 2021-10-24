@@ -134,10 +134,16 @@ def benchmark(desc, func, session, prepared, concurrency: int, duration: int) ->
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--concurrency", help="Number of concurrency clients, by default 32", type=int, default=32,
+        "--concurrency",
+        help="Number of concurrency clients, by default 32",
+        type=int,
+        default=32,
     )
     parser.add_argument(
-        "--duration", help="Test duration in seconds, by default 60", type=int, default=10,
+        "--duration",
+        help="Test duration in seconds, by default 60",
+        type=int,
+        default=10,
     )
     args = parser.parse_args()
 

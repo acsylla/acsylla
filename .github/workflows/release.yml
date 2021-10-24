@@ -73,12 +73,13 @@ jobs:
     - name: Test dependencies for manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libuv1 libuv1-dev default-jre
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
         make certs
         docker-compose up -d
         # wait till casssandra server is up, to be improved
         # by checking the readiness of the serivce
-        sleep 300
+        sleep 120
+        docker logs cassandra
     - name: Test generated manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |

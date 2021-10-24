@@ -18,6 +18,12 @@ then
     PIP=/opt/python/cp39-cp39/bin/pip
     CYTHON=/opt/python/cp39-cp39/bin/cython
     AUDITWHEEL=/opt/python/cp39-cp39/bin/auditwheel
+elif [ $PYTHON_VERSION == "3.10" ]
+then
+    PYTHON=/opt/python/cp310-cp310/bin/python
+    PIP=/opt/python/cp310-cp310/bin/pip
+    CYTHON=/opt/python/cp310-cp310/bin/cython
+    AUDITWHEEL=/opt/python/cp310-cp310/bin/auditwheel
 else
     exit 1
 fi

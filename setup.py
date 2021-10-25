@@ -35,6 +35,10 @@ class acsylla_build_ext(build_ext):
             extension.extra_objects.append(os.path.join(ssl_path, "libcrypto.a"))
             extension.libraries.remove("ssl")
             extension.libraries.remove("crypto")
+        libuv_path = os.environ.get("UV_LIBRARY_PATH")
+        if os.sys.platform == "darwin" and libuv_path is not None:
+            extension.extra_objects.append(os.path.join(libuv_path, "libuv.a"))
+            extension.libraries.remove("uv")
         super().build_extensions()
 
 

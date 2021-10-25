@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9, "3.10"]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -67,6 +67,11 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
+        make certs
+        docker-compose up -d
+        # wait till casssandra server is up, to be improved
+        # by checking the readiness of the serivce
+        sleep 60
     - name: Test generated manylinux2010-wheel
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
@@ -79,11 +84,6 @@ jobs:
         rm -r acsylla
         pip install test_wheel/acsylla-*.whl --upgrade
         pip install -r requirements-test.txt
-        make certs
-        docker-compose up -d
-        # wait till casssandra server is up, to be improved
-        # by checking the readiness of the serivce
-        sleep 60
         make test
     - name: Get the version
       id: get_version

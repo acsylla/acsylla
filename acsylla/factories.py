@@ -117,6 +117,9 @@ def create_statement(
     If `consistency` is provided, this will override the consistency value provided during the cluster
     creation.
     """
+    if statement.strip().lower().startswith("use"):
+        raise ValueError("For change keyspace use await session.set_keyspace(name)")
+
     return _cython.cyacsylla.create_statement(
         statement,
         parameters=parameters,

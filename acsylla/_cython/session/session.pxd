@@ -6,5 +6,5 @@ cdef class Session:
         object keyspace
         bint closed
         bint connected
-        const CassSchemaMeta* schema_meta
-        const CassKeyspaceMeta* keyspace_meta
+        const CassSchemaMeta* _schema_meta
+        const CassSchemaMeta* schema_meta(self)

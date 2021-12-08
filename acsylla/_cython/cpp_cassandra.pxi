@@ -231,6 +231,14 @@ cdef extern from "cassandra.h":
   ctypedef struct CassKeyspaceMeta:
     pass
 
+  ctypedef struct CassTableMeta:
+    pass
+
+  ctypedef struct CassVersion:
+    int major_version
+    int minor_version
+    int patch_version
+
   ctypedef struct _requests:
     cass_uint64_t min
     cass_uint64_t max
@@ -263,7 +271,17 @@ cdef extern from "cassandra.h":
     _stats stats
     _errors errors
 
+  ctypedef struct CassSpeculativeExecutionMetrics:
+    pass
+
+  ctypedef struct CassLogMessage:
+    pass
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
+  ctypedef void (*CassLogCallback)(const CassLogMessage * message, void * data)
+
+  void cass_log_set_callback(CassLogCallback callback, void* data)
+
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
@@ -296,13 +314,17 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_execute(CassSession* session, const CassStatement* statement)
   CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length)
   CassFuture* cass_session_execute_batch(CassSession* session, const CassBatch* batch)
+
+  CassUuid cass_session_get_client_id(CassSession* session)
   void cass_session_get_metrics(const CassSession* session, CassMetrics* output)
+  void cass_session_get_speculative_execution_metrics(const CassSession * session, CassSpeculativeExecutionMetrics * output)
 
   CassError cass_prepared_parameter_name(const CassPrepared* prepared, size_t index,  const char** name, size_t* name_length)
   const CassDataType* cass_prepared_parameter_data_type(const CassPrepared* prepared, size_t index)
   const CassDataType* cass_prepared_parameter_data_type_by_name(const CassPrepared* prepared,const char * name)
   CassFuture* cass_session_close(CassSession* session)
 
+  CassStatement* cass_statement_new(const char* query, size_t parameter_count)
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
   CassError cass_statement_set_request_timeout(CassStatement* statement, cass_uint64_t timeout_ms)
   CassError cass_statement_bind_null(CassStatement* statement, size_t index)
@@ -496,11 +518,18 @@ cdef extern from "cassandra.h":
   CassUserType* cass_user_type_new_from_data_type(const CassDataType * data_type)
   void cass_user_type_free(CassUserType* user_type)
 
-  const CassSchemaMeta* cass_session_get_schema_meta(const CassSession* session)
-  void cass_schema_meta_free(const CassSchemaMeta* schema_meta)
-
+  CassIterator* cass_iterator_keyspaces_from_schema_meta(const CassSchemaMeta * schema_meta)
+  CassIterator* cass_iterator_tables_from_keyspace_meta(const CassKeyspaceMeta * keyspace_meta)
+  const CassKeyspaceMeta* cass_iterator_get_keyspace_meta(const CassIterator * iterator)
   const CassKeyspaceMeta* cass_schema_meta_keyspace_by_name(const CassSchemaMeta* schema_meta, const char* keyspace)
-  
+  const CassSchemaMeta* cass_session_get_schema_meta(const CassSession* session)
+  const CassTableMeta* cass_iterator_get_table_meta(const CassIterator * iterator)
+  CassVersion cass_schema_meta_version(const CassSchemaMeta * schema_meta)
+  cass_uint32_t cass_schema_meta_snapshot_version(const CassSchemaMeta * schema_meta)
+  void cass_schema_meta_free(const CassSchemaMeta* schema_meta)
+  void cass_keyspace_meta_name(const CassKeyspaceMeta* keyspace_meta, const char** name, size_t* name_length)
+  void cass_table_meta_name(const CassTableMeta * table_meta, const char** name, size_t * name_length)
+
   CassError cass_user_type_set_null(CassUserType* user_type, size_t index); 
   CassError cass_user_type_set_null_by_name(CassUserType* user_type, const char* name)
   CassError cass_user_type_set_null_by_name_n(CassUserType* user_type, const char* name, size_t name_length)

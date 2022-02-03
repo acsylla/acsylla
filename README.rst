@@ -3,6 +3,8 @@ acsylla
 
 WORK IN PROGRESS, use only for developing
 
+acsylla a composition of async + cassandra + scylla words. (c) @pfreixes
+
 Install
 ==========
 
@@ -32,7 +34,7 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
     async def main():
         cluster = acsylla.create_cluster([host])
         session = await cluster.create_session(keyspace="acsylla")
-        statement = ascylla.create_statement("SELECT id, value FROM test WHERE id=100")
+        statement = acsylla.create_statement("SELECT id, value FROM test WHERE id=100")
         result = await session.execute(statement)
         row = result.first()
         value = row.column_value("value")
@@ -78,7 +80,48 @@ Example for use prepared statement and paging.
 
     asyncio.run(main())
 
+
+
+.. code-block:: python
+
+    class AsyncResultGenerator:
+        def __init__(self, session, statement):
+            self.session = session
+            self.statement = statement
+
+        async def __aiter__(self):
+            result = await self.session.execute(self.statement)
+            while True:
+                if result.has_more_pages():
+                    self.statement.set_page_state(result.page_state())
+                    future_result = asyncio.create_task(
+                        self.session.execute(self.statement))
+                    await asyncio.sleep(0)
+                else:
+                    future_result = None
+                for row in result:
+                    yield dict(row)
+                if future_result is not None:
+                    result = await future_result
+                else:
+                    break
+
+    async def main():
+        cluster = acsylla.create_cluster(['localhost'])
+        session = await cluster.create_session(keyspace="acsylla")
+        prepared = await session.create_prepared("SELECT id, value FROM test")
+
+        async def find(statement):
+            return AsyncResultGenerator(session, statement)
+
+        statement = prepared.bind(page_size=10, timeout=0.01)
+
+        async for res in find(statement):
+            print(res)
+
+
 Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific>`__ connection to `Scylla` cluster.
+
 
 .. code-block:: python
 

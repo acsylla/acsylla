@@ -84,6 +84,9 @@ Example for use prepared statement and paging.
 
 .. code-block:: python
 
+    import asyncio
+    import acsylla
+
     class AsyncResultGenerator:
         def __init__(self, session, statement):
             self.session = session
@@ -105,20 +108,21 @@ Example for use prepared statement and paging.
                     result = await future_result
                 else:
                     break
+    def find(session, statement):
+        return AsyncResultGenerator(session, statement)
 
     async def main():
         cluster = acsylla.create_cluster(['localhost'])
         session = await cluster.create_session(keyspace="acsylla")
         prepared = await session.create_prepared("SELECT id, value FROM test")
 
-        def find(session, statement):
-            return AsyncResultGenerator(session, statement)
-
         statement = prepared.bind(page_size=10, timeout=0.01)
 
-        async for res in find(statement):
+        async for res in find(session, statement):
             print(res)
 
+    if __name__ == '__main__':
+        asyncio.run(main())
 
 Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific>`__ connection to `Scylla` cluster.
 

@@ -54,7 +54,7 @@ Example for use prepared statement and paging.
     import asyncio
     import acsylla
 
-    async def main()
+    async def main():
         cluster = acsylla.create_cluster(['localhost'])
         session = await cluster.create_session(keyspace="acsylla")
         prepared = await session.create_prepared("SELECT id, value FROM test")
@@ -111,7 +111,7 @@ Example for use prepared statement and paging.
         session = await cluster.create_session(keyspace="acsylla")
         prepared = await session.create_prepared("SELECT id, value FROM test")
 
-        async def find(statement):
+        def find(session, statement):
             return AsyncResultGenerator(session, statement)
 
         statement = prepared.bind(page_size=10, timeout=0.01)

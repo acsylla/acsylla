@@ -14,7 +14,7 @@ def create_cluster(
     port: int = 9042,
     username: str = None,
     password: str = None,
-    protocol_version: int = 3,
+    protocol_version: int = 4,
     connect_timeout: float = 5.0,
     request_timeout: float = 2.0,
     resolve_timeout: float = 1.0,

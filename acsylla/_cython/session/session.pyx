@@ -8,14 +8,14 @@ cdef class Session:
 
     def __dealloc__(self):
         cass_session_free(self.cass_session)
-        if self._schema_meta:
-            cass_schema_meta_free(self._schema_meta)
 
     def __init__(self, cass_cluster, keyspace=None):
         self.loop = asyncio.get_running_loop()
         self.keyspace = keyspace
         self.closed = 0
         self.connected = 0
+        self.meta = Meta()
+        self.meta.cass_session = self.cass_session
 
     async def _connect(self):
         cdef CassFuture* cass_future
@@ -47,19 +47,6 @@ cdef class Session:
         finally:
             cass_future_free(cass_future)
 
-    cdef const CassSchemaMeta* schema_meta(self):
-        if self._schema_meta:
-            cass_schema_meta_free(self._schema_meta)
-        self._schema_meta = cass_session_get_schema_meta(self.cass_session)
-        return self._schema_meta
-
-    def version(self):
-        cdef CassVersion v = cass_schema_meta_version(self.schema_meta())
-        return v.major_version, v.minor_version, v.patch_version
-
-    def snapshot_version(self):
-        return cass_schema_meta_snapshot_version(self.schema_meta())
-
     def get_client_id(self):
         cdef char uuid_str[CASS_UUID_STRING_LENGTH]
         cdef CassUuid cass_uuid = cass_session_get_client_id(self.cass_session)
@@ -74,47 +61,6 @@ cdef class Session:
         if result is not None:
             self.keyspace = keyspace
         return result
-
-    def get_keyspace(self):
-        cdef const CassKeyspaceMeta* keyspace_meta
-        cdef size_t length = 0
-        cdef char* keyspace_name = NULL
-        if self.keyspace is not None:
-            keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta(), self.keyspace.encode())
-            cass_keyspace_meta_name(keyspace_meta, <const char**> &keyspace_name, <size_t *> &length)
-            return keyspace_name[:length].decode()
-
-    def get_keyspaces(self):
-        cdef CassIterator* cass_iterator
-        cdef size_t length = 0
-        cdef char* keyspace_name = NULL
-        try:
-            cass_iterator = cass_iterator_keyspaces_from_schema_meta(self.schema_meta())
-            while cass_iterator_next(cass_iterator) == cass_true:
-                keyspace_meta = cass_iterator_get_keyspace_meta(cass_iterator)
-                cass_keyspace_meta_name(keyspace_meta, <const char**> &keyspace_name, <size_t*> &length)
-                yield keyspace_name[:length].decode()
-        finally:
-            cass_iterator_free(cass_iterator)
-
-    def get_tables(self, object keyspace=None):
-        keyspace = keyspace or self.keyspace
-        cdef CassIterator* cass_iterator
-        cdef const CassKeyspaceMeta* keyspace_meta
-        cdef const CassTableMeta* table_meta
-
-        cdef size_t length = 0
-        cdef char* table_name = NULL
-        if keyspace is not None:
-            keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta(), keyspace.encode())
-            try:
-                cass_iterator = cass_iterator_tables_from_keyspace_meta(keyspace_meta)
-                while cass_iterator_next(cass_iterator) == cass_true:
-                    table_meta = cass_iterator_get_table_meta(cass_iterator)
-                    cass_table_meta_name(table_meta, <const char**> &table_name, <size_t *> &length)
-                    yield table_name[:length].decode()
-            finally:
-                cass_iterator_free(cass_iterator)
 
     async def close(self):
         cdef CassFuture* cass_future
@@ -190,9 +136,6 @@ cdef class Session:
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
-
-        if statement.strip().lower().startswith('use'):
-            raise ValueError("For change keyspace use await session.set_keyspace(name)")
 
         encoded_statement = statement.encode()
 

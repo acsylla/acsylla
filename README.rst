@@ -32,7 +32,7 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
     import asyncio
     import acsylla
     async def main():
-        cluster = acsylla.create_cluster([host])
+        cluster = acsylla.create_cluster(['localhost'])
         session = await cluster.create_session(keyspace="acsylla")
         statement = acsylla.create_statement("SELECT id, value FROM test WHERE id=100")
         result = await session.execute(statement)
@@ -161,6 +161,19 @@ SSL Connection example
 
 
 
+
+Retrieving metadata
+
+.. code-block:: python
+    import asyncio
+    import acsylla
+    async def main():
+        cluster = acsylla.create_cluster(['localhost'])
+        session = await cluster.create_session(keyspace="acsylla")
+        meta = session.meta.keyspace('acsylla')
+        print('\n\n'.join(meta.as_cql_query(formatted=True)))
+        await session.close()
+    asyncio.run(main())
 Developing
 ============
 

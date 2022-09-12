@@ -5,6 +5,7 @@ import asyncio
 import atexit
 import csv
 import os
+import re
 import readline
 import sys
 
@@ -79,19 +80,159 @@ class AcsyllaCQLSH:
     async def init(self):
         self.cluster = acsylla.create_cluster(**self.cluster_args)
         self.session = await self.cluster.create_session(**self.session_args)
-        print("cluster_version=>", self.session.version())
-        print("snapshot_version=>", self.session.snapshot_version())
-        keyspaces = self.session.get_keyspaces()
-        print("keyspaces", list(keyspaces))
-        print("client_id:", self.session.get_client_id())
-        print("get_tables:", list(self.session.get_tables()))
 
     def get_input_prefix(self):
         return (
             f'{self.cluster_args["username"]}@'
             f'{self.cluster_args["contact_points"][0]}'
-            f"/{self.session.get_keyspace()}> "
+            f"/{self.session.keyspace}> "
         )
+
+    def autocomplete(self, text, state):
+        keywords = [
+            "ADD",
+            "AGGREGATE",
+            "AGGREGATES",
+            "ALL",
+            "ALLOW",
+            "ALTER",
+            "AND",
+            "ANY",
+            "APPLY",
+            "AS",
+            "ASC",
+            "ASCII",
+            "AUTHORIZE",
+            "BATCH",
+            "BEGIN",
+            "BIGINT",
+            "BLOB",
+            "BOOLEAN",
+            "BY",
+            "CLUSTERING",
+            "COLUMNFAMILY",
+            "COMPACT",
+            "CONSISTENCY",
+            "COUNT",
+            "COUNTER",
+            "CREATE",
+            "CUSTOM",
+            "DECIMAL",
+            "DELETE",
+            "DESC",
+            "DISTINCT",
+            "DOUBLE",
+            "DROP",
+            "EACH_QUORUM",
+            "ENTRIES",
+            "EXISTS",
+            "FILTERING",
+            "FLOAT",
+            "FROM",
+            "FROZEN",
+            "FUNCTION",
+            "FUNCTIONS",
+            "FULL",
+            "GRANT",
+            "IF",
+            "IN",
+            "INDEX",
+            "INDEXES",
+            "INET",
+            "INFINITY",
+            "INSERT",
+            "INT",
+            "INTO",
+            "KEY",
+            "KEYSPACE",
+            "KEYSPACES",
+            "LEVEL",
+            "LIMIT",
+            "LIST",
+            "LOCAL_ONE",
+            "LOCAL_QUORUM",
+            "MAP",
+            "MATERIALIZED",
+            "MODIFY",
+            "NAN",
+            "NORECURSIVE",
+            "NOSUPERUSER",
+            "NOT",
+            "OF",
+            "ON",
+            "ONE",
+            "ORDER",
+            "PARTITION",
+            "PASSWORD",
+            "PER",
+            "PERMISSION",
+            "PERMISSIONS",
+            "PRIMARY",
+            "QUORUM",
+            "RENAME",
+            "REVOKE",
+            "SCHEMA",
+            "SELECT",
+            "SET",
+            "STATIC",
+            "STORAGE",
+            "SUPERUSER",
+            "TABLE",
+            "TABLES",
+            "TEXT",
+            "TIME",
+            "TIMESTAMP",
+            "TIMEUUID",
+            "THREE",
+            "TO",
+            "TOKEN",
+            "TRUNCATE",
+            "TTL",
+            "TUPLE",
+            "TWO",
+            "TYPE",
+            "TYPES",
+            "UNLOGGED",
+            "UPDATE",
+            "USE",
+            "USER",
+            "USERS",
+            "USING",
+            "UUID",
+            "VALUES",
+            "VARCHAR",
+            "VARINT",
+            "VIEW",
+            "VIEWS",
+            "WHERE",
+            "WITH",
+            "WRITETIME",
+            "BYPASS",
+            "CACHE",
+            "SERVICE",
+            "LEVEL",
+            "LEVELS",
+            "ATTACH",
+            "ATTACHED",
+            "DETACH",
+            "TIMEOUT",
+            "FOR",
+            "PER",
+            "PARTITION",
+            "LIKE",
+        ]
+        options = [i.upper() for i in keywords if i.startswith(text.upper())]
+        line = readline.get_line_buffer()
+        cmd = line.split()[-2:]
+        if len(cmd) == 2:
+            if cmd[0].lower() == "from" or (cmd[1].lower() == "from" and line.endswith(" ")):
+                options = [
+                    i.lower() for i in list(self.session.meta.tables_names(self.keyspace)) if i.startswith(text.lower())
+                ]
+        if state < len(options):
+            return options[state]
+        else:
+            return None
 
     def init_tty(self):
         history = os.path.join(os.path.expanduser("~"), ".acsylla_history")
@@ -109,85 +250,99 @@ class AcsyllaCQLSH:
 
         atexit.register(save, h_len, history)
 
-        def autocomplete(text, state):
-            keywords = [
-                "DATE",
-                "DELETE",
-                "DESC",
-                "DESCRIBE",
-                "KEYWORDS",
-                "BEGIN",
-                "KEYSPACE",
-                "KEYSPACES",
-                "SCHEMA",
-                "SELECT",
-                "UUID",
-                "TIMESTAMP",
-                "BATCH",
-                "ASCII",
-                "TRUNCATE",
-                "ALTER",
-                "INT",
-                "DROP",
-                "USER",
-                "USERS",
-                "AGGREGATES",
-                "COLUMNFAMILY",
-                "CREATE",
-                "FUNCTIONS",
-                "TIME",
-                "MATERIALIZED",
-                "FUNCTION",
-                "ROLES",
-                "COUNTER",
-                "UPDATE",
-                "BOOLEAN",
-                "AGGREGATE",
-                "PERMISSIONS",
-                "GRANT",
-                "TYPE",
-                "USE",
-                "VIEW",
-                "ROLE",
-                "TABLE",
-                "TYPES",
-                "BLOB",
-                "LIST",
-                "INSERT",
-                "APPLY",
-                "JSON",
-                "INDEX",
-                "TRIGGER",
-                "TEXT",
-                "REVOKE",
-                "FROM",
-            ]
-            options = [i.upper() for i in keywords if i.startswith(text.upper())]
-            if state < len(options):
-                return options[state]
-            else:
-                return None
-
         readline.parse_and_bind("tab: complete")
-        readline.set_completer(autocomplete)
+        readline.set_completer(self.autocomplete)
 
     def describe(self, query):
         query = query.replace(";", "")
-        if query.endswith("keyspaces"):
-            self.print.table(["keyspaces"], [[k] for k in self.session.get_keyspaces()])
-        elif query.endswith("tables"):
-            self.print.table(["tables"], [[k] for k in self.session.get_tables()])
+        print("query:", query)
+        keyspace_re = re.compile(r"[desc|describe] keyspace (\S+)$")
+        type_re = re.compile(r"[desc|describe] type (\S+)$")
+        function_re = re.compile(r"[desc|describe] function (\S+)$")
+        aggregate_re = re.compile(r"[desc|describe] aggregate (\S+)$")
+        table_re = re.compile(r"[desc|describe] table (\S+)$")
+        index_re = re.compile(r"[desc|describe] index (\S+)$")
+        materialized_view_re = re.compile(r"[desc|describe] materialized view (\S+)$")
+
+        keyspace = self.keyspace
+        name = None
+
+        try:
+            if query.endswith("keyspaces"):
+                self.print.table(["keyspaces"], [[k] for k in self.session.meta.keyspaces_names()])
+            elif query.endswith("keyspace"):
+                print("\n\n".join(self.session.meta.keyspace(keyspace).as_cql_query(formatted=True)))
+            elif query.endswith("types"):
+                self.print.table(["types"], [[k] for k in self.session.meta.user_types_names(keyspace)])
+            elif query.endswith("functions"):
+                self.print.table(["functions"], [[k] for k in self.session.meta.functions_names(keyspace)])
+            elif query.endswith("aggregates"):
+                self.print.table(["aggregates"], [[k] for k in self.session.meta.aggregates_names(keyspace)])
+            elif query.endswith("tables"):
+                self.print.table(["tables"], [[k] for k in self.session.meta.tables_names(keyspace)])
+            elif query.endswith("indexes"):
+                self.print.table(["indexes"], [[k] for k in self.session.meta.indexes_names(keyspace)])
+            elif query.endswith("materialized views"):
+                self.print.table(
+                    ["materialized views"], [[k] for k in self.session.meta.materialized_views_names(keyspace)]
+                )
+            elif re.findall(keyspace_re, query):
+                keyspace = re.findall(keyspace_re, query)[0]
+                print("\n\n".join(self.session.meta.keyspace(keyspace).as_cql_query(formatted=True)))
+            elif re.findall(type_re, query):
+                name = re.findall(type_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.user_type(keyspace, name).as_cql_query(formatted=True)))
+            elif re.findall(function_re, query):
+                name = re.findall(function_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.function(keyspace, name).as_cql_query(formatted=True)))
+            elif re.findall(aggregate_re, query):
+                name = re.findall(aggregate_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.aggregate(keyspace, name).as_cql_query(formatted=True)))
+            elif re.findall(table_re, query):
+                name = re.findall(table_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.table(keyspace, name).as_cql_query(formatted=True)))
+            elif re.findall(index_re, query):
+                name = re.findall(index_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.index(keyspace, name).as_cql_query(formatted=True)))
+            elif re.findall(materialized_view_re, query):
+                name = re.findall(materialized_view_re, query)[0]
+                if len(name.split(".")) == 2:
+                    keyspace, name = name.split(".")
+                print("\n\n".join(self.session.meta.materialized_view(keyspace, name).as_cql_query(formatted=True)))
+        except acsylla.errors.KeyspaceNotFound:
+            print(f'{Colors.BRED}ERROR: Keyspace "{keyspace}" not found! {Colors.RESET}')
+        except acsylla.errors.UserTypeNotFound:
+            print(f'{Colors.BRED}ERROR: Type "{keyspace}.{name}" not found! {Colors.RESET}')
+        except acsylla.errors.FunctionNotFound:
+            print(f'{Colors.BRED}ERROR: Function "{keyspace}.{name}" not found! {Colors.RESET}')
+        except acsylla.errors.AggregateNotFound:
+            print(f'{Colors.BRED}ERROR: Function "{keyspace}.{name}" not found! {Colors.RESET}')
+        except acsylla.errors.TableNotFound:
+            print(f'{Colors.BRED}ERROR: Table "{keyspace}.{name}" not found! {Colors.RESET}')
+        except acsylla.errors.IndexNotFound:
+            print(f'{Colors.BRED}ERROR: Index "{keyspace}.{name}" not found! {Colors.RESET}')
 
     async def tty(self):
         self.init_tty()
         await self.init()
+
         while True:
             try:
                 input_str = input(self.get_input_prefix())
             except (KeyboardInterrupt, EOFError):
                 print("Bye!")
                 break
-            input_str = input_str.strip().lower()
+            input_str = input_str.replace("\n", " ").strip().lower()
             if input_str == "/m" or input_str.startswith("show metrics"):
                 self.print.dict(asdict(self.session.metrics()))
                 continue
@@ -211,6 +366,7 @@ class AcsyllaCQLSH:
                 _, keyspace = query.replace(";", "").split()
                 try:
                     await self.session.set_keyspace(keyspace)
+                    self.keyspace = keyspace
                 except (acsylla.errors.CassErrorServerSyntaxError, acsylla.errors.CassErrorServerInvalidQuery) as e:
                     print(f"{Colors.RED}{e.args}{Colors.RESET}")
                 continue
@@ -240,7 +396,7 @@ class AcsyllaCQLSH:
     async def stdin(self):
         await self.init()
         for query in sys.stdin:
-            statement = acsylla.create_statement(query, page_size=10)
+            statement = acsylla.create_statement(query, page_size=1000)
             result = await self.session.execute(statement)
             if result:
                 writer = csv.writer(sys.stdout)
@@ -259,7 +415,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "contact_points", nargs="*", default=["127.0.0.1"], help="Set contact points, default: 127.0.0.1:9042"
     )
-    parser.add_argument("-v", "--protocol-version", default=3, type=int)
+    parser.add_argument("-v", "--protocol-version", default=4, type=int)
     parser.add_argument("-u", "--username", help="Authenticate as user.")
     parser.add_argument("-p", "--password", help="Authenticate using password.")
     parser.add_argument("-k", "--keyspace", help="Authenticate to the given keyspace.")

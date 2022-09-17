@@ -25,8 +25,8 @@ async def session(event_loop, cluster, keyspace):
     # Create the acsylla keyspace if it does not exist yet
     session_without_keyspace = await cluster.create_session()
     create_keyspace_statement = create_statement(
-        "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = ".format(keyspace)
-        + "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
+        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH REPLICATION = "
+        "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
     )
     await session_without_keyspace.execute(create_keyspace_statement)
     await session_without_keyspace.close()
@@ -36,6 +36,10 @@ async def session(event_loop, cluster, keyspace):
     # Drop table if exits, will truncate any data used before
     # and will enforce in the next step that if the schema of
     # table changed is used during the tests.
+    create_table_statement = create_statement("DROP MATERIALIZED VIEW IF EXISTS test_materialized_view")
+    await session.execute(create_table_statement)
+    create_table_statement = create_statement("DROP INDEX IF EXISTS test_index")
+    await session.execute(create_table_statement)
     create_table_statement = create_statement("DROP TABLE IF EXISTS test")
     await session.execute(create_table_statement)
     create_table_statement = create_statement("DROP TYPE IF EXISTS udt_type")
@@ -122,6 +126,58 @@ async def session(event_loop, cluster, keyspace):
     """
     )
     await session.execute(create_table_statement)
+
+    additional_statements = [
+        create_statement(
+            """
+            CREATE OR REPLACE FUNCTION avgstate ( state tuple<int,bigint>, val int )
+            CALLED ON NULL INPUT
+            RETURNS tuple<int,bigint>
+            LANGUAGE java AS  $$
+                if (val !=null) {
+                      state.setInt(0, state.getInt(0)+1);
+                      state.setLong(1, state.getLong(1)+val.intValue());
+                      }
+                   return state;
+            $$;"""
+        ),
+        create_statement(
+            """
+            CREATE OR REPLACE FUNCTION avgfinal ( state tuple<int,bigint> )
+            CALLED ON NULL INPUT
+            RETURNS double
+            LANGUAGE java AS $$
+                double r = 0;
+                if (state.getInt(0) == 0) return null;
+                r = state.getLong(1);
+                r = state.getInt(0);
+                return Double.valueOf(r);
+            $$;"""
+        ),
+        create_statement(
+            """
+            CREATE OR REPLACE AGGREGATE average(int)
+            SFUNC avgState
+            STYPE tuple<int,bigint>
+            FINALFUNC avgFinal
+            INITCOND (0,0);"""
+        ),
+        create_statement(
+            """
+            CREATE INDEX test_index ON test (value_text);
+        """
+        ),
+        create_statement(
+            """
+            CREATE MATERIALIZED VIEW test_materialized_view
+            AS SELECT * FROM test
+            WHERE id IS NOT null AND value_bool IS NOT NULL PRIMARY KEY (id, value_bool);
+        """
+        ),
+    ]
+
+    for statement in additional_statements:
+        await session.execute(statement)
 
     try:
         yield session

@@ -1,3 +1,4 @@
+from acsylla._cython.cyacsylla import AggregateNotFound
 from acsylla._cython.cyacsylla import CassErrorLibBadParams
 from acsylla._cython.cyacsylla import CassErrorLibCallbackAlreadySet
 from acsylla._cython.cyacsylla import CassErrorLibExecutionProfileInvalid
@@ -66,9 +67,22 @@ from acsylla._cython.cyacsylla import CassExceptionConnectionError
 from acsylla._cython.cyacsylla import CassExceptionInvalidQuery
 from acsylla._cython.cyacsylla import CassExceptionSyntaxError
 from acsylla._cython.cyacsylla import ColumnNotFound
+from acsylla._cython.cyacsylla import FunctionNotFound
+from acsylla._cython.cyacsylla import IndexNotFound
+from acsylla._cython.cyacsylla import KeyspaceNotFound
+from acsylla._cython.cyacsylla import MaterializedViewNotFound
+from acsylla._cython.cyacsylla import TableNotFound
+from acsylla._cython.cyacsylla import UserTypeNotFound
 
 __all__ = (
+    "KeyspaceNotFound",
+    "UserTypeNotFound",
+    "FunctionNotFound",
+    "AggregateNotFound",
+    "TableNotFound",
     "ColumnNotFound",
+    "IndexNotFound",
+    "MaterializedViewNotFound",
     "CassException",
     "CassExceptionConnectionError",
     "CassExceptionSyntaxError",

@@ -12,12 +12,17 @@ from decimal import Decimal
 from enum import Enum
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
+from typing import Dict
 from typing import Iterable
+from typing import List
 from typing import Mapping
 from typing import Optional
 from typing import Sequence
+from typing import Set
 from typing import Union
 from uuid import UUID
+
+import json
 
 SupportedType = Union[
     None,
@@ -56,9 +61,91 @@ class Cluster(metaclass=ABCMeta):
         """
 
 
+class Meta(metaclass=ABCMeta):
+    """Provides a Meta instance class for retrieving metadata from cluster."""
+
+    @abstractmethod
+    def version(self) -> tuple:
+        """Gets the version of the connected cluster."""
+
+    @abstractmethod
+    def snapshot_version(self) -> int:
+        """Gets the version of the schema metadata snapshot."""
+
+    @abstractmethod
+    def keyspaces_names(self) -> List[str]:
+        """Returns a list of all keyspaces names from cluster."""
+
+    @abstractmethod
+    def keyspace(self, name) -> "KeyspaceMeta":
+        """Returns metadata for given keyspace."""
+
+    @abstractmethod
+    def user_types_names(self, keyspace) -> List[str]:
+        """Returns a list of user defined types (UDT) names for given keyspace name."""
+
+    @abstractmethod
+    def user_types(self, keyspace) -> List["UserTypeMeta"]:
+        """Returns a list of user defined types (UDT) metadata for given keyspace name."""
+
+    @abstractmethod
+    def user_type(self, keyspace, name) -> "UserTypeMeta":
+        """Returns metadata for user defined types (UDT) for given keyspace name and type name."""
+
+    @abstractmethod
+    def functions_names(self, keyspace) -> List[str]:
+        """Returns a list of functions names for the given keyspace name."""
+
+    @abstractmethod
+    def functions(self, keyspace) -> List["FunctionMeta"]:
+        """Returns a list of functions metadata for given keyspace name."""
+
+    @abstractmethod
+    def function(self, keyspace, name) -> "FunctionMeta":
+        """Returns metadata for function for given keyspace name and function name."""
+
+    @abstractmethod
+    def tables_names(self, keyspace) -> List[str]:
+        """Returns a list of tables names for the given keyspace name."""
+
+    @abstractmethod
+    def tables(self, keyspace) -> List["TableMeta"]:
+        """Returns a list of tables metadata for given keyspace name."""
+
+    @abstractmethod
+    def table(self, keyspace, name) -> "TableMeta":
+        """Returns metadata for table for given keyspace name and table name."""
+
+    @abstractmethod
+    def indexes_names(self, keyspace) -> List[str]:
+        """Returns a list of indexes names for the given keyspace name."""
+
+    @abstractmethod
+    def indexes(self, keyspace) -> List["IndexMeta"]:
+        """Returns a list of indexes metadata for given keyspace name."""
+
+    @abstractmethod
+    def index(self, keyspace, name) -> "IndexMeta":
+        """Returns metadata for index for given keyspace name and index name."""
+
+    @abstractmethod
+    def materialized_views_names(self, keyspace) -> List[str]:
+        """Returns a list of materialized views names for the given keyspace name."""
+
+    @abstractmethod
+    def materialized_views(self, keyspace) -> List["MaterializedViewMeta"]:
+        """Returns a list of materialized views metadata for given keyspace name."""
+
+    @abstractmethod
+    def materialized_view(self, keyspace, name) -> "MaterializedViewMeta":
+        """Returns metadata for materialized view for given keyspace name and materialized view name."""
+
+
 class Session(metaclass=ABCMeta):
     """Provides a Session instance class. Use the the
     `Cluster.create_session` coroutine for creating a new instance"""
+
+    meta: Meta
 
     @abstractmethod
     async def close(self):
@@ -236,6 +323,22 @@ class Row(metaclass=ABCMeta):
         """Returns the row as dict."""
 
     @abstractmethod
+    def as_list(self) -> list:
+        """Returns the row as list."""
+
+    @abstractmethod
+    def as_tuple(self) -> tuple:
+        """Returns the row as tuple."""
+
+    @abstractmethod
+    def as_named_tuple(self) -> tuple:
+        """Returns the row as named tuple."""
+
+    @abstractmethod
+    def column_count(self) -> int:
+        """Returns column count."""
+
+    @abstractmethod
     def column_value(self, name: str) -> SupportedType:
         """Returns the row column value called by `name`.
 
@@ -247,6 +350,11 @@ class Row(metaclass=ABCMeta):
 
         Types support for now: None, bool, int, float, str, bytes, and UUID.
         """
+
+    @abstractmethod
+    def column_value_by_index(self, index):
+        """Returns the column value by `column index`.
+        Raises an exception if the column can not be found"""
 
 
 @dataclass
@@ -311,3 +419,418 @@ class SSLVerifyFlags(Enum):
     PEER_CERT = cyacsylla.SSLVerifyFlags.PEER_CERT
     PEER_IDENTITY = cyacsylla.SSLVerifyFlags.PEER_IDENTITY
     PEER_IDENTITY_DNS = cyacsylla.SSLVerifyFlags.PEER_IDENTITY_DNS
+
+
+@dataclass
+class NestedTypeMeta:
+    """User type field metadata."""
+
+    type: str
+    is_frozen: bool
+
+
+@dataclass
+class UserTypeFieldMeta:
+    """User type field metadata."""
+
+    name: str
+    type: str
+    is_frozen: bool
+    nested_types: List[NestedTypeMeta]
+
+
+@dataclass
+class UserTypeMeta:
+    """User type metadata."""
+
+    keyspace: str
+    name: str
+    is_frozen: bool
+    fields: List[UserTypeFieldMeta]
+
+    def as_cql_query(self, formatted=False, with_keyspace=True) -> List[str]:
+        """Returns a CQL query that can be used to recreate this type.
+        If formatted is set to True, extra whitespace will be added to make
+        the query more readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        user type name in CREATE statement.
+        For example CREATE TYPE keyspace_name.type_name... if with_keyspace is
+        set to False, statement will be CREATE TYPE type_name.."""
+
+        keyspace = f"{self.keyspace}."
+        if with_keyspace is False:
+            keyspace = ""
+        query = f"CREATE TYPE {keyspace}{self.name} ("
+        for field in self.fields:
+            nested = ""
+            if field.nested_types:
+                nested = []
+                for el in field.nested_types:
+                    if el.is_frozen:
+                        nested.append(f"frozen<{el.type}>")
+                    else:
+                        nested.append(f"{el.type}")
+                nested = ", ".join(nested)
+
+            if field.is_frozen:
+                if field.nested_types:
+                    query += f"\n\t{field.name} frozen<{field.type}<{nested}>>,"
+                else:
+                    query += f"\n\t{field.name} frozen<{field.type}>,"
+            else:
+                if field.nested_types:
+                    query += f"\n\t{field.name} {field.type}<{nested}>,"
+                else:
+                    query += f"\n\t{field.name} {field.type},"
+        query = query[:-1]
+        query += "\n);"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ").replace("( ", "(").replace("\n);", ");")
+        return [query]
+
+
+@dataclass
+class FunctionMeta:
+    """Function metadata."""
+
+    keyspace: str
+    name: str
+    function_name: str
+    keyspace_name: str
+    argument_names: List[str]
+    argument_types: List[str]
+    called_on_null_input: bool
+    language: str
+    body: str
+    return_type: str
+
+    def as_cql_query(self, formatted=False, with_keyspace=True) -> List[str]:
+        """Returns a CQL query that can be used to recreate function.
+        If formatted is set to True, extra whitespace will be added to make
+        the query more readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        function name in CREATE statement.
+        For example CREATE FUNCTION keyspace_name.function_name... if with_keyspace
+        is set to False, statement will be CREATE FUNCTION function_name..."""
+
+        keyspace = f"{self.keyspace}."
+        if with_keyspace is False:
+            keyspace = ""
+        args = ", ".join([" ".join(k) for k in zip(self.argument_names, self.argument_types)])
+        query = f"CREATE FUNCTION {keyspace}{self.name}({args})\n\t"
+        if self.called_on_null_input:
+            query += "CALLED ON NULL INPUT\n\t"
+        else:
+            query += "RETURNS NULL ON NULL INPUT\n\t"
+        query += f"RETURNS {self.return_type}\n\t"
+        query += f"LANGUAGE {self.language}\n\tAS $${self.body}$$;"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ")
+        return [query]
+
+
+@dataclass
+class AggregateMeta:
+    """Aggregate metadata."""
+
+    keyspace: str
+    keyspace_name: str
+    name: str
+    aggregate_name: str
+    argument_types: List[str]
+    initcond: str
+    state_func: str
+    state_type: str
+    final_func: str
+    return_type: str
+
+    def as_cql_query(self, formatted=False, with_keyspace=True) -> List[str]:
+        """Returns a CQL query that can be used to recreate aggregate.
+        If formatted is set to True, extra whitespace will be added to make
+        the query more readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        function name in CREATE statement.
+        For example CREATE AGGREGATE keyspace_name.aggregate_name... if with_keyspace
+        is set to False, statement will be CREATE AGGREGATE aggregate_name..."""
+
+        keyspace = f"{self.keyspace}."
+        if with_keyspace is False:
+            keyspace = ""
+        args = ", ".join(self.argument_types)
+        query = f"CREATE AGGREGATE {keyspace}{self.name}({args})\n\t"
+        query += f"SFUNC {self.state_func}\n\t"
+        query += f"STYPE {self.state_type}\n\t"
+        query += f"FINALFUNC {self.final_func}\n\t"
+        query += f"INITCOND {self.initcond};"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ")
+        return [query]
+
+
+@dataclass
+class ColumnMeta:
+    """Column metadata."""
+
+    name: str
+    type: str
+    clustering_order: str
+    column_name: str
+    column_name_bytes: bytes
+    keyspace_name: str
+    kind: str
+    position: int
+    table_name: str
+
+
+@dataclass
+class IndexMeta:
+    """Index metadata."""
+
+    keyspace: str
+    table: str
+    name: str
+    kind: str
+    target: str
+    options: Dict[str, str]
+
+    def as_cql_query(self, formatted=False, with_keyspace=True) -> List[str]:
+        """Returns a CQL query that can be used to recreate this index.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        index name in CREATE statement.
+        For example CREATE INDEX keyspace_name.index_name...
+        if with_keyspace is set to False, statement will be
+        CREATE INDEX index_name...
+        """
+
+        keyspace = f"{self.keyspace}."
+        if with_keyspace is False:
+            keyspace = ""
+        target = self.target
+        if target.startswith('{"pk":["'):
+            target = json.loads(target)
+            pk = ",".join([k for k in target["pk"]])
+            ck = ",".join([k for k in target["ck"]])
+            target = f"(({pk}), {ck})"
+        query = f"CREATE INDEX {self.name} ON {keyspace}{self.table} ({target});"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ")
+        return [query]
+
+
+@dataclass
+class MaterializedViewMeta:
+    """Materialized view metadata."""
+
+    keyspace: str
+    name: str
+    id: UUID
+    base_table_id: UUID
+    base_table_name: str
+    bloom_filter_fp_chance: float
+    caching: Dict[str, str]
+    comment: str
+    compaction: Dict[str, str]
+    compression: Dict[str, str]
+    crc_check_chance: float
+    dclocal_read_repair_chance: float
+    default_time_to_live: int
+    extensions: Dict[str, str]
+    gc_grace_seconds: int
+    include_all_columns: bool
+    keyspace_name: str
+    max_index_interval: int
+    memtable_flush_period_in_ms: int
+    min_index_interval: 128
+    read_repair_chance: int
+    speculative_retry: str
+    view_name: str
+    where_clause: str
+    columns: []
+
+    def as_cql_query(self, formatted=False, with_keyspace=True) -> List[str]:
+        """Returns a CQL query that can be used to recreate this
+        materialized view.
+
+        If formatted is set to True, extra whitespace will be added to make
+        the query more readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        materialized view name in CREATE statement.
+        For example CREATE MATERIALIZED VIEW keyspace_name.view_name...
+        if with_keyspace is set to False, statement will be
+        CREATE MATERIALIZED VIEW view_name..."""
+
+        keyspace = f"{self.keyspace_name}."
+        if with_keyspace is False:
+            keyspace = ""
+        query = f"CREATE MATERIALIZED VIEW {keyspace}{self.name} AS\n\t"
+        if self.include_all_columns is True:
+            query += "SELECT *\n\t"
+        else:
+            columns = ", ".join([k.column_name for k in self.columns])
+            query += f"SELECT {columns}\n\t"
+        query += f"FROM {keyspace}{self.base_table_name}\n\t"
+        query += f"WHERE {self.where_clause}\n\t"
+        pk = ", ".join([k.column_name for k in self.columns if k.kind in ("partition_key", "clustering")])
+        query += f"PRIMARY KEY ({pk})\n\t"
+        order = ", ".join(
+            [
+                f"{k.column_name} {k.clustering_order.upper()}"
+                for k in self.columns
+                if k.clustering_order.upper() != "NONE"
+            ]
+        )
+        query += f"WITH CLUSTERING ORDER BY ({order})\n\t"
+        query += f"AND bloom_filter_fp_chance = {self.bloom_filter_fp_chance}\n\t"
+        query += f"AND caching = {self.caching}\n\t"
+        query += f"AND comment = '{self.comment}'\n\t"
+        query += f"AND compaction = {self.compaction}\n\t"
+        query += f"AND compression = {self.compression}\n\t"
+        query += f"AND crc_check_chance = {self.crc_check_chance}\n\t"
+        query += f"AND gc_grace_seconds = {self.gc_grace_seconds}\n\t"
+        query += f"AND max_index_interval = {self.max_index_interval}\n\t"
+        query += f"AND memtable_flush_period_in_ms = {self.memtable_flush_period_in_ms}\n\t"
+        query += f"AND min_index_interval = {self.min_index_interval}\n\t"
+        query += f"AND speculative_retry = '{self.speculative_retry}';"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ")
+        return [query]
+
+
+@dataclass
+class TableMeta:
+    """Table metadata."""
+
+    id: UUID
+    name: str
+    table_name: str
+    keyspace_name: str
+    is_virtual: bool
+    bloom_filter_fp_chance: float
+    caching: Dict[str, str]
+    comment: str
+    compaction: Dict[str, str]
+    compression: Dict[str, str]
+    crc_check_chance: float
+    dclocal_read_repair_chance: float
+    default_time_to_live: int
+    extensions: Dict[str, str]
+    flags: Set[str]
+    gc_grace_seconds: int
+    max_index_interval: int
+    memtable_flush_period_in_ms: int
+    min_index_interval: int
+    read_repair_chance: float
+    speculative_retry: str
+    columns: List[ColumnMeta]
+    indexes: List[IndexMeta]
+    materialized_views: List[MaterializedViewMeta]
+
+    def as_cql_query(self, formatted=False, with_keyspace=True, full_schema=True) -> List[str]:
+        """If full_schema is set to True returns a CQL query that can be used
+        to recreate this table include indexes and materialized views creations.
+
+        If formatted is set to True, extra whitespace will be added to make
+        the query human readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        table name in CREATE statement.
+        For example CREATE TABLE keyspace_name.table_name... if with_keyspace
+        is set to False, statement will be CREATE TABLE table_name..."""
+
+        keyspace = f"{self.keyspace_name}."
+        if with_keyspace is False:
+            keyspace = ""
+        query = f"CREATE TABLE {keyspace}{self.table_name} (\n\t"
+        for colum in self.columns:
+            query += f"{colum.name} {colum.type},\n\t"
+        pk = ", ".join([k.column_name for k in self.columns if k.kind in ("partition_key", "clustering")])
+        query += f"PRIMARY KEY ({pk})\n"
+        order = ", ".join(
+            [
+                f"{k.column_name} {k.clustering_order.upper()}"
+                for k in self.columns
+                if k.clustering_order.upper() != "NONE"
+            ]
+        )
+        if order:
+            query += f") WITH CLUSTERING ORDER BY ({order})\n\t"
+            query += f"AND bloom_filter_fp_chance = {self.bloom_filter_fp_chance}\n\t"
+        else:
+            query += f") WITH bloom_filter_fp_chance = {self.bloom_filter_fp_chance}\n\t"
+        query += f"AND caching = {self.caching}\n\t"
+        query += f"AND comment = '{self.comment}'\n\t"
+        query += f"AND compaction = {self.compaction}\n\t"
+        query += f"AND compression = {self.compression}\n\t"
+        query += f"AND crc_check_chance = {self.crc_check_chance}\n\t"
+        query += f"AND default_time_to_live = {self.default_time_to_live}\n\t"
+        query += f"AND gc_grace_seconds = {self.gc_grace_seconds}\n\t"
+        query += f"AND max_index_interval = {self.max_index_interval}\n\t"
+        query += f"AND memtable_flush_period_in_ms = {self.memtable_flush_period_in_ms}\n\t"
+        query += f"AND min_index_interval = {self.min_index_interval}\n\t"
+        query += f"AND speculative_retry = '{self.speculative_retry}';"
+
+        if formatted is False:
+            query = query.replace("\n\t", " ").replace("( ", "(").replace("\n)", ")")
+        query = [query]
+        if full_schema is True:
+            for index in self.indexes:
+                query += index.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
+            for materialized_view in self.materialized_views:
+                query += materialized_view.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
+
+        return query
+
+
+@dataclass
+class KeyspaceMeta:
+    """Keyspace metadata."""
+
+    name: str
+    is_virtual: bool
+    durable_writes: bool
+    keyspace_name: str
+    replication: Dict[str, str]
+    user_types: List[UserTypeMeta]
+    functions: List[FunctionMeta]
+    aggregates: List[AggregateMeta]
+    tables: List[TableMeta]
+
+    def as_cql_query(self, formatted=False, with_keyspace=True, full_schema=True) -> List[str]:
+        """If full_schema is set to True returns a CQL query string that can
+        be used to recreate the entire keyspace including UDT, functions,
+        tables, indexes and materialized views.
+
+        If formatted is set to True, extra whitespace will be added to make
+        the query more readable.
+
+        If with_keyspace is set to True, keyspace name will be added before
+        UDT name, function name, table name and materialized view name in
+        CREATE statement.
+        For example CREATE TABLE keyspace_name.table_name... if with_keyspace
+        is set to False, statement will be CREATE TABLE table_name..."""
+
+        query = [
+            f"CREATE KEYSPACE {self.name} "
+            f"WITH replication = {self.replication} "
+            f"AND durable_writes = {self.durable_writes};"
+        ]
+        if full_schema is True:
+            for user_type in self.user_types:
+                query += user_type.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
+            for function in self.functions:
+                query += function.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
+            for aggregate in self.aggregates:
+                query += aggregate.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
+            for table in self.tables:
+                query += table.as_cql_query(formatted=formatted, with_keyspace=with_keyspace, full_schema=full_schema)
+        return query

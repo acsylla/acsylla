@@ -8,14 +8,14 @@ cdef class Session:
 
     def __dealloc__(self):
         cass_session_free(self.cass_session)
-        if self.schema_meta:
-            cass_schema_meta_free(self.schema_meta)
 
     def __init__(self, cass_cluster, keyspace=None):
         self.loop = asyncio.get_running_loop()
         self.keyspace = keyspace
         self.closed = 0
         self.connected = 0
+        self.meta = Meta()
+        self.meta.cass_session = self.cass_session
 
     async def _connect(self):
         cdef CassFuture* cass_future
@@ -46,6 +46,21 @@ cdef class Session:
             raise_if_error(cass_error, error_message)
         finally:
             cass_future_free(cass_future)
+
+    def get_client_id(self):
+        cdef char uuid_str[CASS_UUID_STRING_LENGTH]
+        cdef CassUuid cass_uuid = cass_session_get_client_id(self.cass_session)
+        cass_uuid_string(cass_uuid, uuid_str)
+        return uuid_str.decode()
+
+    async def set_keyspace(self, object keyspace):
+        query = f"USE {keyspace}".encode()
+        statement = Statement()
+        statement.cass_statement = cass_statement_new(query, 0)
+        result = await self.execute(statement)
+        if result is not None:
+            self.keyspace = keyspace
+        return result
 
     async def close(self):
         cdef CassFuture* cass_future
@@ -134,11 +149,6 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
                 raise_if_error(cass_error, error_message)
-            self.schema_meta = cass_session_get_schema_meta(self.cass_session)
-            if self.keyspace is not None:
-                keyspace = self.keyspace.encode()
-                self.keyspace_meta = cass_schema_meta_keyspace_by_name(self.schema_meta, keyspace)
-
             prepared = PreparedStatement.new_(cass_prepared, timeout, consistency, serial_consistency)
         finally:
             cass_future_free(cass_future)

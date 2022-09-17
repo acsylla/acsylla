@@ -1,5 +1,25 @@
+class KeyspaceNotFound(CassException):
+    pass
+
+class UserTypeNotFound(CassException):
+    pass
+
+class FunctionNotFound(CassException):
+    pass
+
+class AggregateNotFound(CassException):
+    pass
+
+class TableNotFound(CassException):
+    pass
 
 class ColumnNotFound(CassException):
+    pass
+
+class IndexNotFound(CassException):
+    pass
+
+class MaterializedViewNotFound(CassException):
     pass
 
 

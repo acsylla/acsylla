@@ -171,6 +171,19 @@ cdef extern from "cassandra.h":
     CASS_SSL_VERIFY_PEER_IDENTITY
     CASS_SSL_VERIFY_PEER_IDENTITY_DNS
 
+  ctypedef enum CassColumnType:
+    CASS_COLUMN_TYPE_REGULAR
+    CASS_COLUMN_TYPE_PARTITION_KEY
+    CASS_COLUMN_TYPE_CLUSTERING_KEY
+    CASS_COLUMN_TYPE_STATIC
+    CASS_COLUMN_TYPE_COMPACT_VALUE
+
+  ctypedef enum CassIndexType:
+    CASS_INDEX_TYPE_UNKNOWN
+    CASS_INDEX_TYPE_KEYS
+    CASS_INDEX_TYPE_CUSTOM
+    CASS_INDEX_TYPE_COMPOSITES
+
   ctypedef struct CassSsl:
     pass
 
@@ -231,6 +244,29 @@ cdef extern from "cassandra.h":
   ctypedef struct CassKeyspaceMeta:
     pass
 
+  ctypedef struct CassTableMeta:
+    pass
+
+  ctypedef struct CassIndexMeta:
+    pass
+
+  ctypedef struct CassColumnMeta:
+    pass
+
+  ctypedef struct CassMaterializedViewMeta:
+    pass
+
+  ctypedef struct CassFunctionMeta:
+    pass
+
+  ctypedef struct CassAggregateMeta:
+    pass
+
+  ctypedef struct CassVersion:
+    int major_version
+    int minor_version
+    int patch_version
+
   ctypedef struct _requests:
     cass_uint64_t min
     cass_uint64_t max
@@ -263,7 +299,32 @@ cdef extern from "cassandra.h":
     _stats stats
     _errors errors
 
+  ctypedef struct CassSpeculativeExecutionMetrics:
+    pass
+
+  ctypedef enum CassLogLevel:
+    CASS_LOG_DISABLED
+    CASS_LOG_CRITICAL
+    CASS_LOG_ERROR
+    CASS_LOG_WARN
+    CASS_LOG_INFO
+    CASS_LOG_DEBUG
+    CASS_LOG_TRACE
+
+  ctypedef struct CassLogMessage:
+    cass_uint64_t time_ms
+    CassLogLevel severity
+    const char* file
+    int line
+    const char* function
+    const char* message
+
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
+  ctypedef void (*CassLogCallback)(const CassLogMessage* message, void* data)
+
+  void cass_log_set_level(CassLogLevel log_level)
+  void cass_log_set_callback(CassLogCallback callback, void* data)
+
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
   CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
@@ -296,13 +357,17 @@ cdef extern from "cassandra.h":
   CassFuture* cass_session_execute(CassSession* session, const CassStatement* statement)
   CassFuture* cass_session_prepare_n(CassSession* session, const char* query, size_t query_length)
   CassFuture* cass_session_execute_batch(CassSession* session, const CassBatch* batch)
+
+  CassUuid cass_session_get_client_id(CassSession* session)
   void cass_session_get_metrics(const CassSession* session, CassMetrics* output)
+  void cass_session_get_speculative_execution_metrics(const CassSession * session, CassSpeculativeExecutionMetrics * output)
 
   CassError cass_prepared_parameter_name(const CassPrepared* prepared, size_t index,  const char** name, size_t* name_length)
   const CassDataType* cass_prepared_parameter_data_type(const CassPrepared* prepared, size_t index)
   const CassDataType* cass_prepared_parameter_data_type_by_name(const CassPrepared* prepared,const char * name)
   CassFuture* cass_session_close(CassSession* session)
 
+  CassStatement* cass_statement_new(const char* query, size_t parameter_count)
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
   CassError cass_statement_set_request_timeout(CassStatement* statement, cass_uint64_t timeout_ms)
   CassError cass_statement_bind_null(CassStatement* statement, size_t index)
@@ -492,15 +557,70 @@ cdef extern from "cassandra.h":
   size_t cass_data_type_sub_type_count(const CassDataType * data_type)
   const CassDataType* cass_data_type_sub_data_type(const CassDataType* data_type, size_t index)
   const CassDataType* cass_data_type_sub_data_type_by_name(const CassDataType * data_type, const char * name)
+  CassError cass_data_type_keyspace(const CassDataType* data_type, const char** keyspace, size_t* keyspace_length)
+  CassError cass_data_type_sub_type_name(const CassDataType* data_type, size_t index, const char** name, size_t* name_length)
+  CassError cass_data_type_class_name(const CassDataType* data_type, const char** class_name, size_t* class_name_length)
+  cass_bool_t cass_data_type_is_frozen(const CassDataType* data_type)
 
   CassUserType* cass_user_type_new_from_data_type(const CassDataType * data_type)
   void cass_user_type_free(CassUserType* user_type)
 
-  const CassSchemaMeta* cass_session_get_schema_meta(const CassSession* session)
-  void cass_schema_meta_free(const CassSchemaMeta* schema_meta)
+  CassIterator* cass_iterator_keyspaces_from_schema_meta(const CassSchemaMeta * schema_meta)
+  CassIterator* cass_iterator_fields_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
+  CassIterator* cass_iterator_tables_from_keyspace_meta(const CassKeyspaceMeta * keyspace_meta)
+  CassIterator* cass_iterator_columns_from_table_meta(const CassTableMeta* table_meta)
+  CassIterator* cass_iterator_indexes_from_table_meta(const CassTableMeta* table_meta)
+  CassIterator* cass_iterator_fields_from_column_meta(const CassColumnMeta* column_meta)
+  CassIterator* cass_iterator_fields_from_function_meta(const CassFunctionMeta* function_meta)
+  CassIterator* cass_iterator_fields_from_table_meta(const CassTableMeta* table_meta)
+  CassIterator* cass_iterator_materialized_views_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
+  CassIterator* cass_iterator_fields_from_materialized_view_meta(const CassMaterializedViewMeta* view_meta)
+  CassIterator* cass_iterator_user_types_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
+  CassIterator* cass_iterator_functions_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
+  CassIterator* cass_iterator_aggregates_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
+  CassIterator* cass_iterator_columns_from_materialized_view_meta(const CassMaterializedViewMeta* view_meta)
+  CassIterator* cass_iterator_materialized_views_from_table_meta(const CassTableMeta* table_meta)
+  CassIterator* cass_iterator_fields_from_index_meta(const CassIndexMeta* index_meta)
+  CassIterator* cass_iterator_fields_from_aggregate_meta(const CassAggregateMeta* aggregate_meta)
 
+  CassError cass_iterator_get_meta_field_name(const CassIterator* iterator, const char** name, size_t* name_length)
+  const CassKeyspaceMeta* cass_iterator_get_keyspace_meta(const CassIterator * iterator)
   const CassKeyspaceMeta* cass_schema_meta_keyspace_by_name(const CassSchemaMeta* schema_meta, const char* keyspace)
-  
+  const CassSchemaMeta* cass_session_get_schema_meta(const CassSession* session)
+  const CassTableMeta* cass_iterator_get_table_meta(const CassIterator * iterator)
+  const CassTableMeta* cass_keyspace_meta_table_by_name(const CassKeyspaceMeta* keyspace_meta, const char* table)
+  const CassColumnMeta* cass_iterator_get_column_meta(const CassIterator* iterator)
+  const CassIndexMeta* cass_iterator_get_index_meta(const CassIterator* iterator)
+  const CassMaterializedViewMeta* cass_iterator_get_materialized_view_meta(const CassIterator* iterator)
+  const CassDataType* cass_iterator_get_user_type(const CassIterator* iterator)
+  const CassFunctionMeta* cass_iterator_get_function_meta(const CassIterator* iterator)
+  const CassAggregateMeta* cass_iterator_get_aggregate_meta(const CassIterator* iterator)
+
+  CassVersion cass_schema_meta_version(const CassSchemaMeta * schema_meta)
+  cass_uint32_t cass_schema_meta_snapshot_version(const CassSchemaMeta * schema_meta)
+  void cass_schema_meta_free(const CassSchemaMeta* schema_meta)
+  void cass_keyspace_meta_name(const CassKeyspaceMeta* keyspace_meta, const char** name, size_t* name_length)
+  void cass_table_meta_name(const CassTableMeta * table_meta, const char** name, size_t * name_length)
+  void cass_column_meta_name(const CassColumnMeta* column_meta, const char** name, size_t* name_length)
+  void cass_index_meta_name(const CassIndexMeta* index_meta, const char** name, size_t* name_length)
+  void cass_index_meta_target(const CassIndexMeta* index_meta, const char** target, size_t* target_length)
+  void cass_materialized_view_meta_name(const CassMaterializedViewMeta* view_meta, const char** name, size_t* name_length)
+  void cass_function_meta_name(const CassFunctionMeta* function_meta, const char** name, size_t* name_length)
+  void cass_function_meta_full_name(const CassFunctionMeta* function_meta, const char** full_name, size_t* full_name_length)
+  void cass_function_meta_body(const CassFunctionMeta* function_meta, const char** body, size_t* body_length)
+  void cass_function_meta_language(const CassFunctionMeta* function_meta, const char** language, size_t* language_length)
+
+  const CassDataType* cass_column_meta_data_type(const CassColumnMeta* column_meta)
+  const CassTableMeta* cass_materialized_view_meta_base_table(const CassMaterializedViewMeta* view_meta)
+  CassColumnType cass_column_meta_type(const CassColumnMeta* column_meta)
+  CassIndexType cass_index_meta_type(const CassIndexMeta* index_meta)
+  const CassValue* cass_index_meta_options(const CassIndexMeta* index_meta)
+  const CassValue* cass_iterator_get_meta_field_value(const CassIterator* iterator)
+  cass_bool_t cass_keyspace_meta_is_virtual(const CassKeyspaceMeta* keyspace_meta)
+  cass_bool_t cass_table_meta_is_virtual(const CassTableMeta* table_meta)
+
+  CassError cass_data_type_type_name(const CassDataType* data_type, const char** type_name, size_t* type_name_length)
+
   CassError cass_user_type_set_null(CassUserType* user_type, size_t index); 
   CassError cass_user_type_set_null_by_name(CassUserType* user_type, const char* name)
   CassError cass_user_type_set_null_by_name_n(CassUserType* user_type, const char* name, size_t name_length)

@@ -159,12 +159,11 @@ SSL Connection example
                              ssl_trusted_cert=ssl_trusted_cert,
                              ssl_verify_flags=acsylla.SSLVerifyFlags.PEER_IDENTITY)
 
-
-
-
 Retrieving metadata
 
+
 .. code-block:: python
+
     import asyncio
     import acsylla
     async def main():
@@ -174,6 +173,7 @@ Retrieving metadata
         print('\n\n'.join(meta.as_cql_query(formatted=True)))
         await session.close()
     asyncio.run(main())
+
 Developing
 ============
 

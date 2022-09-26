@@ -1,13 +1,18 @@
 NOT RELEASED YET
 ================
 
+0.1.8a0
+========
+- Add metadata support
+- Update cpp-driver to latest version
+- Static link OpenSSL and libuv for MacOS wheel
+
 0.1.7a0
 ========
 - Fixed issue with `execute_batch`
 - Fixed issue with cancelled tasks which impacted comunication between Python Asyncio and CPP Driver
 - Add support for SSL
 - Support for Pyhton 3.10
-
 
 0.1.6a0
 ========

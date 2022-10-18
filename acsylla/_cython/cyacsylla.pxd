@@ -1,6 +1,7 @@
 include "cpp_cassandra.pxi"
 include "callback_wrapper.pxd"
 include "cluster/cluster.pxd"
+include "cluster/logger.pxd"
 include "posix_to_python_thread.pxd"
 include "result/result.pxd"
 include "result/row.pxd"

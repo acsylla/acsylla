@@ -46,13 +46,13 @@ class Testcreate_cluster:
         create_cluster([host], username="cassandra", password="cassandra")
 
     async def test_cluster_whitelist_dc(self, host):
-        create_cluster([host], whitelist_dc='dc2,dc3')
+        create_cluster([host], whitelist_dc="dc2,dc3")
 
     async def test_cluster_blacklist_dc(self, host):
-        create_cluster([host], blacklist_dc='dc2, dc3')
+        create_cluster([host], blacklist_dc="dc2, dc3")
 
     async def test_cluster_whitelist_hosts(self, host):
-        create_cluster([host], whitelist_hosts='127.0.0.1, 127.0.0.4')
+        create_cluster([host], whitelist_hosts="127.0.0.1, 127.0.0.4")
 
     async def test_cluster_blacklist_hosts(self, host):
-        create_cluster([host], blacklist_hosts='127.0.0.1, 127.0.0.4')
+        create_cluster([host], blacklist_hosts="127.0.0.1, 127.0.0.4")

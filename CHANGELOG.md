@@ -5,7 +5,7 @@ NOT RELEASED YET
 ========
 - Add metadata support
 - Add logging
-- Add Blacklist, whitelist DC, and blacklist, whitelist hostd load balancing policies
+- Add Blacklist, whitelist DC, and blacklist, whitelist hosts load balancing policies
 - Update cpp-driver to latest version
 - Static link OpenSSL and libuv for MacOS wheel
 

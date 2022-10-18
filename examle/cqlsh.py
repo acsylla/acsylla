@@ -432,6 +432,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ssl", help="Use SSL.", default=False, type=bool, dest="ssl_enabled")
     parser.add_argument("--log_level", help="Set log level", default="debug", type=str, dest="log_level")
+    parser.add_argument("--whitelist_dc", help="Set whitelist dc to connect to",  type=str, dest="whitelist_dc")
+    parser.add_argument("--blacklist_dc", help="Set blacklist dc to connect to",  type=str, dest="blacklist_dc")
+    parser.add_argument("--whitelist_hosts", help="Set whitelist hosts to connect to",  type=str, dest="whitelist_hosts")
+    parser.add_argument("--blacklist_hosts", help="Set blacklist hosts to connect to",  type=str, dest="blacklist_hosts")
 
     cqlsh = AcsyllaCQLSH(parser.parse_args())
     if sys.stdin.isatty():

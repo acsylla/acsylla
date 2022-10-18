@@ -34,6 +34,10 @@ def create_cluster(
     ssl_verify_flags: SSLVerifyFlags = SSLVerifyFlags.PEER_CERT,
     log_level: str = "warn",
     logging_callback: Callable = None,
+    whitelist_dc: str = None,
+    blacklist_dc: str = None,
+    whitelist_hosts: str = None,
+    blacklist_hosts: str = None
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -76,7 +80,14 @@ def create_cluster(
         Default: An internal logger with "acsylla" name. logging.getLogger('acsylla')
         Example:
             def logging_callback(message: acsylla.LogMessage):
-                ...
+    `whitelist_dc` Set the list of predefined datacenters the driver is allowed to connect to
+        Example: "dc2,dc3"
+    `blacklist_dc` Set the list of predefined datacenters the driver is NOT allowed to connect to
+        Example: "dc2,dc3"
+    `whitelist_hosts` Set the list of predefined hosts the driver is allowed to connect to
+        Example: "127.0.0.1,127.0.0.2"
+    `blacklist_hosts` Set the list of predefined hosts the driver is NOT allowed to connect to
+        Example: "127.0.0.1,127.0.0.2"
     """
     return _cython.cyacsylla.Cluster(
         contact_points,
@@ -102,6 +113,10 @@ def create_cluster(
         ssl_verify_flags,
         log_level,
         logging_callback,
+        whitelist_dc,
+        blacklist_dc,
+        whitelist_hosts,
+        blacklist_hosts
     )
 
 

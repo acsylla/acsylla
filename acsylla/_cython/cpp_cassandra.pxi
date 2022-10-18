@@ -680,3 +680,8 @@ cdef extern from "cassandra.h":
   CassError cass_user_type_set_tuple_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassTuple* value); 
   CassError cass_user_type_set_user_type(CassUserType* user_type, size_t index,  const CassUserType* value); 
   CassError cass_user_type_set_user_type_by_name(CassUserType* user_type, const char* name, const CassUserType* value)
+
+  void cass_cluster_set_whitelist_filtering(CassCluster* cluster, const char* hosts)
+  void cass_cluster_set_blacklist_filtering(CassCluster * cluster, const char * hosts)
+  void cass_cluster_set_whitelist_dc_filtering(CassCluster * cluster, const char * dcs)
+  void cass_cluster_set_blacklist_dc_filtering(CassCluster * cluster, const char * dcs)

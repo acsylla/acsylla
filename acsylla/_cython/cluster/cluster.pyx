@@ -37,8 +37,12 @@ cdef class Cluster:
         object ssl_private_key_password,
         object ssl_trusted_cert,
         object ssl_verify_flags,
-        object log_level,
-        object logging_callback
+        str log_level,
+        object logging_callback,
+        str whitelist_dc,
+        str blacklist_dc,
+        str whitelist_hosts,
+        str blacklist_hosts,
     ):
 
         cdef CassProtocolVersion cass_protocol_version
@@ -134,6 +138,15 @@ cdef class Cluster:
 
             cass_ssl_set_verify_flags(self.ssl, ssl_verify_flags.value)
             cass_cluster_set_ssl(self.cass_cluster, self.ssl)
+
+        if whitelist_dc is not None:
+            cass_cluster_set_whitelist_dc_filtering(self.cass_cluster, whitelist_dc.encode())
+        if blacklist_dc is not None:
+            cass_cluster_set_blacklist_dc_filtering(self.cass_cluster, blacklist_dc.encode())
+        if whitelist_hosts is not None:
+            cass_cluster_set_whitelist_filtering(self.cass_cluster, whitelist_hosts.encode())
+        if blacklist_hosts is not None:
+            cass_cluster_set_blacklist_filtering(self.cass_cluster, blacklist_hosts.encode())
 
     async def create_session(self, keyspace=None):
         session = Session(self, keyspace=keyspace)

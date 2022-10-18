@@ -28,7 +28,7 @@ Features
 * **[In progress]** Idle connection heartbeats
 * Support for materialized view and secondary index metadata
 * Support for clustering key order, `frozen<>` and Cassandra version metadata
-* **[In progress]** Blacklist, whitelist DC, and blacklist DC load balancing policies
+* Blacklist, whitelist DC, and blacklist DC load balancing policies
 * **[In progress]** Custom authenticators
 * Reverse DNS with SSL peer identity verification support
 * Randomized contact points

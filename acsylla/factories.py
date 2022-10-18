@@ -37,7 +37,7 @@ def create_cluster(
     whitelist_dc: str = None,
     blacklist_dc: str = None,
     whitelist_hosts: str = None,
-    blacklist_hosts: str = None
+    blacklist_hosts: str = None,
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -116,7 +116,7 @@ def create_cluster(
         whitelist_dc,
         blacklist_dc,
         whitelist_hosts,
-        blacklist_hosts
+        blacklist_hosts,
     )
 
 

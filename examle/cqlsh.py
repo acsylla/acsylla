@@ -13,6 +13,12 @@ __version__ = "0.0.1"
 
 from dataclasses import asdict
 
+import logging
+
+logging.basicConfig(level=logging.INFO, format="[%(levelname)1.1s %(asctime)s] %(message)s")
+logger = logging.getLogger("acsylla")
+logger.setLevel(logging.DEBUG)
+
 
 class Colors:
     RED = "\033[0;0;31m"
@@ -427,6 +433,7 @@ if __name__ == "__main__":
         f"{acsylla.version.__version__}",
     )
     parser.add_argument("--ssl", help="Use SSL.", default=False, type=bool, dest="ssl_enabled")
+    parser.add_argument("--log_level", help="Set log level", default="debug", type=str, dest="log_level")
 
     cqlsh = AcsyllaCQLSH(parser.parse_args())
     if sys.stdin.isatty():

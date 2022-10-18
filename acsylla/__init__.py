@@ -7,6 +7,7 @@ from .base import Consistency
 from .base import FunctionMeta
 from .base import IndexMeta
 from .base import KeyspaceMeta
+from .base import LogMessage
 from .base import MaterializedViewMeta
 from .base import NestedTypeMeta
 from .base import PreparedStatement
@@ -46,6 +47,7 @@ __all__ = (
     "NestedTypeMeta",
     "FunctionMeta",
     "AggregateMeta",
+    "LogMessage",
     "create_cluster",
     "create_statement",
     "create_batch_logged",

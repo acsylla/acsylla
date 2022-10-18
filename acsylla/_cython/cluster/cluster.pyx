@@ -6,9 +6,8 @@ cdef class Cluster:
         # Is idempotent, can be called as many times as we want
         # but would be initalize only once.
         _initialize_posix_to_python_thread()
-
-        self.cass_cluster = cass_cluster_new()
         self.ssl = NULL
+        self.cass_cluster = NULL
 
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
@@ -38,6 +37,8 @@ cdef class Cluster:
         object ssl_private_key_password,
         object ssl_trusted_cert,
         object ssl_verify_flags,
+        object log_level,
+        object logging_callback
     ):
 
         cdef CassProtocolVersion cass_protocol_version
@@ -48,6 +49,11 @@ cdef class Cluster:
         cdef int connect_timeout_ms = int(connect_timeout * 1000)
         cdef int request_timeout_ms = int(request_timeout * 1000)
         cdef int resolve_timeout_ms = int(resolve_timeout * 1000)
+
+        logger = Logger(logging_callback=logging_callback)
+        Py_INCREF(logger)
+        cass_log_set_callback(cb_log_message, <void*>logger)
+        cass_log_set_level(log_level_from_str(log_level))
 
         if not contact_points:
             raise ValueError("Contact points can not be an empty list or a None value")
@@ -64,7 +70,9 @@ cdef class Cluster:
             cass_protocol_version = CASS_PROTOCOL_VERSION_V5
         else:
             raise ValueError(f"Protocol version {protocol_version} invalid")
- 
+
+        self.cass_cluster = cass_cluster_new()
+
         contact_points_csv = ",".join(contact_points)
         contact_points_csv_b = contact_points_csv.encode()
         error = cass_cluster_set_contact_points_n(

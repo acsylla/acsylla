@@ -3,12 +3,41 @@ acsylla
 
 WORK IN PROGRESS, use only for developing
 
-acsylla a composition of async + cassandra + scylla words. (c) @pfreixes
+acsylla a composition of async + cassandra + scylla words.
+
+Features
+#######
+* Shard-Awareness
+* Asynchronous API
+* Simple, Prepared, and Batch statements
+* Asynchronous I/O, parallel execution, and request pipelining
+* Connection pooling
+* Automatic node discovery
+* Automatic reconnection
+* **[In progress]** Configurable load balancing
+* Works with any cluster size
+* Authentication
+* SSL
+* **[In progress]** Latency-aware routing
+* Performance metrics
+* Tuples and UDTs
+* Nested collections
+* **[In progress]** Retry policies
+* **[In progress]** Client-side timestamps
+* Data types
+* **[In progress]** Idle connection heartbeats
+* Support for materialized view and secondary index metadata
+* Support for clustering key order, `frozen<>` and Cassandra version metadata
+* **[In progress]** Blacklist, whitelist DC, and blacklist DC load balancing policies
+* **[In progress]** Custom authenticators
+* Reverse DNS with SSL peer identity verification support
+* Randomized contact points
+* **[In progress]** Speculative execution
 
 Install
 ==========
 
-There is an Alpha realease compabitble with Python 3.7, 3.8 and 3.9 for Linux and MacOS environments uploaded as a Pypi package. Use the following
+There is an Alpha realease compabitble with Python 3.7, 3.8, 3.9 and 3.10 for Linux and MacOS environments uploaded as a Pypi package. Use the following
 command for installing it:
 
 .. code-block:: bash
@@ -19,7 +48,7 @@ For MacOS you would need to install the following libraries for make it work:
 
 .. code-block:: bash
 
-    brew install libuv openssl 
+    brew install libuv openssl
 
 Usage
 ==========
@@ -42,12 +71,12 @@ object for the keyspace ``acsylla`` and then peform a query for reading a set of
     asyncio.run(main())
 
 
-Acsylla comes with a minimal support for the following objects: ``Cluster``, ``Session``,
-``Statement``, ``PreparedStatement``, ``Batch``, ``Result``, ``Row``.
-
 Acsylla supports all native datatypes including `Collections` and `UDT`
 
+
+============
 Example for use prepared statement and paging.
+============
 
 .. code-block:: python
 
@@ -121,11 +150,13 @@ Example for use prepared statement and paging.
         async for res in find(session, statement):
             print(res)
 
-    if __name__ == '__main__':
-        asyncio.run(main())
+    asyncio.run(main())
 
+
+
+============
 Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific>`__ connection to `Scylla` cluster.
-
+============
 
 .. code-block:: python
 
@@ -139,7 +170,9 @@ Example for use `Shard-Awareness <https://github.com/scylladb/cpp-driver/tree/ma
         local_port_range_max=65535  # default: 65535
     )
 
+============
 SSL Connection example
+============
 
 .. code-block:: python
 
@@ -159,20 +192,62 @@ SSL Connection example
                              ssl_trusted_cert=ssl_trusted_cert,
                              ssl_verify_flags=acsylla.SSLVerifyFlags.PEER_IDENTITY)
 
+============
 Retrieving metadata
-
+============
 
 .. code-block:: python
 
     import asyncio
     import acsylla
+
     async def main():
         cluster = acsylla.create_cluster(['localhost'])
         session = await cluster.create_session(keyspace="acsylla")
         meta = session.meta.keyspace('acsylla')
         print('\n\n'.join(meta.as_cql_query(formatted=True)))
         await session.close()
+
     asyncio.run(main())
+
+============
+Configure logging
+============
+***************
+Set log level
+***************
+
+.. code-block:: python
+
+    import asyncio
+    import acsylla
+
+    async def main():
+        cluster = acsylla.create_cluster(['localhost'], log_level='info')
+        session = await cluster.create_session(keyspace="acsylla")
+        await session.close()
+
+    asyncio.run(main())
+
+***************
+Set callback for capture log messages
+***************
+
+.. code-block:: python
+
+    import asyncio
+    import acsylla
+
+    def on_log_message(msg):
+        print(msg)
+
+    async def main():
+        cluster = acsylla.create_cluster(['localhost'], log_level='info', logging_callback=on_log_message)
+        session = await cluster.create_session(keyspace="acsylla")
+        await session.close()
+
+    asyncio.run(main())
+
 
 Developing
 ============

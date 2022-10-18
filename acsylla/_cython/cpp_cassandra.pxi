@@ -324,6 +324,7 @@ cdef extern from "cassandra.h":
 
   void cass_log_set_level(CassLogLevel log_level)
   void cass_log_set_callback(CassLogCallback callback, void* data)
+  const char* cass_log_level_string(CassLogLevel log_level)
 
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)

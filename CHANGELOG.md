@@ -4,6 +4,7 @@ NOT RELEASED YET
 0.1.8a0
 ========
 - Add metadata support
+- Add logging
 - Update cpp-driver to latest version
 - Static link OpenSSL and libuv for MacOS wheel
 

@@ -5,6 +5,7 @@ from .base import Consistency
 from .base import SSLVerifyFlags
 from .base import Statement
 from .version import __version__
+from typing import Callable
 from typing import List
 from typing import Optional
 
@@ -31,6 +32,8 @@ def create_cluster(
     ssl_private_key_password: str = "",
     ssl_trusted_cert: str = None,
     ssl_verify_flags: SSLVerifyFlags = SSLVerifyFlags.PEER_CERT,
+    log_level: str = "warn",
+    logging_callback: Callable = None,
 ) -> Cluster:
     """Instanciates a new cluster.
 
@@ -66,6 +69,14 @@ def create_cluster(
             one of its subject alternative names. This implies the certificate is
             also present. Hostname resolution must also be enabled.
         Default: SSLVerifyFlags.PEER_CERT
+    `log_level` Sets the log level.
+        Available levels: disabled, critical, error, warn, info, debug, trace
+        Default: warn
+    `logging_callback` Sets a callback function to catch log messages.
+        Default: An internal logger with "acsylla" name. logging.getLogger('acsylla')
+        Example:
+            def logging_callback(message: acsylla.LogMessage):
+                ...
     """
     return _cython.cyacsylla.Cluster(
         contact_points,
@@ -89,6 +100,8 @@ def create_cluster(
         ssl_private_key_password,
         ssl_trusted_cert,
         ssl_verify_flags,
+        log_level,
+        logging_callback,
     )
 
 
@@ -117,9 +130,6 @@ def create_statement(
     If `consistency` is provided, this will override the consistency value provided during the cluster
     creation.
     """
-    if statement.strip().lower().startswith("use"):
-        raise ValueError("For change keyspace use await session.set_keyspace(name)")
-
     return _cython.cyacsylla.create_statement(
         statement,
         parameters=parameters,

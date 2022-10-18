@@ -10,6 +10,7 @@
 import socket
 import threading
 
+from libc.string cimport strcpy
 from posix cimport unistd
 
 
@@ -32,6 +33,41 @@ cdef void cb_cass_future(CassFuture* cass_future, void* data):
     _queue_mutex.unlock()
     _socket_write(_write_fd)
 
+cdef void cb_log_message(const CassLogMessage* message, void* data):
+    global _log_write_fd, _log_queue
+    cdef LogMessageCallback cb
+    cb.msg.time_ms = message.time_ms
+    cb.msg.severity = message.severity
+    cb.msg.file = message.file
+    cb.msg.line = message.line
+    cb.msg.function = message.function
+    cb.logger = data
+    strcpy(cb.msg.message, message.message)
+    _log_queue_mutex.lock()
+    _log_queue.push(cb)
+    _log_queue_mutex.unlock()
+    _socket_write(_log_write_fd)
+
+
+def _handle_log_message():
+    cdef bytes _ = _log_read_socket.recv(1)
+    cdef LogMessageCallback data
+
+    _log_queue_mutex.lock()
+    data = _log_queue.front()
+    _log_queue.pop()
+    _log_queue_mutex.unlock()
+
+    logger = <Logger>data.logger
+    from acsylla import LogMessage
+    logger.log(LogMessage(
+        time_ms=data.msg.time_ms,
+        log_level=cass_log_level_string(data.msg.severity).decode(),
+        file=data.msg.file.decode(),
+        line=data.msg.line,
+        function=data.msg.function.decode(),
+        message=data.msg.message.decode()
+    ))
 
 def _handle_events():
     """ Function called from the Asyncio Loop because some
@@ -60,7 +96,7 @@ _lock = threading.Lock()
 
 cdef _initialize_posix_to_python_thread():
     cdef object current_loop
-    global _lock, _loop, _read_socket, _write_socket, _write_fd, _queue, _thread_id
+    global _lock, _loop, _read_socket, _log_read_socket, _write_socket, _log_write_socket, _write_fd, _log_write_fd, _queue, _log_queue, _thread_id
 
     with _lock:
 
@@ -73,6 +109,10 @@ cdef _initialize_posix_to_python_thread():
             _write_fd = _write_socket.fileno()
             _queue = cpp_event_queue()
             _loop.add_reader(_read_socket, _handle_events)
+            _log_read_socket, _log_write_socket = socket.socketpair()
+            _log_write_fd = _log_write_socket.fileno()
+            _log_queue = cpp_log_queue()
+            _loop.add_reader(_log_read_socket, _handle_log_message)
         elif _loop != current_loop:
             # Either the loop has been recreated for the current thread
             # or a new thread with a new asyncio loop has been started.
@@ -85,6 +125,7 @@ cdef _initialize_posix_to_python_thread():
             # adding the proper handlers to the loop
             _loop = current_loop
             _loop.add_reader(_read_socket, _handle_events)
+            _loop.add_reader(_log_read_socket, _handle_log_message)
         else:
             return
 

@@ -422,6 +422,18 @@ class SSLVerifyFlags(Enum):
 
 
 @dataclass
+class LogMessage:
+    """Log message"""
+
+    time_ms: int
+    log_level: str
+    file: str
+    line: int
+    function: str
+    message: str
+
+
+@dataclass
 class NestedTypeMeta:
     """User type field metadata."""
 

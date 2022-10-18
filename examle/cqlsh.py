@@ -16,8 +16,6 @@ from dataclasses import asdict
 import logging
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)1.1s %(asctime)s] %(message)s")
-logger = logging.getLogger("acsylla")
-logger.setLevel(logging.DEBUG)
 
 
 class Colors:

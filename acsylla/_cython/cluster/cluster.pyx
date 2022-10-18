@@ -50,7 +50,7 @@ cdef class Cluster:
         cdef int request_timeout_ms = int(request_timeout * 1000)
         cdef int resolve_timeout_ms = int(resolve_timeout * 1000)
 
-        logger = Logger(logging_callback=logging_callback)
+        logger = Logger(log_level, logging_callback=logging_callback)
         Py_INCREF(logger)
         cass_log_set_callback(cb_log_message, <void*>logger)
         cass_log_set_level(log_level_from_str(log_level))

@@ -25,9 +25,21 @@ cdef class Logger:
         'DEBUG': logger.debug,
         'TRACE': logger.debug
     }
-    def __init__(self, logging_callback=None):
+    levels = {
+        'DISABLED': None,
+        'CRITICAL': logging.CRITICAL,
+        'ERROR': logging.ERROR,
+        'WARN': logging.WARNING,
+        'INFO': logging.INFO,
+        'DEBUG': logging.DEBUG,
+        'TRACE': logging.DEBUG
+    }
+    def __init__(self, log_level, logging_callback=None):
         self.logging_callback = logging_callback
+        log_level = self.levels[log_level.upper()]
         self.log = self.log_fn
+        if logging_callback is None and log_level is not None:
+            logger.setLevel(log_level)
 
     def log_fn(self, msg):
         if self.logging_callback:

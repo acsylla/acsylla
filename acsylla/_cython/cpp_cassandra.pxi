@@ -322,6 +322,12 @@ cdef extern from "cassandra.h":
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
   ctypedef void (*CassLogCallback)(const CassLogMessage* message, void* data)
 
+  ctypedef struct CassExecProfile:
+    pass
+
+  ctypedef struct CassRetryPolicy:
+    pass
+
   void cass_log_set_level(CassLogLevel log_level)
   void cass_log_set_callback(CassLogCallback callback, void* data)
   const char* cass_log_level_string(CassLogLevel log_level)
@@ -343,6 +349,7 @@ cdef extern from "cassandra.h":
   void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
   void cass_cluster_set_ssl(CassCluster* cluster, CassSsl * ssl)
   CassError cass_cluster_set_use_hostname_resolution(CassCluster* cluster, cass_bool_t enabled)
+  CassError cass_cluster_set_execution_profile(CassCluster * cluster, const char * name, CassExecProfile * profile)
 
   CassSsl* cass_ssl_new()
   void cass_ssl_free(CassSsl * ssl)
@@ -420,7 +427,7 @@ cdef extern from "cassandra.h":
   CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
   CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
   CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
-
+  CassError cass_statement_set_execution_profile(CassStatement * statement, const char * name)
   void cass_statement_free(CassStatement* statement)
 
   void cass_future_free(CassFuture* future)
@@ -489,6 +496,7 @@ cdef extern from "cassandra.h":
   CassBatch* cass_batch_new(CassBatchType type)
   CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
   CassError cass_batch_set_request_timeout(CassBatch* batch, cass_uint64_t timeout_ms)
+  CassError cass_batch_set_execution_profile(CassBatch* batch, const char * name)
   void cass_batch_free(CassBatch* cass_batch)
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)
@@ -685,3 +693,32 @@ cdef extern from "cassandra.h":
   void cass_cluster_set_blacklist_filtering(CassCluster * cluster, const char * hosts)
   void cass_cluster_set_whitelist_dc_filtering(CassCluster * cluster, const char * dcs)
   void cass_cluster_set_blacklist_dc_filtering(CassCluster * cluster, const char * dcs)
+
+  CassRetryPolicy* cass_retry_policy_default_new()
+  CassRetryPolicy* cass_retry_policy_fallthrough_new()
+  CassRetryPolicy* cass_retry_policy_logging_new(CassRetryPolicy * child_retry_policy)
+  void cass_retry_policy_free(CassRetryPolicy * policy)
+
+  CassExecProfile* cass_execution_profile_new()
+  void cass_execution_profile_free(CassExecProfile * profile)
+  CassError cass_execution_profile_set_request_timeout(CassExecProfile * profile, cass_uint64_t timeout_ms)
+  CassError cass_execution_profile_set_consistency(CassExecProfile * profile, CassConsistency consistency)
+  CassError cass_execution_profile_set_serial_consistency(CassExecProfile * profile, CassConsistency serial_consistency)
+  CassError cass_execution_profile_set_load_balance_round_robin(CassExecProfile * profile)
+  CassError cass_execution_profile_set_load_balance_dc_aware(CassExecProfile* profile, const char* local_dc, unsigned used_hosts_per_remote_dc, cass_bool_t allow_remote_dcs_for_local_cl)
+  CassError cass_execution_profile_set_token_aware_routing(CassExecProfile* profile, cass_bool_t enabled)
+  CassError cass_execution_profile_set_token_aware_routing_shuffle_replicas(CassExecProfile* profile, cass_bool_t enabled)
+  CassError cass_execution_profile_set_latency_aware_routing(CassExecProfile * profile, cass_bool_t enabled)
+  CassError cass_execution_profile_set_latency_aware_routing_settings(
+          CassExecProfile * profile,
+          cass_double_t exclusion_threshold,
+          cass_uint64_t scale_ms,
+          cass_uint64_t retry_period_ms,
+          cass_uint64_t update_rate_ms,
+          cass_uint64_t min_measured)
+  CassError cass_execution_profile_set_whitelist_filtering(CassExecProfile * profile, const char * hosts)
+  CassError cass_execution_profile_set_blacklist_filtering(CassExecProfile * profile, const char * hosts)
+  CassError cass_execution_profile_set_whitelist_dc_filtering(CassExecProfile * profile, const char * dcs)
+  CassError cass_execution_profile_set_blacklist_dc_filtering(CassExecProfile * profile, const char * dcs)
+  CassError cass_execution_profile_set_retry_policy(CassExecProfile * profile, CassRetryPolicy * retry_policy)
+  CassError cass_execution_profile_set_constant_speculative_execution_policy(CassExecProfile * profile, cass_int64_t constant_delay_ms, int max_speculative_executions)

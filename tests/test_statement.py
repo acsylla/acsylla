@@ -60,6 +60,11 @@ class TestStatement:
         assert statement is not None
         statement.set_timeout(0.01)
 
+    async def test_create_with_execution_profile(self):
+        statement = create_statement("INSERT INTO test (id) values (1)", execution_profile="")
+        statement.set_execution_profile("")
+        assert statement is not None
+
     @pytest.mark.parametrize(
         "consistency",
         [

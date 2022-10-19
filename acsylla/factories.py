@@ -128,6 +128,7 @@ def create_statement(
     timeout: Optional[float] = None,
     consistency: Optional[Consistency] = None,
     serial_consistency: Optional[Consistency] = None,
+    execution_profile: Optional[str] = None,
 ) -> Statement:
     """
     Creates a new statment.
@@ -144,6 +145,8 @@ def create_statement(
 
     If `consistency` is provided, this will override the consistency value provided during the cluster
     creation.
+
+    `execution_profile` Assign the execution profile to the statement
     """
     return _cython.cyacsylla.create_statement(
         statement,
@@ -153,34 +156,38 @@ def create_statement(
         timeout=timeout,
         consistency=consistency,
         serial_consistency=serial_consistency,
+        execution_profile=execution_profile,
     )
 
 
-def create_batch_logged(timeout: Optional[float] = None) -> Batch:
+def create_batch_logged(timeout: Optional[float] = None, execution_profile: Optional[str] = None) -> Batch:
     """
     Creates a new batch logged.
 
     If `timeout` is provided, this will override the request timeout provided during the cluster
     creation. Value expected is in seconds.
+    `execution_profile` Assign the execution profile to the statement
     """
-    return _cython.cyacsylla.create_batch_logged(timeout)
+    return _cython.cyacsylla.create_batch_logged(timeout, execution_profile)
 
 
-def create_batch_unlogged(timeout: Optional[float] = None) -> Batch:
+def create_batch_unlogged(timeout: Optional[float] = None, execution_profile: Optional[str] = None) -> Batch:
     """
     Creates a new batch unlogged.
 
     If `timeout` is provided, this will override the request timeout provided during the cluster
     creation. Value expected is in seconds.
+    `execution_profile` Assign the execution profile to the statement
     """
-    return _cython.cyacsylla.create_batch_unlogged(timeout)
+    return _cython.cyacsylla.create_batch_unlogged(timeout, execution_profile)
 
 
-def create_batch_counter(timeout: Optional[float] = None) -> Batch:
+def create_batch_counter(timeout: Optional[float] = None, execution_profile: Optional[str] = None) -> Batch:
     """
     Creates a new batch counter.
 
     If `timeout` is provided, this will override the request timeout provided during the cluster
     creation. Value expected is in seconds.
+    `execution_profile` Assign the execution profile to the statement
     """
-    return _cython.cyacsylla.create_batch_counter(timeout)
+    return _cython.cyacsylla.create_batch_counter(timeout, execution_profile)

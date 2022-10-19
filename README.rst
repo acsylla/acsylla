@@ -1,7 +1,6 @@
 acsylla
 #######
-
-WORK IN PROGRESS, use only for developing
+Python bindings for C/C++ Driver for Cassandra and ScyllaDB
 
 acsylla a composition of async + cassandra + scylla words.
 
@@ -14,15 +13,15 @@ Features
 * Connection pooling
 * Automatic node discovery
 * Automatic reconnection
-* **[In progress]** Configurable load balancing
+* **[Implemented in execution profile]** Configurable load balancing
 * Works with any cluster size
 * Authentication
 * SSL
-* **[In progress]** Latency-aware routing
+* **[Implemented in execution profile]** Latency-aware routing
 * Performance metrics
 * Tuples and UDTs
 * Nested collections
-* **[In progress]** Retry policies
+* **[Implemented in execution profile]** Retry policies
 * **[In progress]** Client-side timestamps
 * Data types
 * **[In progress]** Idle connection heartbeats
@@ -32,7 +31,7 @@ Features
 * **[In progress]** Custom authenticators
 * Reverse DNS with SSL peer identity verification support
 * Randomized contact points
-* **[In progress]** Speculative execution
+* **[Implemented in execution profile]** Speculative execution
 
 Install
 ==========

@@ -1,3 +1,4 @@
+from acsylla import create_batch_counter
 from acsylla import create_batch_logged
 from acsylla import create_batch_unlogged
 from acsylla import create_statement
@@ -38,12 +39,23 @@ class TestBatch:
         batch = create_batch_unlogged()
         assert batch is not None
 
-    def test_create_batch_logged_with_timeout(self):
-        batch = create_batch_logged(timeout=1.0)
+    def test_create_batch_logged_with_timeout__and_profile(self):
+        batch = create_batch_logged(timeout=1.0, execution_profile="")
+        batch.set_execution_profile("")
         assert batch is not None
 
-    def test_create_batch_unlogged_with_timeout(self):
-        batch = create_batch_unlogged(timeout=1.0)
+    def test_create_batch_unlogged_with_timeout_and_profile(self):
+        batch = create_batch_unlogged(timeout=1.0, execution_profile="")
+        batch.set_execution_profile("")
+        assert batch is not None
+
+    def test_create_batch_counter(self):
+        batch = create_batch_counter()
+        assert batch is not None
+
+    def test_create_batch_counter_with_timeout_and_profile(self):
+        batch = create_batch_counter(timeout=1.0, execution_profile="")
+        batch.set_execution_profile("")
         assert batch is not None
 
     def test_add_statement(self, batch, statement):

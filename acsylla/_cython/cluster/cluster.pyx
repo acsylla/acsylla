@@ -152,3 +152,96 @@ cdef class Cluster:
         session = Session(self, keyspace=keyspace)
         await session._connect()
         return session
+
+    def create_execution_profile(
+        self,
+        name: str,
+        request_timeout: int = None,
+        consistency: "Consistency" = None,
+        serial_consistency: "Consistency" = None,
+        load_balance_round_robin: bool = False,
+        load_balance_dc_aware: str = None,
+        token_aware_routing: bool = True,
+        token_aware_routing_shuffle_replicas: bool = True,
+        latency_aware_routing: "LatencyAwareRoutingSettings" = None,
+        whitelist_hosts: str = None,
+        blacklist_hosts: str = None,
+        whitelist_dc: str = None,
+        blacklist_dc: str = None,
+        retry_policy: str = None,
+        retry_policy_logging: bool = False,
+        speculative_execution_policy: "SpeculativeExecutionSettings" = None,
+    ):
+        cdef CassError error
+        cdef CassRetryPolicy* cass_policy
+        cdef CassRetryPolicy* cass_log_policy
+        cdef CassExecProfile* profile = cass_execution_profile_new()
+
+        if request_timeout is not None:
+            error = cass_execution_profile_set_request_timeout(profile, <cass_uint64_t>request_timeout)
+            raise_if_error(error)
+        if consistency is not None:
+            error = cass_execution_profile_set_consistency(profile, <CassConsistency>consistency.value)
+            raise_if_error(error)
+        if serial_consistency is not None:
+            error = cass_execution_profile_set_serial_consistency(profile, <CassConsistency>serial_consistency.value)
+            raise_if_error(error)
+        if load_balance_round_robin is True:
+            error = cass_execution_profile_set_load_balance_round_robin(profile)
+            raise_if_error(error)
+        if load_balance_dc_aware is not None:
+            error = cass_execution_profile_set_load_balance_dc_aware(profile, load_balance_dc_aware.encode(), 0, cass_false)
+            raise_if_error(error)
+        if token_aware_routing is False:
+            error = cass_execution_profile_set_token_aware_routing(profile, cass_false)
+            raise_if_error(error)
+        if token_aware_routing_shuffle_replicas is False:
+            error = cass_execution_profile_set_token_aware_routing_shuffle_replicas(profile, cass_false)
+            raise_if_error(error)
+        if latency_aware_routing is not None:
+            cass_execution_profile_set_latency_aware_routing(profile, cass_true)
+            raise_if_error(error)
+            error = cass_execution_profile_set_latency_aware_routing_settings(
+                profile,
+                <cass_double_t>latency_aware_routing.exclusion_threshold,
+                <cass_uint64_t>latency_aware_routing.scale_ms,
+                <cass_uint64_t>latency_aware_routing.retry_period_ms,
+                <cass_uint64_t>latency_aware_routing.update_rate_ms,
+                <cass_uint64_t>latency_aware_routing.min_measured
+            )
+            raise_if_error(error)
+        if whitelist_hosts is not None:
+            error = cass_execution_profile_set_whitelist_filtering(profile, whitelist_hosts.encode())
+            raise_if_error(error)
+        if blacklist_hosts is not None:
+            error = cass_execution_profile_set_blacklist_filtering(profile, blacklist_hosts.encode())
+            raise_if_error(error)
+        if whitelist_dc is not None:
+            error = cass_execution_profile_set_whitelist_dc_filtering(profile, whitelist_dc.encode())
+            raise_if_error(error)
+        if blacklist_dc is not None:
+            error = cass_execution_profile_set_blacklist_dc_filtering(profile, blacklist_dc.encode())
+            raise_if_error(error)
+        if retry_policy is not None:
+            if retry_policy == 'default':
+                cass_policy = cass_retry_policy_default_new()
+            elif retry_policy == 'fallthrough':
+                cass_policy = cass_retry_policy_fallthrough_new()
+            if retry_policy_logging is True:
+                cass_log_policy = cass_retry_policy_logging_new(cass_policy)
+                error = cass_execution_profile_set_retry_policy(profile, cass_log_policy)
+                raise_if_error(error)
+                cass_retry_policy_free(cass_log_policy)
+            else:
+                error = cass_execution_profile_set_retry_policy(profile, cass_policy)
+                raise_if_error(error)
+            cass_retry_policy_free(cass_policy)
+        if speculative_execution_policy is not None:
+            error = cass_execution_profile_set_constant_speculative_execution_policy(
+                profile,
+                <cass_int64_t>speculative_execution_policy.constant_delay_ms,
+                <int>speculative_execution_policy.max_speculative_executions
+            )
+            raise_if_error(error)
+        cass_cluster_set_execution_profile(self.cass_cluster, name.encode(), profile)
+        cass_execution_profile_free(profile)

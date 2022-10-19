@@ -10,3 +10,4 @@ cdef class PreparedStatement:
                                 object timeout,
                                 object consistency,
                                 object serial_consistency)
+    cdef set_execution_profile(self, CassStatement* statement, str name)

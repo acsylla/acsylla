@@ -37,3 +37,10 @@ class TestPreparedStatement:
         prepared = await session.create_prepared(statement_str)
         statement = prepared.bind()
         assert statement is not None
+
+    async def test_statement_with_execution_profile(self, session):
+        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+        prepared = await session.create_prepared(statement_str)
+        statement = prepared.bind(execution_profile="")
+        statement.set_execution_profile("")
+        assert statement is not None

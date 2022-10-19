@@ -60,6 +60,174 @@ class Cluster(metaclass=ABCMeta):
         The coroutine will try to make a connection to the cluster hosts.
         """
 
+    @abstractmethod
+    def create_execution_profile(
+        self,
+        name: str,
+        request_timeout: int = None,
+        consistency: "Consistency" = None,
+        serial_consistency: "Consistency" = None,
+        load_balance_round_robin: bool = False,
+        load_balance_dc_aware: str = None,
+        token_aware_routing: bool = True,
+        token_aware_routing_shuffle_replicas: bool = True,
+        latency_aware_routing: "LatencyAwareRoutingSettings" = None,
+        whitelist_hosts: str = None,
+        blacklist_hosts: str = None,
+        whitelist_dc: str = None,
+        blacklist_dc: str = None,
+        retry_policy: str = None,
+        retry_policy_logging: bool = False,
+        speculative_execution_policy: "SpeculativeExecutionSettings" = None,
+    ):
+        """Execution profiles provide a mechanism to group together a set of
+        configuration options and reuse them across different query executions.
+
+        Execution profiles are being introduced to help deal with the exploding
+        number of configuration options, especially as the database platform
+        evolves into more complex workloads. The number of options being
+        introduced with the execution profiles is limited and may be expanded
+        based on feedback from the community.
+
+        `request_timeout` Sets the timeout waiting for a response from a node.
+            Default: Disabled (uses the cluster request timeout)
+        `consistency` Sets the consistency level.
+            Default: Disabled (uses the default consistency)
+        `serial_consistency` Sets the serial consistency level.
+            Default: Disabled (uses the default serial consistency)
+        `load_balance_round_robin` Configures the execution profile to use
+            round-robin load balancing. The driver discovers all nodes in a
+            cluster and cycles through  them per request. All are considered
+            ‘local’.
+           Note: Profile-based load balancing policy is disabled by default;
+            cluster load balancing policy is used when profile does not
+            contain a policy.
+        `load_balance_dc_aware` Configures the execution profile to use
+            DC-aware load balancing. For each query, all live nodes in a
+            primary ‘local’ DC are tried first, followed by any node from other
+            DCs.
+           Note: Profile-based load balancing policy is disabled by default;
+            cluster load balancing policy is used when profile does not contain
+            a policy.
+           Example: "datacenter1"
+        `token_aware_routing` Configures the execution profile to use
+            token-aware request routing or not.
+           Important: Token-aware routing depends on keyspace metadata. For
+            this reason enabling token-aware routing will also enable
+            retrieving and updating keyspace schema metadata.
+           Default: true (enabled).
+            This routing policy composes the base routing policy, routing
+            requests first to replicas on nodes considered ‘local’ by the base
+            load balancing policy.
+           Note: Execution profiles use the cluster-level load balancing policy
+            unless enabled. This setting is not applicable unless a load
+            balancing policy is enabled on the execution profile.
+        `token_aware_routing_shuffle_replicas` Configures the execution
+            profile’s token-aware routing to randomly shuffle replicas. This
+            can reduce the effectiveness of server-side caching, but it can
+            better distribute load over replicas for a given partition key.
+           Note: Token-aware routing must be enabled and a load balancing
+            policy must be enabled on the execution profile for the setting to
+            be applicable.
+           Default: true (enabled).
+        `latency_aware_routing` Configures the execution profile to use
+            latency-aware request routing or not.
+           Note: Execution profiles use the cluster-level load balancing policy
+           unless enabled. This setting is not applicable unless a load
+           balancing policy is enabled on the execution profile.
+          Default: Disable. For enable use `LatencyAwareRoutingSettings`
+           This routing policy is a top-level routing policy. It uses the base
+           routing policy to determine locality (dc-aware) and/or placement
+           (token-aware) before considering the latency.
+        `whitelist_hosts` Sets whitelist hosts for the execution profile.
+            This policy filters requests to all other policies, only allowing
+            requests to the hosts contained in the whitelist. Any host not in
+            the whitelist will be ignored and a connection will not be
+            established. This policy is useful for ensuring that the driver
+            will only connect to a predefined set of hosts.
+           Examples: “127.0.0.1” “127.0.0.1,127.0.0.2”
+           Note: Execution profiles use the cluster-level load balancing policy
+            unless enabled. This setting is not applicable unless a load
+            balancing policy is enabled on the execution profile.
+        `blacklist_hosts` Sets blacklist hosts for the execution profile.
+            The first call sets the blacklist hosts and any subsequent calls
+            appends additional hosts. Passing an empty string will clear and
+            disable the blacklist. White space is striped from the hosts.
+            This policy filters requests to all other policies, only allowing
+            requests to the hosts not contained in the blacklist. Any host in
+            the blacklist will be ignored and a connection will not be
+            established. This policy is useful for ensuring that the driver
+            will not connect to a predefined set of hosts.
+           Examples: “127.0.0.1” “127.0.0.1,127.0.0.2”
+           Note: Execution profiles use the cluster-level load balancing policy
+            unless enabled. This setting is not applicable unless a load
+            balancing policy is enabled on the execution profile.
+        `whitelist_dc` Same as `whitelist_hosts`, but whitelist
+            all hosts of a DC.
+           Examples: “dc1”, “dc1,dc2”
+        `blacklist_dc` Same as `blacklist_hosts`, but blacklist
+            all hosts of a dc.
+           Examples: “dc1”, “dc1,dc2”
+        `retry_policy` Sets the execution profile’s retry policy.
+           Note: Profile-based retry policy is disabled by default; cluster
+            retry policy is used when profile does not contain a policy unless
+            the retry policy was explicitly set on the batch/statement request.
+           Values:
+            `default` This policy retries queries in the following cases:
+                - On a read timeout, if enough replicas replied but data was
+                    not received.
+                - On a write timeout, if a timeout occurs while writing the
+                    distributed batch log
+                - On unavailable, it will move to the next host
+                In all other cases the error will be returned.
+                This policy always uses the query’s original consistency level.
+            `fallthrough` This policy never retries or ignores a server-side
+                failure. The error is always returned.
+        `retry_policy_logging` If `retry_policy` is set then add logging using
+            log level INFO for selected policy.
+        `constant_speculative_execution_policy` Enable constant speculative
+            executions with the supplied settings `SpeculativeExecutionSettings`
+            for the execution profile.
+           Note: Profile-based speculative execution policy is disabled by
+            default; cluster speculative execution policy is used when profile
+            does not contain a policy.
+        """
+
+
+@dataclass
+class LatencyAwareRoutingSettings:
+    """Configures the execution profile’s settings for latency-aware request
+    routing.
+       Note: Execution profiles use the cluster-level load balancing policy
+        unless enabled. This setting is not applicable unless a load balancing
+        policy is enabled on the execution profile.
+    `exclusion_threshold` Controls how much worse the latency must be compared
+        to the average latency of the best performing node before it penalized.
+    `scale_ms` Controls the weight given to older latencies when calculating
+        the average latency of a node. A bigger scale will give more weight to
+        older latency measurements.
+    `retry_period_ms` The amount of time a node is penalized by the policy
+        before being given a second chance when the current average latency exceeds
+        the calculated threshold (exclusion_threshold * best_average_latency).
+    `update_rate_ms` The rate at which the best average latency is recomputed.
+    `min_measured` The minimum number of measurements per-host required to be
+        considered by the policy.
+    """
+
+    exclusion_threshold: float = 2.0
+    scale_ms: int = 100
+    retry_period_ms: int = 10_000
+    update_rate_ms: int = 100
+    min_measured: int = 50
+
+
+@dataclass
+class SpeculativeExecutionSettings:
+    """Settings for constant speculative execution policy"""
+
+    constant_delay_ms: int
+    max_speculative_executions: int
+
 
 class Meta(metaclass=ABCMeta):
     """Provides a Meta instance class for retrieving metadata from cluster."""
@@ -252,14 +420,31 @@ class Statement(metaclass=ABCMeta):
         """Sets the statement’s serial consistency level.
         Default: Not set"""
 
+    @abstractmethod
+    def set_execution_profile(self, name: str) -> None:
+        """Sets the execution profile to execute the statement with.
+        Note: Empty string will clear execution profile from statement
+        """
+
 
 class PreparedStatement(metaclass=ABCMeta):
     """Provides a PreparedStatement instance class. Use the
     `session.create_prepared()` coroutine for creating a new instance"""
 
     @abstractmethod
-    def bind(self, page_size: Optional[int] = None, page_state: Optional[bytes] = None) -> Statement:
+    def bind(
+        self,
+        page_size: Optional[int] = None,
+        page_state: Optional[bytes] = None,
+        execution_profile: Optional[str] = None,
+    ) -> Statement:
         """Returns a new statment using the prepared."""
+
+    @abstractmethod
+    def set_execution_profile(self, statement: Statement, name: str) -> None:
+        """Sets the execution profile to execute the statement with.
+        Note: Empty string will clear execution profile from statement
+        """
 
 
 class Batch(metaclass=ABCMeta):
@@ -270,6 +455,12 @@ class Batch(metaclass=ABCMeta):
     @abstractmethod
     def add_statement(self, statement: Statement) -> None:
         """Adds a new statement to the batch."""
+
+    @abstractmethod
+    def set_execution_profile(self, name: str) -> None:
+        """Sets the execution profile to execute the statement with.
+        Note: Empty string will clear execution profile from statement
+        """
 
 
 class Result(metaclass=ABCMeta):

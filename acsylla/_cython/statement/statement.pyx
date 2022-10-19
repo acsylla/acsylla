@@ -14,7 +14,8 @@ cdef class Statement:
         object page_state,
         object timeout,
         object consistency,
-        object serial_consistency):
+        object serial_consistency,
+        str execution_profile):
 
         cdef Statement statement
         cdef bytes encoded_statement
@@ -33,6 +34,7 @@ cdef class Statement:
         statement.set_timeout(timeout)
         statement.set_consistency(consistency)
         statement.set_serial_consistency(serial_consistency)
+        statement.set_execution_profile(execution_profile)
         return statement
 
     @staticmethod
@@ -43,7 +45,8 @@ cdef class Statement:
             object page_state,
             object timeout,
             object consistency,
-            object serial_consistency):
+            object serial_consistency,
+            str execution_profile):
 
         cdef Statement statement
 
@@ -56,6 +59,7 @@ cdef class Statement:
         statement.set_timeout(timeout)
         statement.set_consistency(consistency)
         statement.set_serial_consistency(serial_consistency)
+        statement.set_execution_profile(execution_profile)
         return statement
 
     cpdef set_page_size(self, object py_page_size):
@@ -332,6 +336,12 @@ cdef class Statement:
         for name, value in values.items():
             self.bind_by_name(name, value)
 
+    def set_execution_profile(self, name: str) -> None:
+        if name is None:
+            return
+        cdef CassError error = cass_statement_set_execution_profile(self.cass_statement, name.encode())
+        raise_if_error(error)
+
 
 def create_statement(
     str statement_str,
@@ -340,7 +350,8 @@ def create_statement(
     object page_state=None,
     object timeout=None,
     object consistency=None,
-    object serial_consistency=None):
+    object serial_consistency=None,
+    str execution_profile=None):
     cdef Statement statement
     statement = Statement.new_from_string(
         statement_str,
@@ -349,6 +360,7 @@ def create_statement(
         page_state,
         timeout,
         consistency,
-        serial_consistency
+        serial_consistency,
+        execution_profile
     )
     return statement

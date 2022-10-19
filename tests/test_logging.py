@@ -9,7 +9,7 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-class Testcreate_cluster:
+class TestLogging:
     async def test_logging_callback(self, host, keyspace):
         class Result:
             msg = None

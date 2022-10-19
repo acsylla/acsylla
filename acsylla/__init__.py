@@ -7,6 +7,7 @@ from .base import Consistency
 from .base import FunctionMeta
 from .base import IndexMeta
 from .base import KeyspaceMeta
+from .base import LatencyAwareRoutingSettings
 from .base import LogMessage
 from .base import MaterializedViewMeta
 from .base import NestedTypeMeta
@@ -15,6 +16,7 @@ from .base import Result
 from .base import Row
 from .base import Session
 from .base import SessionMetrics
+from .base import SpeculativeExecutionSettings
 from .base import SSLVerifyFlags
 from .base import Statement
 from .base import TableMeta
@@ -41,6 +43,8 @@ __all__ = (
     "IndexMeta",
     "TableMeta",
     "KeyspaceMeta",
+    "LatencyAwareRoutingSettings",
+    "SpeculativeExecutionSettings",
     "MaterializedViewMeta",
     "UserTypeMeta",
     "UserTypeFieldMeta",

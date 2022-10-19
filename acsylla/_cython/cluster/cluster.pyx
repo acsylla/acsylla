@@ -243,5 +243,6 @@ cdef class Cluster:
                 <int>speculative_execution_policy.max_speculative_executions
             )
             raise_if_error(error)
-        cass_cluster_set_execution_profile(self.cass_cluster, name.encode(), profile)
+        error = cass_cluster_set_execution_profile(self.cass_cluster, name.encode(), profile)
+        raise_if_error(error)
         cass_execution_profile_free(profile)

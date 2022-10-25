@@ -1,10 +1,12 @@
-cdef class Meta:
+cdef class Metadata:
     cdef:
         CassSession* cass_session
         const CassSchemaMeta* cass_schema_meta
         const CassSchemaMeta* _get_schema_meta(self)
         const CassKeyspaceMeta* _get_keyspace_meta(self, object keyspace) except *
-        cdef const CassTableMeta* _get_table_meta(self, object keyspace, object table)  except *
+        const CassTableMeta* _get_table_meta(self, object keyspace, object table)  except *
+    @staticmethod
+    cdef Metadata new_(CassSession* cass_session)
 
 cdef object _fields_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta)
 cdef object _keyspace_meta(const CassKeyspaceMeta* keyspace_meta)

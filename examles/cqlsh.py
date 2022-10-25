@@ -272,57 +272,56 @@ class AcsyllaCQLSH:
         name = None
 
         try:
+            meta = self.session.get_metadata()
             if query.endswith("keyspaces"):
-                self.print.table(["keyspaces"], [[k] for k in self.session.meta.keyspaces_names()])
+                self.print.table(["keyspaces"], [[k] for k in meta.keyspaces()])
             elif query.endswith("keyspace"):
-                print("\n\n".join(self.session.meta.keyspace(keyspace).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_keyspace_meta(keyspace).as_cql_query(formatted=True)))
             elif query.endswith("types"):
-                self.print.table(["types"], [[k] for k in self.session.meta.user_types_names(keyspace)])
+                self.print.table(["types"], [[k] for k in meta.user_types(keyspace)])
             elif query.endswith("functions"):
-                self.print.table(["functions"], [[k] for k in self.session.meta.functions_names(keyspace)])
+                self.print.table(["functions"], [[k] for k in meta.get_functions(keyspace)])
             elif query.endswith("aggregates"):
-                self.print.table(["aggregates"], [[k] for k in self.session.meta.aggregates_names(keyspace)])
+                self.print.table(["aggregates"], [[k] for k in meta.get_aggregates(keyspace)])
             elif query.endswith("tables"):
-                self.print.table(["tables"], [[k] for k in self.session.meta.tables_names(keyspace)])
+                self.print.table(["tables"], [[k] for k in meta.get_tables(keyspace)])
             elif query.endswith("indexes"):
-                self.print.table(["indexes"], [[k] for k in self.session.meta.indexes_names(keyspace)])
+                self.print.table(["indexes"], [[k] for k in meta.get_indexes(keyspace)])
             elif query.endswith("materialized views"):
-                self.print.table(
-                    ["materialized views"], [[k] for k in self.session.meta.materialized_views_names(keyspace)]
-                )
+                self.print.table(["materialized views"], [[k] for k in meta.get_materialized_views(keyspace)])
             elif re.findall(keyspace_re, query):
                 keyspace = re.findall(keyspace_re, query)[0]
-                print("\n\n".join(self.session.meta.keyspace(keyspace).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_keyspace_meta(keyspace).as_cql_query(formatted=True)))
             elif re.findall(type_re, query):
                 name = re.findall(type_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.user_type(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_user_type_meta(keyspace, name).as_cql_query(formatted=True)))
             elif re.findall(function_re, query):
                 name = re.findall(function_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.function(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_function_meta(keyspace, name).as_cql_query(formatted=True)))
             elif re.findall(aggregate_re, query):
                 name = re.findall(aggregate_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.aggregate(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_aggregate_meta(keyspace, name).as_cql_query(formatted=True)))
             elif re.findall(table_re, query):
                 name = re.findall(table_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.table(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_table_meta(keyspace, name).as_cql_query(formatted=True)))
             elif re.findall(index_re, query):
                 name = re.findall(index_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.index(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_index_meta(keyspace, name).as_cql_query(formatted=True)))
             elif re.findall(materialized_view_re, query):
                 name = re.findall(materialized_view_re, query)[0]
                 if len(name.split(".")) == 2:
                     keyspace, name = name.split(".")
-                print("\n\n".join(self.session.meta.materialized_view(keyspace, name).as_cql_query(formatted=True)))
+                print("\n\n".join(meta.get_materialized_view_meta(keyspace, name).as_cql_query(formatted=True)))
         except acsylla.errors.KeyspaceNotFound:
             print(f'{Colors.BRED}ERROR: Keyspace "{keyspace}" not found! {Colors.RESET}')
         except acsylla.errors.UserTypeNotFound:
@@ -349,6 +348,7 @@ class AcsyllaCQLSH:
             input_str = input_str.replace("\n", " ").strip().lower()
             if input_str == "/m" or input_str.startswith("show metrics"):
                 self.print.dict(asdict(self.session.metrics()))
+                self.print.dict(asdict(self.session.speculative_execution_metrics()))
                 continue
             elif input_str == "/s" or input_str.startswith("show settings"):
                 self.print.dict(self.cluster_args)

@@ -4,6 +4,10 @@ from .base import Batch
 from .base import Cluster
 from .base import ColumnMeta
 from .base import Consistency
+from .base import DseGssapiAuthenticator
+from .base import DseGssapiAuthenticatorProxy
+from .base import DsePlaintextAuthenticator
+from .base import DsePlaintextAuthenticatorProxy
 from .base import FunctionMeta
 from .base import IndexMeta
 from .base import KeyspaceMeta
@@ -12,11 +16,13 @@ from .base import LogMessage
 from .base import MaterializedViewMeta
 from .base import NestedTypeMeta
 from .base import PreparedStatement
+from .base import ProtocolVersion
 from .base import Result
 from .base import Row
 from .base import Session
 from .base import SessionMetrics
-from .base import SpeculativeExecutionSettings
+from .base import SpeculativeExecutionMetrics
+from .base import SpeculativeExecutionPolicy
 from .base import SSLVerifyFlags
 from .base import Statement
 from .base import TableMeta
@@ -30,10 +36,15 @@ from .factories import create_statement
 
 __all__ = (
     "Cluster",
+    "DseGssapiAuthenticator",
+    "DseGssapiAuthenticatorProxy",
+    "DsePlaintextAuthenticator",
+    "DsePlaintextAuthenticatorProxy",
     "Consistency",
     "SSLVerifyFlags",
     "Session",
     "Statement",
+    "ProtocolVersion",
     "PreparedStatement",
     "Batch",
     "Result",
@@ -44,7 +55,8 @@ __all__ = (
     "TableMeta",
     "KeyspaceMeta",
     "LatencyAwareRoutingSettings",
-    "SpeculativeExecutionSettings",
+    "SpeculativeExecutionMetrics",
+    "SpeculativeExecutionPolicy",
     "MaterializedViewMeta",
     "UserTypeMeta",
     "UserTypeFieldMeta",

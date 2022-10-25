@@ -62,60 +62,88 @@ cdef class Statement:
         statement.set_execution_profile(execution_profile)
         return statement
 
-    cpdef set_page_size(self, object py_page_size):
-        cdef CassError error
-        cdef int page_size
-        cdef int length
-        cdef char* page_state = NULL
+    def add_key_index(self, int index):
+        error = cass_statement_add_key_index(self.cass_statement, index)
+        raise_if_error(error)
 
-        if py_page_size is not None:
-            page_size = py_page_size
+    def reset_parameters(self, int count):
+        error = cass_statement_reset_parameters(self.cass_statement, count)
+        raise_if_error(error)
+
+    def set_page_size(self, page_size: int):
+        if page_size is not None:
             error = cass_statement_set_paging_size(self.cass_statement, page_size)
             raise_if_error(error)
 
-    cpdef set_page_state(self, object py_page_state):
-        cdef CassError error
-        cdef int length
-        cdef char* page_state = NULL
-
-        if py_page_state is not None:
-            page_state = py_page_state
-            length = len(py_page_state)
-            error = cass_statement_set_paging_state_token(self.cass_statement, page_state, length)
+    def set_page_state(self, bytes page_state):
+        if page_state is not None:
+            error = cass_statement_set_paging_state_token(self.cass_statement, page_state, len(page_state))
             raise_if_error(error)
 
-    cpdef set_timeout(self, object timeout):
-        cdef CassError error
-        cdef int timeout_ms
+    def set_timeout(self, object timeout):
+        if timeout is not None:
+            timeout_ms = int(timeout * 1000)
+            error = cass_statement_set_request_timeout(self.cass_statement, timeout_ms)
+            raise_if_error(error)
 
-        if timeout is None:
-            return
-
-        timeout_ms = int(timeout * 1000)
-        error = cass_statement_set_request_timeout(self.cass_statement, timeout_ms)
-        raise_if_error(error)
-
-    cpdef set_consistency(self, object consistency):
-        cdef CassError error
+    def set_consistency(self, object consistency):
         cdef CassConsistency cass_consistency
+        if consistency is not None:
+            cass_consistency = consistency.value
+            error = cass_statement_set_consistency(self.cass_statement, cass_consistency)
+            raise_if_error(error)
 
-        if consistency is None:
-            return
-
-        cass_consistency = consistency.value
-        error = cass_statement_set_consistency(self.cass_statement, cass_consistency)
-        raise_if_error(error)
-
-    cpdef set_serial_consistency(self, object consistency):
-        cdef CassError error
+    def set_serial_consistency(self, object consistency):
         cdef CassConsistency cass_consistency
+        if consistency is not None:
+            cass_consistency = consistency.value
+            error = cass_statement_set_serial_consistency(self.cass_statement, cass_consistency)
+            raise_if_error(error)
+    def set_timestamp(self, timestamp: int):
+        if timestamp is not None:
+            error = cass_statement_set_timestamp(self.cass_statement, timestamp)
+            raise_if_error(error)
 
-        if consistency is None:
-            return
+    def set_is_idempotent(self, is_idempotent: bool):
+        if is_idempotent is not None:
+            error = cass_statement_set_is_idempotent(self.cass_statement, is_idempotent)
+            raise_if_error(error)
 
-        cass_consistency = consistency.value
-        error = cass_statement_set_serial_consistency(self.cass_statement, cass_consistency)
-        raise_if_error(error)
+    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+        cdef CassRetryPolicy* cass_policy
+        cdef CassRetryPolicy* cass_log_policy
+        if retry_policy is not None:
+            if retry_policy == 'default':
+                cass_policy = cass_retry_policy_default_new()
+            elif retry_policy == 'fallthrough':
+                cass_policy = cass_retry_policy_fallthrough_new()
+            else:
+                raise ValueError("Retry policy must be 'default' or 'fallthrough'")
+            if retry_policy_logging is True:
+                cass_log_policy = cass_retry_policy_logging_new(cass_policy)
+                error = cass_statement_set_retry_policy(self.cass_statement, cass_log_policy)
+                raise_if_error(error)
+                cass_retry_policy_free(cass_log_policy)
+            else:
+                error = cass_statement_set_retry_policy(self.cass_statement, cass_policy)
+                raise_if_error(error)
+            cass_retry_policy_free(cass_policy)
+
+    def set_tracing(self, enabled: bool = None):
+        if enabled is not None:
+            error = cass_statement_set_tracing(self.cass_statement, enabled)
+            raise_if_error(error)
+            self.tracing_enabled = enabled
+
+    def set_host(self, host: str, port: int = 9042):
+        if host is not None:
+            error = cass_statement_set_host(self.cass_statement, host.encode(), port)
+            raise_if_error(error)
+
+    def set_execution_profile(self, name: str) -> None:
+        if name is not None:
+            error = cass_statement_set_execution_profile(self.cass_statement, name.encode())
+            raise_if_error(error)
 
     cdef const CassDataType* _get_data_type(self, int index):
         cdef const CassDataType* data_type
@@ -335,12 +363,6 @@ cdef class Statement:
 
         for name, value in values.items():
             self.bind_by_name(name, value)
-
-    def set_execution_profile(self, name: str) -> None:
-        if name is None:
-            return
-        cdef CassError error = cass_statement_set_execution_profile(self.cass_statement, name.encode())
-        raise_if_error(error)
 
 
 def create_statement(

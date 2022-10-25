@@ -119,11 +119,13 @@ cdef extern from "cassandra.h":
     CASS_ERROR_SSL_CLOSED
 
   ctypedef enum CassProtocolVersion:
-    CASS_PROTOCOL_VERSION_V1 = 1
-    CASS_PROTOCOL_VERSION_V2 = 2
-    CASS_PROTOCOL_VERSION_V3 = 3
-    CASS_PROTOCOL_VERSION_V4 = 4
-    CASS_PROTOCOL_VERSION_V5 = 5
+    CASS_PROTOCOL_VERSION_V1
+    CASS_PROTOCOL_VERSION_V2
+    CASS_PROTOCOL_VERSION_V3
+    CASS_PROTOCOL_VERSION_V4
+    CASS_PROTOCOL_VERSION_V5
+    CASS_PROTOCOL_VERSION_DSEV1
+    CASS_PROTOCOL_VERSION_DSEV2
 
   ctypedef enum CassBatchType:
     CASS_BATCH_TYPE_LOGGED
@@ -262,6 +264,9 @@ cdef extern from "cassandra.h":
   ctypedef struct CassAggregateMeta:
     pass
 
+  ctypedef struct CassTimestampGen:
+    pass
+
   ctypedef struct CassVersion:
     int major_version
     int minor_version
@@ -300,7 +305,24 @@ cdef extern from "cassandra.h":
     _errors errors
 
   ctypedef struct CassSpeculativeExecutionMetrics:
-    pass
+    cass_uint64_t min
+    cass_uint64_t max
+    cass_uint64_t mean
+    cass_uint64_t stddev
+    cass_uint64_t median
+    cass_uint64_t percentile_75th
+    cass_uint64_t percentile_95th
+    cass_uint64_t percentile_98th
+    cass_uint64_t percentile_99th
+    cass_uint64_t percentile_999th
+    cass_uint64_t count
+    cass_double_t percentage
+
+  ctypedef enum CassHostListenerEvent:
+    CASS_HOST_LISTENER_EVENT_UP
+    CASS_HOST_LISTENER_EVENT_DOWN
+    CASS_HOST_LISTENER_EVENT_ADD
+    CASS_HOST_LISTENER_EVENT_REMOVE
 
   ctypedef enum CassLogLevel:
     CASS_LOG_DISABLED
@@ -321,6 +343,7 @@ cdef extern from "cassandra.h":
 
   ctypedef void (*CassFutureCallback)(CassFuture* future, void* data)
   ctypedef void (*CassLogCallback)(const CassLogMessage* message, void* data)
+  ctypedef void (*CassHostListenerCallback)(CassHostListenerEvent event, const CassInet address, void* data)
 
   ctypedef struct CassExecProfile:
     pass
@@ -334,22 +357,66 @@ cdef extern from "cassandra.h":
 
   CassCluster* cass_cluster_new()
   void cass_cluster_free(CassCluster* cluster)
-  CassError cass_cluster_set_contact_points_n(CassCluster* cluster, const char* contact_points, size_t contat_points_length)
+  CassError cass_cluster_set_contact_points(CassCluster * cluster, const char * contact_points)
   CassError cass_cluster_set_port(CassCluster* cluster, int port)
+  CassError cass_cluster_set_local_address(CassCluster * cluster, const char * name)
   CassError cass_cluster_set_protocol_version(CassCluster* cluster, int protocol_version)
+  CassError cass_cluster_set_use_beta_protocol_version(CassCluster* cluster, cass_bool_t enable)
+  CassError cass_cluster_set_consistency(CassCluster* cluster, CassConsistency consistency)
+  CassError cass_cluster_set_serial_consistency(CassCluster * cluster, CassConsistency consistency)
+  CassError cass_cluster_set_num_threads_io(CassCluster * cluster, unsigned num_threads)
+  CassError cass_cluster_set_queue_size_io(CassCluster* cluster, unsigned queue_size)
+  CassError cass_cluster_set_core_connections_per_host(CassCluster * cluster, unsigned num_connections)
+  void cass_cluster_set_constant_reconnect(CassCluster * cluster, cass_uint64_t delay_ms)
+  CassError cass_cluster_set_exponential_reconnect(CassCluster * cluster, cass_uint64_t base_delay_ms, cass_uint64_t max_delay_ms)
+  CassError cass_cluster_set_new_request_ratio(CassCluster * cluster, cass_int32_t ratio)
+  CassError cass_cluster_set_coalesce_delay(CassCluster * cluster, cass_int64_t delay_us)
   void cass_cluster_set_connect_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_request_timeout(CassCluster* cluster, unsigned timeout_ms)
   void cass_cluster_set_resolve_timeout(CassCluster* cluster, unsigned timeout_ms)
+  void cass_cluster_set_max_schema_wait_time(CassCluster * cluster, unsigned wait_time_ms)
+  void cass_cluster_set_tracing_max_wait_time(CassCluster * cluster, unsigned max_wait_time_ms)
+  void cass_cluster_set_tracing_retry_wait_time(CassCluster * cluster, unsigned retry_wait_time_ms)
+  void cass_cluster_set_tracing_consistency(CassCluster * cluster, CassConsistency consistency)
   void cass_cluster_set_credentials(CassCluster* cluster, const char* username, const char* password)
-  CassError cass_cluster_set_consistency(CassCluster* cluster, CassConsistency consistency)
+  void cass_cluster_set_load_balance_round_robin(CassCluster * cluster)
+  CassError cass_cluster_set_load_balance_dc_aware(CassCluster * cluster, const char * local_dc, unsigned used_hosts_per_remote_dc, cass_bool_t allow_remote_dcs_for_local_cl)
+  void cass_cluster_set_token_aware_routing(CassCluster * cluster, cass_bool_t enabled)
   CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi);
-  CassError cass_cluster_set_core_connections_per_host(CassCluster * cluster, unsigned num_connections)
-  CassError cass_cluster_set_num_threads_io(CassCluster * cluster, unsigned num_threads)
-  void cass_cluster_set_application_name(CassCluster * cluster, const char * application_name)
-  void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
-  void cass_cluster_set_ssl(CassCluster* cluster, CassSsl * ssl)
+  void cass_cluster_set_token_aware_routing_shuffle_replicas(CassCluster * cluster, cass_bool_t enabled)
+  void cass_cluster_set_latency_aware_routing(CassCluster * cluster, cass_bool_t enabled)
+  void cass_cluster_set_latency_aware_routing_settings(CassCluster * cluster,
+                                                       cass_double_t exclusion_threshold,
+                                                       cass_uint64_t scale_ms,
+                                                       cass_uint64_t retry_period_ms,
+                                                       cass_uint64_t update_rate_ms,
+                                                       cass_uint64_t min_measured)
+  void cass_cluster_set_whitelist_filtering(CassCluster* cluster, const char* hosts)
+  void cass_cluster_set_blacklist_filtering(CassCluster * cluster, const char * hosts)
+  void cass_cluster_set_whitelist_dc_filtering(CassCluster * cluster, const char * dcs)
+  void cass_cluster_set_blacklist_dc_filtering(CassCluster * cluster, const char * dcs)
+  void cass_cluster_set_tcp_nodelay(CassCluster * cluster, cass_bool_t enabled)
+  void cass_cluster_set_tcp_keepalive(CassCluster * cluster, cass_bool_t enabled, unsigned delay_secs)
+  void cass_cluster_set_timestamp_gen(CassCluster * cluster, CassTimestampGen * timestamp_gen)
+  void cass_cluster_set_retry_policy(CassCluster * cluster, CassRetryPolicy * retry_policy)
+  void cass_cluster_set_use_schema(CassCluster * cluster, cass_bool_t enabled)
   CassError cass_cluster_set_use_hostname_resolution(CassCluster* cluster, cass_bool_t enabled)
+  CassError cass_cluster_set_use_randomized_contact_points(CassCluster * cluster, cass_bool_t enabled)
+  CassError cass_cluster_set_constant_speculative_execution_policy(CassCluster * cluster, cass_int64_t constant_delay_ms, int max_speculative_executions)
+  CassError cass_cluster_set_no_speculative_execution_policy(CassCluster * cluster)
+  CassError cass_cluster_set_max_reusable_write_objects(CassCluster * cluster, unsigned num_objects)
+  CassError cass_cluster_set_prepare_on_all_hosts(CassCluster * cluster, cass_bool_t enabled)
+  CassError cass_cluster_set_no_compact(CassCluster * cluster, cass_bool_t enabled)
+  CassError cass_cluster_set_host_listener_callback(CassCluster * cluster, CassHostListenerCallback callback, void * data)
+  void cass_cluster_set_application_version(CassCluster * cluster, const char * application_version)
+  void cass_cluster_set_application_name(CassCluster * cluster, const char * application_name)
+  void cass_cluster_set_client_id(CassCluster * cluster, CassUuid client_id)
+  void cass_cluster_set_monitor_reporting_interval(CassCluster * cluster, unsigned interval_secs)
+  void cass_cluster_set_connection_heartbeat_interval(CassCluster * cluster, unsigned interval_secs)
+  void cass_cluster_set_connection_idle_timeout(CassCluster * cluster, unsigned timeout_secs)
+  void cass_cluster_set_ssl(CassCluster* cluster, CassSsl * ssl)
   CassError cass_cluster_set_execution_profile(CassCluster * cluster, const char * name, CassExecProfile * profile)
+  CassError cass_cluster_set_cloud_secure_connection_bundle(CassCluster * cluster, const char * path)
 
   CassSsl* cass_ssl_new()
   void cass_ssl_free(CassSsl * ssl)
@@ -357,6 +424,10 @@ cdef extern from "cassandra.h":
   void cass_ssl_set_verify_flags(CassSsl * ssl, int flags)
   CassError cass_ssl_set_cert(CassSsl * ssl, const char * cert)
   CassError cass_ssl_set_private_key(CassSsl * ssl, const char * key, const char * password)
+
+  CassTimestampGen* cass_timestamp_gen_server_side_new()
+  CassTimestampGen* cass_timestamp_gen_monotonic_new()
+  void cass_timestamp_gen_free(CassTimestampGen* timestamp_gen)
 
   CassSession* cass_session_new()
   void cass_session_free(CassSession* session)
@@ -377,7 +448,20 @@ cdef extern from "cassandra.h":
 
   CassStatement* cass_statement_new(const char* query, size_t parameter_count)
   CassStatement* cass_statement_new_n(const char* query, size_t query_length, size_t parameter_count)
+  void cass_statement_free(CassStatement * statement)
+  CassError cass_statement_add_key_index(CassStatement * statement, size_t index)
+  CassError cass_statement_reset_parameters(CassStatement * statement, size_t count)
+  CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
+  CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
+  CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
+  CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
+  CassError cass_statement_set_timestamp(CassStatement * statement, cass_int64_t timestamp)
   CassError cass_statement_set_request_timeout(CassStatement* statement, cass_uint64_t timeout_ms)
+  CassError cass_statement_set_is_idempotent(CassStatement * statement, cass_bool_t is_idempotent)
+  CassError cass_statement_set_retry_policy(CassStatement * statement, CassRetryPolicy * retry_policy)
+  CassError cass_statement_set_tracing(CassStatement * statement, cass_bool_t enabled)
+  CassError cass_statement_set_host(CassStatement * statement, const char * host, int port)
+  CassError cass_statement_set_execution_profile(CassStatement * statement, const char * name)
   CassError cass_statement_bind_null(CassStatement* statement, size_t index)
   CassError cass_statement_bind_int8(CassStatement* statement, size_t index,  cass_int8_t value)
   CassError cass_statement_bind_int16(CassStatement* statement, size_t index,  cass_int16_t value)
@@ -423,12 +507,7 @@ cdef extern from "cassandra.h":
   CassError cass_statement_bind_collection_by_name(CassStatement* statement, const char * name, const CassCollection * collection)
   CassError cass_statement_bind_tuple_by_name(CassStatement * statement, const char * name, const CassTuple * tuple)
   CassError cass_statement_bind_user_type_by_name(CassStatement * statement, const char * name, const CassUserType * user_type)
-  CassError cass_statement_set_paging_size(CassStatement* statement, int page_size)
-  CassError cass_statement_set_paging_state_token(CassStatement* statement, const char* paging_state, size_t paging_state_size)
-  CassError cass_statement_set_consistency(CassStatement* statement, CassConsistency consistency)
-  CassError cass_statement_set_serial_consistency(CassStatement * statement, CassConsistency serial_consistency)
-  CassError cass_statement_set_execution_profile(CassStatement * statement, const char * name)
-  void cass_statement_free(CassStatement* statement)
+
 
   void cass_future_free(CassFuture* future)
   CassError cass_future_error_code(CassFuture* future)
@@ -436,11 +515,12 @@ cdef extern from "cassandra.h":
   CassErrorResult* cass_future_get_error_result(CassFuture* future)
   CassResult* cass_future_get_result(CassFuture* future)
   const CassPrepared* cass_future_get_prepared(CassFuture* future)
+  CassError cass_future_tracing_id(CassFuture * future, CassUuid * tracing_id)
+  void cass_future_error_message(CassFuture * future, const char** message, size_t * message_length)
 
   CassError cass_error_result_code(CassErrorResult* error_result)
   void cass_error_result_free(CassErrorResult* error_result)
   const char * cass_error_desc(CassError error)
-  void cass_future_error_message(CassFuture * future, const char** message, size_t * message_length)
   size_t cass_result_row_count(CassResult* result)
   size_t cass_result_column_count(CassResult* result)
   CassRow* cass_result_first_row(CassResult* result)
@@ -492,11 +572,16 @@ cdef extern from "cassandra.h":
   CassStatement* cass_prepared_bind(const CassPrepared* prepared)
   void cass_prepared_free(const CassPrepared* prepared)
 
-
   CassBatch* cass_batch_new(CassBatchType type)
-  CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
-  CassError cass_batch_set_request_timeout(CassBatch* batch, cass_uint64_t timeout_ms)
+  CassError cass_batch_set_consistency(CassBatch * batch, CassConsistency consistency)
+  CassError cass_batch_set_serial_consistency(CassBatch * batch, CassConsistency serial_consistency)
+  CassError cass_batch_set_timestamp(CassBatch * batch, cass_int64_t timestamp)
+  CassError cass_batch_set_request_timeout(CassBatch * batch, cass_uint64_t timeout_ms)
+  CassError cass_batch_set_is_idempotent(CassBatch * batch, cass_bool_t is_idempotent)
+  CassError cass_batch_set_retry_policy(CassBatch * batch, CassRetryPolicy * retry_policy)
+  CassError cass_batch_set_tracing(CassBatch * batch, cass_bool_t enabled)
   CassError cass_batch_set_execution_profile(CassBatch* batch, const char * name)
+  CassError cass_batch_add_statement(CassBatch* batch, CassStatement* statement)
   void cass_batch_free(CassBatch* cass_batch)
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)
@@ -688,12 +773,6 @@ cdef extern from "cassandra.h":
   CassError cass_user_type_set_tuple_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassTuple* value); 
   CassError cass_user_type_set_user_type(CassUserType* user_type, size_t index,  const CassUserType* value); 
   CassError cass_user_type_set_user_type_by_name(CassUserType* user_type, const char* name, const CassUserType* value)
-
-  void cass_cluster_set_whitelist_filtering(CassCluster* cluster, const char* hosts)
-  void cass_cluster_set_blacklist_filtering(CassCluster * cluster, const char * hosts)
-  void cass_cluster_set_whitelist_dc_filtering(CassCluster * cluster, const char * dcs)
-  void cass_cluster_set_blacklist_dc_filtering(CassCluster * cluster, const char * dcs)
-
   CassRetryPolicy* cass_retry_policy_default_new()
   CassRetryPolicy* cass_retry_policy_fallthrough_new()
   CassRetryPolicy* cass_retry_policy_logging_new(CassRetryPolicy * child_retry_policy)
@@ -722,3 +801,9 @@ cdef extern from "cassandra.h":
   CassError cass_execution_profile_set_blacklist_dc_filtering(CassExecProfile * profile, const char * dcs)
   CassError cass_execution_profile_set_retry_policy(CassExecProfile * profile, CassRetryPolicy * retry_policy)
   CassError cass_execution_profile_set_constant_speculative_execution_policy(CassExecProfile * profile, cass_int64_t constant_delay_ms, int max_speculative_executions)
+
+cdef extern from "dse.h":
+  CassError cass_cluster_set_dse_gssapi_authenticator(CassCluster * cluster, const char * service, const char * principal)
+  CassError cass_cluster_set_dse_gssapi_authenticator_proxy(CassCluster* cluster, const char* service, const char* principal, const char* authorization_id)
+  CassError cass_cluster_set_dse_plaintext_authenticator(CassCluster * cluster, const char * username, const char * password)
+  CassError cass_cluster_set_dse_plaintext_authenticator_proxy(CassCluster* cluster, const char* username, const char* password, const char* authorization_id)

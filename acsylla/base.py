@@ -46,6 +46,67 @@ SupportedType = Union[
 ]
 
 
+@dataclass
+class LatencyAwareRoutingSettings:
+    """Configures the execution profile’s settings for latency-aware request
+    routing.
+       Note: Execution profiles use the cluster-level load balancing policy
+        unless enabled. This setting is not applicable unless a load balancing
+        policy is enabled on the execution profile.
+    `exclusion_threshold` Controls how much worse the latency must be compared
+        to the average latency of the best performing node before it penalized.
+    `scale_ms` Controls the weight given to older latencies when calculating
+        the average latency of a node. A bigger scale will give more weight to
+        older latency measurements.
+    `retry_period_ms` The amount of time a node is penalized by the policy
+        before being given a second chance when the current average latency exceeds
+        the calculated threshold (exclusion_threshold * best_average_latency).
+    `update_rate_ms` The rate at which the best average latency is recomputed.
+    `min_measured` The minimum number of measurements per-host required to be
+        considered by the policy.
+    """
+
+    exclusion_threshold: float = 2.0
+    scale_ms: int = 100
+    retry_period_ms: int = 10_000
+    update_rate_ms: int = 100
+    min_measured: int = 50
+
+
+@dataclass
+class SpeculativeExecutionPolicy:
+    """Settings for constant speculative execution policy"""
+
+    constant_delay_ms: int
+    max_speculative_executions: int
+
+
+@dataclass
+class DseGssapiAuthenticator:
+    service: str
+    principal: str
+
+
+@dataclass
+class DseGssapiAuthenticatorProxy:
+    service: str
+    principal: str
+    authorization_id: str
+
+
+@dataclass
+class DsePlaintextAuthenticator:
+    username: str
+    password: str
+
+
+@dataclass
+class DsePlaintextAuthenticatorProxy:
+    username: str
+    password: str
+    authorization_id: str
+
+
 class Cluster(metaclass=ABCMeta):
     """Provides a Cluster instance class. Use the factory `create_cluster`
     for creating a new instance"""
@@ -78,7 +139,7 @@ class Cluster(metaclass=ABCMeta):
         blacklist_dc: str = None,
         retry_policy: str = None,
         retry_policy_logging: bool = False,
-        speculative_execution_policy: "SpeculativeExecutionSettings" = None,
+        speculative_execution_policy: "SpeculativeExecutionPolicy" = None,
     ):
         """Execution profiles provide a mechanism to group together a set of
         configuration options and reuse them across different query executions.
@@ -186,7 +247,7 @@ class Cluster(metaclass=ABCMeta):
         `retry_policy_logging` If `retry_policy` is set then add logging using
             log level INFO for selected policy.
         `constant_speculative_execution_policy` Enable constant speculative
-            executions with the supplied settings `SpeculativeExecutionSettings`
+            executions with the supplied settings `SpeculativeExecutionPolicy`
             for the execution profile.
            Note: Profile-based speculative execution policy is disabled by
             default; cluster speculative execution policy is used when profile
@@ -194,129 +255,24 @@ class Cluster(metaclass=ABCMeta):
         """
 
 
-@dataclass
-class LatencyAwareRoutingSettings:
-    """Configures the execution profile’s settings for latency-aware request
-    routing.
-       Note: Execution profiles use the cluster-level load balancing policy
-        unless enabled. This setting is not applicable unless a load balancing
-        policy is enabled on the execution profile.
-    `exclusion_threshold` Controls how much worse the latency must be compared
-        to the average latency of the best performing node before it penalized.
-    `scale_ms` Controls the weight given to older latencies when calculating
-        the average latency of a node. A bigger scale will give more weight to
-        older latency measurements.
-    `retry_period_ms` The amount of time a node is penalized by the policy
-        before being given a second chance when the current average latency exceeds
-        the calculated threshold (exclusion_threshold * best_average_latency).
-    `update_rate_ms` The rate at which the best average latency is recomputed.
-    `min_measured` The minimum number of measurements per-host required to be
-        considered by the policy.
-    """
-
-    exclusion_threshold: float = 2.0
-    scale_ms: int = 100
-    retry_period_ms: int = 10_000
-    update_rate_ms: int = 100
-    min_measured: int = 50
-
-
-@dataclass
-class SpeculativeExecutionSettings:
-    """Settings for constant speculative execution policy"""
-
-    constant_delay_ms: int
-    max_speculative_executions: int
-
-
-class Meta(metaclass=ABCMeta):
-    """Provides a Meta instance class for retrieving metadata from cluster."""
-
-    @abstractmethod
-    def version(self) -> tuple:
-        """Gets the version of the connected cluster."""
-
-    @abstractmethod
-    def snapshot_version(self) -> int:
-        """Gets the version of the schema metadata snapshot."""
-
-    @abstractmethod
-    def keyspaces_names(self) -> List[str]:
-        """Returns a list of all keyspaces names from cluster."""
-
-    @abstractmethod
-    def keyspace(self, name) -> "KeyspaceMeta":
-        """Returns metadata for given keyspace."""
-
-    @abstractmethod
-    def user_types_names(self, keyspace) -> List[str]:
-        """Returns a list of user defined types (UDT) names for given keyspace name."""
-
-    @abstractmethod
-    def user_types(self, keyspace) -> List["UserTypeMeta"]:
-        """Returns a list of user defined types (UDT) metadata for given keyspace name."""
-
-    @abstractmethod
-    def user_type(self, keyspace, name) -> "UserTypeMeta":
-        """Returns metadata for user defined types (UDT) for given keyspace name and type name."""
-
-    @abstractmethod
-    def functions_names(self, keyspace) -> List[str]:
-        """Returns a list of functions names for the given keyspace name."""
-
-    @abstractmethod
-    def functions(self, keyspace) -> List["FunctionMeta"]:
-        """Returns a list of functions metadata for given keyspace name."""
-
-    @abstractmethod
-    def function(self, keyspace, name) -> "FunctionMeta":
-        """Returns metadata for function for given keyspace name and function name."""
-
-    @abstractmethod
-    def tables_names(self, keyspace) -> List[str]:
-        """Returns a list of tables names for the given keyspace name."""
-
-    @abstractmethod
-    def tables(self, keyspace) -> List["TableMeta"]:
-        """Returns a list of tables metadata for given keyspace name."""
-
-    @abstractmethod
-    def table(self, keyspace, name) -> "TableMeta":
-        """Returns metadata for table for given keyspace name and table name."""
-
-    @abstractmethod
-    def indexes_names(self, keyspace) -> List[str]:
-        """Returns a list of indexes names for the given keyspace name."""
-
-    @abstractmethod
-    def indexes(self, keyspace) -> List["IndexMeta"]:
-        """Returns a list of indexes metadata for given keyspace name."""
-
-    @abstractmethod
-    def index(self, keyspace, name) -> "IndexMeta":
-        """Returns metadata for index for given keyspace name and index name."""
-
-    @abstractmethod
-    def materialized_views_names(self, keyspace) -> List[str]:
-        """Returns a list of materialized views names for the given keyspace name."""
-
-    @abstractmethod
-    def materialized_views(self, keyspace) -> List["MaterializedViewMeta"]:
-        """Returns a list of materialized views metadata for given keyspace name."""
-
-    @abstractmethod
-    def materialized_view(self, keyspace, name) -> "MaterializedViewMeta":
-        """Returns metadata for materialized view for given keyspace name and materialized view name."""
-
-
 class Session(metaclass=ABCMeta):
     """Provides a Session instance class. Use the the
     `Cluster.create_session` coroutine for creating a new instance"""
 
-    meta: Meta
+    @abstractmethod
+    async def set_keyspace(self, keyspace: str) -> "Result":
+        """Sets the keyspace for session"""
 
     @abstractmethod
-    async def close(self):
+    def get_client_id(self) -> str:
+        """Get the client id."""
+
+    @abstractmethod
+    def get_metadata(self) -> "Metadata":
+        """Gets a snapshot of this session’s schema metadata."""
+
+    @abstractmethod
+    async def close(self) -> None:
         """Closes a session.
 
         After calling this method no more executions will be allowed
@@ -336,12 +292,108 @@ class Session(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    async def execute_batch(self, batch: "Batch") -> None:
+    async def execute_batch(self, batch: "Batch") -> "Result":
         """Executes a batch of statements."""
 
     @abstractmethod
-    async def metrics(self) -> "SessionMetrics":
+    def metrics(self) -> "SessionMetrics":
         """Returns the metrics related to the session."""
+
+    @abstractmethod
+    def speculative_execution_metrics(self) -> "SpeculativeExecutionMetrics":
+        """Returns speculative execution performance metrics gathered by the driver."""
+
+
+class Metadata(metaclass=ABCMeta):
+    """Provides a Metadata instance class for retrieving metadata from cluster."""
+
+    @abstractmethod
+    def get_version(self) -> tuple:
+        """Gets the version of the connected cluster."""
+
+    @abstractmethod
+    def get_snapshot_version(self) -> int:
+        """Gets the version of the schema metadata snapshot."""
+
+    @abstractmethod
+    def get_keyspaces(self) -> List[str]:
+        """Returns a list of all keyspaces names from cluster."""
+
+    @abstractmethod
+    def get_keyspace_meta(self, name) -> "KeyspaceMeta":
+        """Returns metadata for given keyspace."""
+
+    @abstractmethod
+    def get_user_types(self, keyspace) -> List[str]:
+        """Returns a list of user defined types (UDT) names for given keyspace name."""
+
+    @abstractmethod
+    def get_user_type_meta(self, keyspace, name) -> "UserTypeMeta":
+        """Returns metadata for user defined types (UDT) for given keyspace name and type name."""
+
+    @abstractmethod
+    def get_user_types_meta(self, keyspace) -> List["UserTypeMeta"]:
+        """Returns a list of user defined types (UDT) metadata for given keyspace name."""
+
+    @abstractmethod
+    def get_functions(self, keyspace) -> List[str]:
+        """Returns a list of functions names for the given keyspace name."""
+
+    @abstractmethod
+    def get_function_meta(self, keyspace, name) -> "FunctionMeta":
+        """Returns metadata for function for given keyspace name and function name."""
+
+    @abstractmethod
+    def get_functions_meta(self, keyspace) -> List["FunctionMeta"]:
+        """Returns a list of functions metadata for given keyspace name."""
+
+    @abstractmethod
+    def get_aggregates(self, keyspace) -> List[str]:
+        """Returns a list of aggregates names for the given keyspace name."""
+
+    @abstractmethod
+    def get_aggregate_meta(self, keyspace, name) -> "AggregateMeta":
+        """Returns metadata for aggregate for given keyspace name and aggregate name."""
+
+    @abstractmethod
+    def get_aggregates_meta(self, keyspace) -> List["AggregateMeta"]:
+        """Returns a list of aggregates metadata for given keyspace name."""
+
+    @abstractmethod
+    def get_tables(self, keyspace) -> List[str]:
+        """Returns a list of tables names for the given keyspace name."""
+
+    @abstractmethod
+    def get_table_meta(self, keyspace, name) -> "TableMeta":
+        """Returns metadata for table for given keyspace name and table name."""
+
+    @abstractmethod
+    def get_tables_meta(self, keyspace) -> List["TableMeta"]:
+        """Returns a list of tables metadata for given keyspace name."""
+
+    @abstractmethod
+    def get_indexes(self, keyspace) -> List[str]:
+        """Returns a list of indexes names for the given keyspace name."""
+
+    @abstractmethod
+    def get_index_meta(self, keyspace, name) -> "IndexMeta":
+        """Returns metadata for index for given keyspace name and index name."""
+
+    @abstractmethod
+    def get_indexes_meta(self, keyspace) -> List["IndexMeta"]:
+        """Returns a list of indexes metadata for given keyspace name."""
+
+    @abstractmethod
+    def get_materialized_views(self, keyspace) -> List[str]:
+        """Returns a list of materialized views names for the given keyspace name."""
+
+    @abstractmethod
+    def get_materialized_view_meta(self, keyspace, name) -> "MaterializedViewMeta":
+        """Returns metadata for materialized view for given keyspace name and materialized view name."""
+
+    @abstractmethod
+    def get_materialized_views_meta(self, keyspace) -> List["MaterializedViewMeta"]:
+        """Returns a list of materialized views metadata for given keyspace name."""
 
 
 class Statement(metaclass=ABCMeta):
@@ -349,10 +401,24 @@ class Statement(metaclass=ABCMeta):
     `create_statement` factory for creating a new instance"""
 
     @abstractmethod
+    def add_key_index(self, index: int):
+        """Adds a key index specifier to this a statement. When using
+        token-aware routing, this can be used to tell the driver which
+        parameters within a non-prepared, parameterized statement are part of
+        the partition key.
+
+        Use consecutive calls for composite partition keys.
+
+        This is not necessary for prepared statements, as the key parameters
+        are determined in the metadata processed in the prepare phase."""
+
+    @abstractmethod
+    def reset_parameters(self, count: int):
+        """Clear and/or resize the statement’s parameters."""
+
+    @abstractmethod
     def bind(self, index: int, value: SupportedType) -> None:
         """Binds the value to a specific index parameter.
-
-        Types support for now: None, bool, int, float, str, bytes, and UUID.
 
         If an invalid type is used for a prepared statement this will raise
         immediately an error. If a none prepared exception is used error will
@@ -379,9 +445,6 @@ class Statement(metaclass=ABCMeta):
         a look at the `Statement.bind` function.
         """
 
-    # following methods are only allowed for statements
-    # created using prepared statements
-
     @abstractmethod
     def bind_dict(self, values: Mapping[str, SupportedType]) -> None:
         """Binds the values into all parameter names. Names are the keys
@@ -389,6 +452,9 @@ class Statement(metaclass=ABCMeta):
 
         For types supported and errors that this function might raise take
         a look at the `Statement.bind_dict` function.
+
+        Note: This method are only allowed for statements created using
+        prepared statements
         """
 
     @abstractmethod
@@ -421,6 +487,58 @@ class Statement(metaclass=ABCMeta):
         Default: Not set"""
 
     @abstractmethod
+    def set_timestamp(self, timestamp: int):
+        """Sets the statement’s timestamp."""
+
+    @abstractmethod
+    def set_is_idempotent(self, is_idempotent: bool):
+        """Sets whether the statement is idempotent. Idempotent statements are
+        able to be automatically retried after timeouts/errors and can be
+        speculatively executed."""
+
+    @abstractmethod
+    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+        """Sets the statement’s retry policy.
+
+        `retry_policy` "default" or "fallthrough" Sets the retry policy used for
+            all requests in batch.
+            "default"  This policy retries queries in the following cases:
+                - On a read timeout, if enough replicas replied but data was not
+                    received.
+                - On a write timeout, if a timeout occurs while writing the
+                    distributed batch log
+                - On unavailable, it will move to the next host
+                - In all other cases the error will be returned.
+                This policy always uses the query’s original consistency level.
+            "fallthrough" This policy never retries or ignores a server-side
+                failure. The error is always returned.
+            Default: "default" This policy will retry on a read timeout if there
+            was enough replicas, but no data present, on a write timeout if a
+            logged batch request failed to write the batch log, and on a
+            unavailable error it retries using a new host. In all other cases the
+            default policy will return an error.
+
+        `retry_policy_logging` This policy logs the retry decision of its child
+            policy. Logging is done using INFO level.
+            Default: False
+        """
+
+    @abstractmethod
+    def set_tracing(self, enabled: bool = None):
+        """Sets whether the statement should use tracing."""
+
+    @abstractmethod
+    def set_host(self, host: str, port: int = 9042):
+        """Sets a specific host that should run the query.
+
+        In general, this should not be used, but it can be useful in the
+        following situations:
+            To query node-local tables such as system and virtual tables.
+            To apply a sequence of schema changes where it makes sense for all
+            the changes to be applied on a single node.
+        """
+
+    @abstractmethod
     def set_execution_profile(self, name: str) -> None:
         """Sets the execution profile to execute the statement with.
         Note: Empty string will clear execution profile from statement
@@ -449,8 +567,63 @@ class PreparedStatement(metaclass=ABCMeta):
 
 class Batch(metaclass=ABCMeta):
     """Provides a Batch instance class. Use the
-    `create_batch_logged()` and `create_batch_unlogged` factories
-    for creating a new instance."""
+    `create_batch_logged()`, `create_batch_unlogged()` and create_batch_counter()
+    factories for creating a new instance."""
+
+    @abstractmethod
+    def set_consistency(self, consistency: int):
+        """Sets the batch’s consistency level"""
+
+    @abstractmethod
+    def set_serial_consistency(self, consistency: int):
+        """Sets the batch’s serial consistency level."""
+
+    @abstractmethod
+    def set_timestamp(self, timestamp: int):
+        """Sets the batch’s timestamp."""
+
+    @abstractmethod
+    def set_request_timeout(self, timeout_ms: int):
+        """Sets the batch’s timeout for waiting for a response from a node.
+        Default: Disabled (use the cluster-level request timeout)
+        """
+
+    @abstractmethod
+    def set_is_idempotent(self, is_idempotent):
+        """Sets whether the statements in a batch are idempotent. Idempotent
+        batches are able to be automatically retried after timeouts/errors and
+        can be speculatively executed."""
+
+    @abstractmethod
+    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+        """Sets the batch’s retry policy.
+
+        `retry_policy` "default" or "fallthrough" Sets the retry policy used for
+            all requests in batch.
+            "default"  This policy retries queries in the following cases:
+                - On a read timeout, if enough replicas replied but data was not
+                    received.
+                - On a write timeout, if a timeout occurs while writing the
+                    distributed batch log
+                - On unavailable, it will move to the next host
+                - In all other cases the error will be returned.
+                This policy always uses the query’s original consistency level.
+            "fallthrough" This policy never retries or ignores a server-side
+                failure. The error is always returned.
+            Default: "default" This policy will retry on a read timeout if there
+            was enough replicas, but no data present, on a write timeout if a
+            logged batch request failed to write the batch log, and on a
+            unavailable error it retries using a new host. In all other cases the
+            default policy will return an error.
+
+        `retry_policy_logging` This policy logs the retry decision of its child
+            policy. Logging is done using INFO level.
+            Default: False
+        """
+
+    @abstractmethod
+    def set_tracing(self, enabled: bool):
+        """Sets whether the batch should use tracing."""
 
     @abstractmethod
     def add_statement(self, statement: Statement) -> None:
@@ -475,6 +648,10 @@ class Result(metaclass=ABCMeta):
     @abstractmethod
     def column_count(self) -> int:
         """Returns the total columns returned"""
+
+    @abstractmethod
+    def columns_names(self):
+        """Returns the columns names"""
 
     @abstractmethod
     def first(self) -> Optional["Row"]:
@@ -538,8 +715,6 @@ class Row(metaclass=ABCMeta):
         Type is inferred by using the Cassandra driver
         and converted, if supported, to a Python type or one
         of the extended types provided by Acsylla.
-
-        Types support for now: None, bool, int, float, str, bytes, and UUID.
         """
 
     @abstractmethod
@@ -579,6 +754,47 @@ class SessionMetrics:
     errors_request_timeouts: int
 
 
+@dataclass
+class SpeculativeExecutionMetrics:
+    """Provides speculative execution metrics.
+    `min` Minimum in microseconds
+    `max` Maximum in microseconds
+    `mean` Mean in microseconds
+    `stddev` Standard deviation in microseconds
+    `median` Median in microseconds
+    `percentile_75th` 75th percentile in microseconds
+    `percentile_95th` 95th percentile in microseconds
+    `percentile_98th` 98th percentile in microseconds
+    `percentile_99th` 99the percentile in microseconds
+    `percentile_999th` 99.9th percentile in microseconds
+    `count` The number of aborted speculative retries
+    `percentage` Fraction of requests that are aborted speculative retries
+    """
+
+    min: int  # Minimum in microseconds
+    max: int  # Maximum in microseconds
+    mean: int  # Mean in microseconds
+    stddev: int  # Standard deviation in microseconds
+    median: int  # Median in microseconds
+    percentile_75th: int  # 75th percentile in microseconds
+    percentile_95th: int  # 95th percentile in microseconds
+    percentile_98th: int  # 98th percentile in microseconds
+    percentile_99th: int  # 99the percentile in microseconds
+    percentile_999th: int  # 99.9th percentile in microseconds
+    count: int  # The number of aborted speculative retries
+    percentage: float  # Fraction of requests that are aborted speculative retries
+
+
+class ProtocolVersion(Enum):
+    V1 = cyacsylla.ProtocolVersion.V1
+    V2 = cyacsylla.ProtocolVersion.V2
+    V3 = cyacsylla.ProtocolVersion.V3
+    V4 = cyacsylla.ProtocolVersion.V4
+    V5 = cyacsylla.ProtocolVersion.V5
+    DSEV1 = cyacsylla.ProtocolVersion.DSEV1
+    DSEV2 = cyacsylla.ProtocolVersion.DSEV2
+
+
 class Consistency(Enum):
     ANY = cyacsylla.Consistency.ANY
     ONE = cyacsylla.Consistency.ONE
@@ -594,8 +810,7 @@ class Consistency(Enum):
 
 
 class SSLVerifyFlags(Enum):
-    """
-    Sets verification performed on the peer’s certificate.
+    """Sets verification performed on the peer’s certificate.
 
     NONE - No verification is performed
     PEER_CERT - Certificate is present and valid

@@ -492,7 +492,13 @@ cdef object _aggregates_meta(const CassKeyspaceMeta* keyspace_meta):
     return aggregates
 
 
-cdef class Meta:
+cdef class Metadata:
+
+    @staticmethod
+    cdef Metadata new_(CassSession* cass_session):
+        metadata = Metadata()
+        metadata.cass_session = cass_session
+        return metadata
 
     def __dealloc__(self):
         if self.cass_schema_meta:
@@ -518,14 +524,14 @@ cdef class Meta:
             raise TableNotFound(f'Table "{table}" not found')
         return table_meta
 
-    def version(self):
+    def get_version(self):
         cdef CassVersion v = cass_schema_meta_version(self._get_schema_meta())
         return v.major_version, v.minor_version, v.patch_version
 
-    def snapshot_version(self):
+    def get_snapshot_version(self):
         return cass_schema_meta_snapshot_version(self._get_schema_meta())
 
-    def keyspaces_names(self):
+    def get_keyspaces(self):
         cdef CassIterator* cass_iterator
         cdef size_t length = 0
         cdef char* keyspace_name = NULL
@@ -541,76 +547,76 @@ cdef class Meta:
 
         return keyspaces
 
-    def keyspace(self, keyspace):
+    def get_keyspace_meta(self, keyspace):
         return _keyspace_meta(self._get_keyspace_meta(keyspace))
 
-    def user_types_names(self, keyspace):
+    def get_user_types(self, keyspace):
         return [k.name for k in _user_types_meta(self._get_keyspace_meta(keyspace))]
 
-    def user_types(self, keyspace):
+    def get_user_types_meta(self, keyspace):
         return _user_types_meta(self._get_keyspace_meta(keyspace))
 
-    def user_type(self, keyspace, name):
+    def get_user_type_meta(self, keyspace, name):
         try:
             return [k for k in _user_types_meta(self._get_keyspace_meta(keyspace)) if k.name==name][0]
         except IndexError:
             raise UserTypeNotFound(f'User type "{name}" not found')
 
-    def functions_names(self, keyspace):
+    def get_functions(self, keyspace):
         return [k.name for k in _functions_meta(self._get_keyspace_meta(keyspace))]
 
-    def functions(self, keyspace):
+    def get_functions_meta(self, keyspace):
         return _functions_meta(self._get_keyspace_meta(keyspace))
 
-    def function(self, keyspace, name):
+    def get_function_meta(self, keyspace, name):
         try:
             return [k for k in _functions_meta(self._get_keyspace_meta(keyspace)) if k.name==name][0]
         except IndexError:
             raise FunctionNotFound(f'Function "{name}" not found')
 
-    def aggregates_names(self, keyspace):
+    def get_aggregates(self, keyspace):
         return [k.name for k in _aggregates_meta(self._get_keyspace_meta(keyspace))]
 
-    def aggregates(self, keyspace):
+    def get_aggregates_meta(self, keyspace):
         return _aggregates_meta(self._get_keyspace_meta(keyspace))
 
-    def aggregate(self, keyspace, name):
+    def get_aggregate_meta(self, keyspace, name):
         try:
             return [k for k in _aggregates_meta(self._get_keyspace_meta(keyspace)) if k.name==name][0]
         except IndexError:
             raise AggregateNotFound(f'Aggregate "{name}" not found')
 
-    def tables_names(self, keyspace):
+    def get_tables(self, keyspace):
         return [k.name for k in _tables_meta(self._get_keyspace_meta(keyspace))]
 
-    def tables(self, keyspace):
+    def get_tables_meta(self, keyspace):
         return _tables_meta(self._get_keyspace_meta(keyspace))
 
-    def table(self, keyspace, name):
+    def get_table_meta(self, keyspace, name):
         try:
             return [k for k in _tables_meta(self._get_keyspace_meta(keyspace)) if k.name==name][0]
         except IndexError:
             raise TableNotFound(f'Table "{name}" not found')
 
-    def indexes(self, keyspace):
+    def get_indexes(self, keyspace):
+        return [k.name for k in self.get_indexes_meta(keyspace)]
+
+    def get_indexes_meta(self, keyspace):
         return [k for k in sum([k.indexes for k in _tables_meta(self._get_keyspace_meta(keyspace))], [])]
 
-    def indexes_names(self, keyspace):
-        return [k.name for k in self.indexes(keyspace)]
-
-    def index(self, keyspace, name):
+    def get_index_meta(self, keyspace, name):
         try:
-            return [k for k in self.indexes(keyspace) if k.name==name][0]
+            return [k for k in self.get_indexes_meta(keyspace) if k.name==name][0]
         except IndexError:
             raise IndexNotFound(f'Index "{name}" not found')
 
-    def materialized_views_names(self, keyspace):
+    def get_materialized_views(self, keyspace):
         return [k.name for k in _materialized_views_meta(self._get_keyspace_meta(keyspace))]
 
-    def materialized_views(self, keyspace):
+    def get_materialized_views_meta(self, keyspace):
         return _materialized_views_meta(self._get_keyspace_meta(keyspace))
 
-    def materialized_view(self, keyspace, name):
+    def get_materialized_view_meta(self, keyspace, name):
         try:
             return [k for k in _materialized_views_meta(self._get_keyspace_meta(keyspace)) if k.name==name][0]
         except IndexError:

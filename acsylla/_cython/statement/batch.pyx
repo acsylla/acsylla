@@ -23,16 +23,71 @@ cdef class Batch:
             batch.set_execution_profile(execution_profile)
         return batch
 
+    def set_consistency(self, object consistency):
+        if consistency is not None:
+            error = cass_batch_set_consistency(self.cass_batch, consistency.value)
+            raise_if_error(error)
+
+    def set_serial_consistency(self, object consistency):
+        if consistency is not None:
+            error =  cass_batch_set_serial_consistency(self.cass_batch, consistency.value)
+            raise_if_error(error)
+
+    def set_timestamp(self, timestamp: int):
+        if timestamp is not None:
+            error =  cass_batch_set_timestamp(self.cass_batch, timestamp)
+            raise_if_error(error)
+
+    def set_request_timeout(self, timeout_ms: int):
+        cdef CassError error
+        if timeout_ms is not None:
+            error = cass_batch_set_request_timeout(self.cass_batch, timeout_ms)
+            raise_if_error(error)
+
+    def set_is_idempotent(self, is_idempotent):
+        cdef CassError error
+        if is_idempotent is not None:
+            error = cass_batch_set_is_idempotent(self.cass_batch, is_idempotent)
+            raise_if_error(error)
+
+    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+        cdef CassError error
+        cdef CassRetryPolicy* cass_policy
+        cdef CassRetryPolicy* cass_log_policy
+        if retry_policy is not None:
+            if retry_policy == 'default':
+                cass_policy = cass_retry_policy_default_new()
+            elif retry_policy == 'fallthrough':
+                cass_policy = cass_retry_policy_fallthrough_new()
+            else:
+                raise ValueError("Retry policy must be 'default' or 'fallthrough'")
+            if retry_policy_logging is True:
+                cass_log_policy = cass_retry_policy_logging_new(cass_policy)
+                error = cass_batch_set_retry_policy(self.cass_batch, cass_log_policy)
+                raise_if_error(error)
+                cass_retry_policy_free(cass_log_policy)
+            else:
+                error = cass_batch_set_retry_policy(self.cass_batch, cass_policy)
+                raise_if_error(error)
+            cass_retry_policy_free(cass_policy)
+
+    def set_tracing(self, enabled: bool):
+        cdef CassError error
+        if enabled is not None:
+            error = cass_batch_set_tracing(self.cass_batch, enabled)
+            raise_if_error(error)
+            self.tracing_enabled = enabled
+
     def add_statement(self, Statement statement):
         cdef CassError error
         error = cass_batch_add_statement(self.cass_batch, statement.cass_statement)
         raise_if_error(error)
 
     def set_execution_profile(self, name: str) -> None:
-        if name is None:
-            return
-        cdef CassError error = cass_batch_set_execution_profile(self.cass_batch, name.encode())
-        raise_if_error(error)
+        cdef CassError error
+        if name is not None:
+            error = cass_batch_set_execution_profile(self.cass_batch, name.encode())
+            raise_if_error(error)
 
 
 def create_batch_logged(timeout=None, execution_profile=None):

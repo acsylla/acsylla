@@ -65,15 +65,16 @@ def get_version():
             raise RuntimeError("Unable to determine version.")
 
 
-with open(os.path.join(os.path.dirname(__file__), "README.rst")) as f:
+with open(os.path.join(os.path.dirname(__file__), "README.md")) as f:
     readme = f.read()
 
 setup(
     version=get_version(),
     name="acsylla",
-    description="A high performance asynchronous Cassandra and Scylla client",
+    description="A high performance asynchronous Cassandra and ScyllaDB client",
     long_description=readme,
-    url="http://github.com/pfreixes/acsylla",
+    long_description_content_type="text/markdown",
+    url="http://github.com/acsylla/acsylla",
     author="Pau Freixes",
     author_email="pfreixes@gmail.com",
     platforms=["*nix"],
@@ -82,7 +83,7 @@ setup(
     ext_modules=[extension],
     extras_require={"dev": dev_requires},
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 3 - Beta",
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",

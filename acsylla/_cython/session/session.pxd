@@ -6,4 +6,3 @@ cdef class Session:
         bint closed
         bint connected
         public object keyspace
-        public Meta meta

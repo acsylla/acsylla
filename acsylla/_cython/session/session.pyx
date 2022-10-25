@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import asyncio
 
 
@@ -14,8 +16,6 @@ cdef class Session:
         self.keyspace = keyspace
         self.closed = 0
         self.connected = 0
-        self.meta = Meta()
-        self.meta.cass_session = self.cass_session
 
     async def _connect(self):
         cdef CassFuture* cass_future
@@ -52,6 +52,9 @@ cdef class Session:
         cdef CassUuid cass_uuid = cass_session_get_client_id(self.cass_session)
         cass_uuid_string(cass_uuid, uuid_str)
         return uuid_str.decode()
+
+    def get_metadata(self):
+        return Metadata.new_(self.cass_session)
 
     async def set_keyspace(self, object keyspace):
         query = f"USE {keyspace}".encode()
@@ -102,6 +105,8 @@ cdef class Session:
 
         cdef Result result
         cdef CallbackWrapper cb_wrapper
+        cdef CassUuid tracing_id
+        cdef char tracing_id_str[CASS_UUID_STRING_LENGTH]
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
@@ -117,6 +122,11 @@ cdef class Session:
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
             result = Result.new_(cass_result)
+            if statement.tracing_enabled is True:
+                error = cass_future_tracing_id(cass_future, &tracing_id)
+                raise_if_error(error)
+                cass_uuid_string(tracing_id, tracing_id_str)
+                result.tracing_id = UUID(tracing_id_str.decode())
         finally:
             cass_future_free(cass_future)
 
@@ -169,6 +179,8 @@ cdef class Session:
 
         cdef Result result
         cdef CallbackWrapper cb_wrapper
+        cdef CassUuid tracing_id
+        cdef char tracing_id_str[CASS_UUID_STRING_LENGTH]
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
@@ -184,6 +196,11 @@ cdef class Session:
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
             result = Result.new_(cass_result)
+            if batch.tracing_enabled is True:
+                error = cass_future_tracing_id(cass_future, &tracing_id)
+                raise_if_error(error)
+                cass_uuid_string(tracing_id, tracing_id_str)
+                result.tracing_id = UUID(tracing_id_str.decode())
         finally:
             cass_future_free(cass_future)
 
@@ -192,7 +209,7 @@ cdef class Session:
     def metrics(self):
         """ Returns performance metrics gathered by the driver.
 
-        Returns a `acsylla.Metrics` object.
+        Returns a `acsylla.SessionMetrics` object.
         """
         cdef CassMetrics cass_metrics
 
@@ -225,3 +242,9 @@ cdef class Session:
             errors_connection_timeouts=int(cass_metrics.errors.connection_timeouts),
             errors_request_timeouts=int(cass_metrics.errors.request_timeouts)
         )
+
+    def speculative_execution_metrics(self):
+        cdef CassSpeculativeExecutionMetrics cass_metrics
+        cass_session_get_speculative_execution_metrics(self.cass_session, &cass_metrics)
+        from acsylla import SpeculativeExecutionMetrics
+        return SpeculativeExecutionMetrics(**cass_metrics)

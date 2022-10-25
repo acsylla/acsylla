@@ -1,15 +1,13 @@
 from acsylla import Consistency
 from acsylla import create_statement
 from acsylla import errors
-from datetime import date
-from datetime import datetime
-from datetime import time
-from datetime import timedelta
 from decimal import Decimal
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
 
+import datetime
 import pytest
+import time
 import uuid
 
 pytestmark = pytest.mark.asyncio
@@ -64,6 +62,41 @@ class TestStatement:
         statement = create_statement("INSERT INTO test (id) values (1)", execution_profile="")
         statement.set_execution_profile("")
         assert statement is not None
+
+    async def test_add_key_index(self):
+        statement = create_statement("SELECT id, value FROM test WHERE id=?", 1)
+        statement.add_key_index(0)
+
+    async def test_reset_parameters(self):
+        statement = create_statement("INSERT INTO test (id, values) VALUES (?, ?)", 2)
+        statement.bind(0, 1)
+        statement.bind(1, 1)
+        statement.reset_parameters(2)
+        statement.bind_list([1, 2])
+
+    async def test_set_timestamp(self, statement):
+        statement.set_timestamp(time.time())
+
+    async def test_set_is_idempotent(self, statement):
+        statement.set_is_idempotent(True)
+        statement.set_is_idempotent(False)
+
+    async def test_set_retry_policy(self, statement):
+        statement.set_retry_policy("default")
+        statement.set_retry_policy("fallthrough")
+        statement.set_retry_policy("default", retry_policy_logging=True)
+        statement.set_retry_policy("fallthrough", retry_policy_logging=True)
+        statement.set_retry_policy(None)
+
+    async def test_set_tracing(self, statement):
+        statement.set_tracing(True)
+        statement.set_tracing(False)
+        statement.set_tracing(None)
+
+    async def test_set_host(self, statement):
+        statement.set_host("127.0.0.1")
+        statement.set_host("127.0.0.1", port=123)
+        statement.set_host(None)
 
     @pytest.mark.parametrize(
         "consistency",
@@ -161,16 +194,16 @@ class TestStatement:
         statement.bind(9, value)
 
     def test_bind_date(self, statement):
-        statement.bind(10, date.today())
+        statement.bind(10, datetime.date.today())
 
     def test_bind_time(self, statement):
-        statement.bind(11, time.fromisoformat("15:24:31"))
+        statement.bind(11, datetime.time.fromisoformat("15:24:31"))
 
     def test_bind_timestamp(self, statement):
-        statement.bind(12, datetime.now())
+        statement.bind(12, datetime.datetime.now())
 
     def test_bind_duration(self, statement):
-        value = timedelta(
+        value = datetime.timedelta(
             days=720, seconds=560, microseconds=3444, milliseconds=21324, minutes=123424, hours=23432, weeks=12340
         )
         statement.bind(13, value)
@@ -297,21 +330,21 @@ class TestStatementOnlyPrepared:
         statement.bind_by_name("value_inet", value)
 
     def test_bind_date_by_name(self, statement):
-        statement.bind_by_name("value_date", date.today())
-        statement.bind_by_name("value_date", datetime.now())
+        statement.bind_by_name("value_date", datetime.date.today())
+        statement.bind_by_name("value_date", datetime.datetime.now())
         statement.bind_by_name("value_date", "2011-07-20")
         statement.bind_by_name("value_date", 1626728400)
 
     def test_bind_time_by_name(self, statement):
-        statement.bind_by_name("value_time", time.fromisoformat("15:24:31"))
+        statement.bind_by_name("value_time", datetime.time.fromisoformat("15:24:31"))
 
     def test_bind_timestamp_by_name(self, statement):
-        statement.bind_by_name("value_timestamp", datetime.fromisoformat("2021-07-21 15:24:31"))
+        statement.bind_by_name("value_timestamp", datetime.datetime.fromisoformat("2021-07-21 15:24:31"))
         statement.bind_by_name("value_timestamp", "2021-07-21 15:24:31")
         statement.bind_by_name("value_timestamp", 1626870271.32)
 
     def test_bind_duration_by_name(self, statement):
-        value = timedelta(
+        value = datetime.timedelta(
             days=720, seconds=560, microseconds=3444, milliseconds=21324, minutes=123424, hours=23432, weeks=12340
         )
         statement.bind_by_name("value_duration", value)

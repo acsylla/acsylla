@@ -1,7 +1,7 @@
 from acsylla import Consistency
 from acsylla import create_cluster
 from acsylla import LatencyAwareRoutingSettings
-from acsylla import SpeculativeExecutionSettings
+from acsylla import SpeculativeExecutionPolicy
 
 import pytest
 
@@ -61,9 +61,7 @@ class Testcreate_cluster:
 
     async def test_cluster_create_execution_profile(self, host):
         latency_aware_routing = LatencyAwareRoutingSettings()
-        speculative_execution_policy = SpeculativeExecutionSettings(
-            constant_delay_ms=100, max_speculative_executions=10
-        )
+        speculative_execution_policy = SpeculativeExecutionPolicy(constant_delay_ms=100, max_speculative_executions=10)
         cluster = create_cluster([host])
         cluster.create_execution_profile(
             "test_profile",

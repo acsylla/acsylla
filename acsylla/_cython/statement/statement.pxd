@@ -3,6 +3,7 @@ cdef class Statement:
         bint prepared
         CassStatement* cass_statement
         const CassPrepared* cass_prepared
+        public object tracing_enabled
 
     @staticmethod
     cdef Statement new_from_string(str statement_str,
@@ -30,10 +31,3 @@ cdef class Statement:
 
     cpdef bind(self, int idx, object value)
     cpdef bind_by_name(self, str name, object value)
-
-    cpdef set_timeout(self, object timeout)
-    cpdef set_consistency(self, object consistency)
-    cpdef set_serial_consistency(self, object consistency)
-    cpdef set_page_size(self, object page_size)
-    cpdef set_page_state(self, object page_state)
-

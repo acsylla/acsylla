@@ -1,13 +1,13 @@
-# Acsylla 
 [![CI](https://github.com/acsylla/acsylla/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci.yml)
 [![CI](https://github.com/acsylla/acsylla/actions/workflows/release.yml/badge.svg?branch=v0.1.7a0)](https://github.com/acsylla/acsylla/actions/workflows/release.yml)
 [![PyPI](https://img.shields.io/pypi/v/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Number of PyPI downloads](https://img.shields.io/pypi/dm/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Documentation Status](https://readthedocs.org/projects/acsylla/badge/?version=latest)](https://acsylla.readthedocs.io/en/latest/)
 
-A composition of `async` + `cassandra` + `scylla` words.
+# Acsylla <img src="data:image/webp;base64,UklGRuoTAABXRUJQVlA4WAoAAAAQAAAAxwAAQgAAQUxQSEgMAAARsEf+/6jW34uPw+GQwxGHSEQiJiIjMmLs+/3+Ysa4RkbEmJgRM0ZGzIiMiBljTIwrxjVmxLjGiImRkUvEROJwOA6vP86p1Wm/+3dETACWUwhMlwAIASCo4G9bEggrAIRDXQEQkID4Bpw+CYAAIABZ+ltRAE2GkhHRPQAJHYBWigCxBJA48zv8cQBaAohpUNJ/K3JWkrck7Bfl5l0geV4GEG0eAbETFcn7DAD4CgFAPlpFLC+wncZfauwpsXUT2P08rdjmx4gPuVyt3/aLzPMPZDpHQhWQDrcBUWoIrZ5E6lxZCqFFkulMKh5SviuhxersDY2eQdPmjA9Hd+MnPT+4CuysQBQbClB4iyuXVYRaa3ANKx6SVgrXr4OJYRqj/tP5ZuD78acObl5HNufduTefc82KwP7rCpAfFuTae0S5qQmX7DY8K200h5zZ6lYi34kI5y47Ey56OBlElaPhLkRxVNWrRl6qvoYBQNq79QMQnohdTfj13r7vu1D/uezb9KRxc2+eC7Uyucr85KVa/twEAP2ilwbg83sh+8652s3QtxA++G3Sw8PMast+vfjgU6wyORaAyDwbBQB6RvHAzojzbkeWTiSqfXp8MCINspO7MWsKEDkf2acyENsPYfHZT87/QV8ukbr65JKav/vWha6lq31aNRVis7qCxUe6XGRNLFO8MeIym+37zoQcllWRuLiNY/GizoWO1wGhS2IjgLjusVBlwO/Qftwr/vy4isCDq6PFsBWT1YuwVIriJI39lHd8+S6X2ZyBpN090OHFcy7YbMcQkABAFliPiELcG6l7i0v9fjecZnbPUzK86O8silWBmaXdmAiIhamlIZd8VDz4OTBNY/R+X85o8GZqsrB7eTYA0Ya2qHiLVtdYLiu3kjs9Lx/tZeOagEdzXHhXh7xZTmO7nBYuclDovkXI+T7/VFpc8kL6bdS7WVcFvFta3DCM7MR+2RmyH3UBRHl9AXrdZDubGiyZffBEvl/Wf6geKi/OvEqfkvaYNLbzR34H/IoQ84o/clyPocglnzRN0rhcz0Q9dLw4cjSgq/3H5KXsAArZOWV77O75gZulG9H5Wgh6aM8Ls7cVt0RkLtL+yG6lJUBqLZtN52e73cgontm0PFaJqC4QUflrvjPrsxIGANFcNvf3jcTGRlh4JTn22OfgUnbx10Nf0i7tlx0fXM++hU+j4YOseCbU94rlRo5iLkLFV/Xm6DIh4J41l8sYjm3y6vC5psG7vt/eeCmsHw/cfukuwGpgttDP14KO6drzUtmNnULlYfi+ulIuB7wjbj3xFgXww3D0knAXpeRM4at6UsKs28YysemXtdiP65uIb3037BmUPXHu0zRVf3FYnXU3CMyqFn74MbtUsZfJvlABKbD1wydC6YBndmwv9F46nZenTwdZmyKvKTPoIYGv+mr2EnUfK0EAQtcARVeFR5JjL8xu7kzRTvRpQmCOyslkOWyb9mk8u+EHAAFAyF4J9Lxmt1fcZo7EtTkA2d+252ybw+shb4RQNRlelx+9Rt5IbjH/NF+2eprfSMQisXjqn53i6UXj6vLitLh3O/Ra9/x1vLXzMc4AELLkMdS911ZcRHl9GuRkqfny3uv9GY4mpmXbdLU+h6Y3bNt264QTN5fKRvdBBSCE1/a99+gGRZoBUELp7f3SSfnEWa5cNDsWvWnblmWTHPcm5CSNQHkDmdcSljFjeu7JTQTETACE7FOnanpo7Z0c/X4252fbljkxTMum6+vm3qPFGqBt+LB2n1mG8J9l8VcDX/lqcjRp7adTHVq9x/bnTLZl0zJs0zRNi07z/WPCcVrELsxBDFAUYO0iuAS+Z8+13eAXC9F+do5WNejdYW0rGc9/zEKbM47HJO82Nopt1gCtYp7BfW1f8R4uPffscwkqWKRcut4KCGD77SAqA+KUHBnkwCLHE3L88jKhabNbats8EpBjdx8hQD3vxdyQSgvvFT33qDhEJbMIkd5JKAB8J4UAAMh39sNek6/lMT+PSyPrLJ08MYYPlvkj1mQFACLPewC0y/MpIhLw3rrpOdkBTVmEHtUFAMTW/HBuDhprvsNJMW9ZtbBcG68D6oOZq9n3cuj+lwwAW7cygNB10g3CJzwX/rMU0qqCRUoynEJX4Qw1T+MSjn5FzviYBJJvcQDH3FUb4wxWWnGHcpUAgNSR7LaMSnsp1LPwQqZLcCr53bAATvL+l2FOBpSrBICcXUCwXQf+KTiQ33cgu7o8qC8FZHg4mtQBSD9Ca+N6AAAKSQBbxg9g/XcIUtbviFUlh7KmLM+e1x5kYCcDDwvVBwAiKJ131uBMugzXAFHPAWrIodSCDmiB5Yn2PVYGkIl7CQKuQm+XfC56DEDuLQJgrSoARQDAccoFilga7PTGg0m/PZq0qgPz90nX+Hgej0eTx9vxPAanKpY224zCVQ4AKLZUAL6qjqm7WbelDiaiyYgaT/pEbE1HMB1WE4l4UpVSp08DcwZ78nF/GMPySuUfkhtkAKenAgD2k9My38EilUgmVzqr1S9qp8XtVFDGMoeLAcwqaptwbmxO0yPf2reaiIuZ1LOIy8rONEh/SSKoYOZgXnEJ5Wb4WxYyZg8l4OrfmEUr1g/F38+XVdVNDs2SMnj39yWEG6RZshbP4GEhviLE/6f5Fsk970QOb1r1bW2avFZu3l/tqA6RPSimHIniwbpDZA9yygxa/mDtK9mTnPS9VGlueCb7TpJ2VbiFbiYkabeCAJAz+RoA/G0aWw7pnj19htgn618IdDlKziStHpwdJR3aP0fnJ7urMhDcrRytCiC6VzmIOaTEXqVS/CcAEd/dleSNk1LAoayVzoptjuIIbB3q4p/yKoBwrnxW2orOJfRO8+Vp2EvDVX8gR89PQz6EHPI1eQSUyAsx5X2m4ZfyNnk+S+hyTPJOAv55tkiyF0aqQ/JVw9YHyTsZCDVGJGkVEejwOXRpknUBRJoGne86KjTSxwZPoJT6dN6IeWzZvPDJiSTcT8jntCInjwJwjfbYj0b77ITg0lqM8kjyIzxN/0WrdVLbALY/+VoqDtjR1DY7pWoe4R4fDmtZIPjI8cVui/YWYkM+3Uy6FjsaQm2aN4ULk08K6hxVDBprUs227wpVi+eYZ45sKJju73CYxOx5i40rGtvwxLphPxo8mFYmzxQAiH3wNYJgny2RGLMOAFs2DwFAatDIAzWOk0gbHA92Iu9886NGuywhZfAaosnJ4O14Ty5YrCnYsbk3l8QnzafjpOyWGPNOfEG5pWmxIU25X4i4Zj/1wt+aW6jHbgDOKs1t4B+TNax8clJWgX8sDvdkIDXmnQz1N/tB7NhkCcEPPsqxATs6UCTLUNrkYBXQO3wPATWa/8xFFPokx9cBl7TJKr668kF2w5jSWkh8yAaOaG27ZS1ew6l3+aYDdfIQcp3kXQBai7QufKjQ3gHWJnxRcUx2dKQmbKBAVgHlF5mD/k6eAcharAGBLkfxuQDR0sOErAlHYsyrL+GELMIbpzQyWBnyp+xSJCsuqxPeCSQGtLcB7dwgz4DgtUW7IO45TkC6IX8KXJInQM5mCVWyAGwZNNaw8slREsAJmQeKNj+CcwKUrQHfNEfgne+hL+Vpb3kj0GXbB3HDcdrlgGwAIqWtW7yFv0UaaQAoGHyUAfnUZkN94WcMeyZ5AeWRkxRQob2FBrmHlTdyGMW6ybYCoEZ7B+k/5ItvPpEE4GtPQY281IDQ0cr8eiFZluVpDVmWZcmlYLMEYNNkXTi2bP7JZ+uDdMrkR/Fx/IefMfVke2V7xHq4/E+saPJAfqJVPR9/WDyB/s43P0ST4yQq5PNhdzDkRwB75DkAnJGtUv/PmPfyXMJPg9pB0+S1cIl1aT9Xzl7Z25ib8bvdfr5Upgza7fZzweF74iAGQHthP+7Qn0nb5r0WfCc5KrY4CIUG9shgJ5YyrJHFxwCqJO3bfZslJMZsCshtDiPImiQ/dl7Z9eOc3HFsWyRfcwM2xVyKFp3vSbinX+nan6FAznJP167q8knXc0fW5LUAgEOy6kCqbdofZwFgf2w8/iPdGr906Xhgj5oJqBcje1APA7FXq3fsyxr9baz3n9cBpW380qBcmJNWSnk27lRx2bsKONRba9iIhPujMuaqFZ/H9uA6genh045hDa6TmL75+pqZJirtp6enp3ZDcYTunpztgmO//bgOZ6TVvgFWUDggfAcAANAjAJ0BKsgAQwA+aTSaTSOmohepSCgGgAXBn+ACXSrTsQPNIlaPxcQFdnH/R+pLbh+ZX9kfVs9J/+W9QD/Af47rdPQa/UD05/2k+Fn+6f9L0pc1m/s3a7/mPDnys+0H+nbyRnf6LwZlx3Mv6n3smqgqY0APEnz+fVvsGfryqALiX6QW7sNUJFbsOf0zuNFCCByahX6/5Z5inUgGuX6NBqISlpAooOvSGVowA1/FuWN1K6AbuzgEd6zmnfSHMhUvXruGYhmwkXljfNapGZ/8ukIINS9A9riTnoWZYnPVV3ZPB8+ajSh1v+2y1DnaEQ9krebl7t5JNpqGAogjmR50fGmOjujoGL8tzhZeahSyHszcKqGuYb4Eqqki28TNbVj1N8JGmAByMgAA/vv9amdXdKfMYdV/5NjF4lLIG1FgNL0nZErLQ5JA2sPFA5Xw35AjKWyU729mu0Rx5ZaiZ6MXqZ/n4h1Ty6cJG/JFrVttBujsiN+76+BGwGTyg64L4pOlLUvcD2VQzs+sgh2nIWe6rP5cISRr6qbjCbaU20h2yCdKvi75X/u1BUpyiI8yL9rhelVsAzjCVm2TMFKt33mMQr8cKdFDfQaSNzxe+8bUinvIs59PXTz/OzZmX5GobqwtMhq7o/xVDMasYrVolPDvxq16zqk9CC2cE0+cxvlkjfz1dLx3ZquW3prNRLMS1ldIRQ9F+l//9wQYsQ8M3pxArbqvJukj6IpfII+ymVVOKPfPKlf8a/g9ZOtLahX8FCOwVXMPqkUiBDHVa04xHZEaWZfKWRh5xet/0xW8wvbha3gV/TcUs7RcDNnn380zPnX/roMVmHFs9JbEf+KlqiYCGz0Zx98ziB5prFCnnN7B0HQdV9QAfYJPAE25cx5a6swJ7s/wnKR5UnvmqVXfe8+mgjL2DAJumn0idOAe5HdrGcKfxHbSnySD/H7/6f0A+kvWs/T6EnyvkkjWZ0oGsjusY+xwA6yP/w11xEgHWbE02VxEKADFfoPoDiPz4kREGfXxF6mxOYIT6O72JbGh7MWgJx0VouRE77T8exVTvxL0k+mecVyH0/yIJFGHOuGKdifC6yrkCAhCPsoaAaQlxgZWKK75bbMvn1YRrl9qrWFybVkfXwKpfE/ODd9Osg/l6A5BnPbJ2DDDRtKH4Dr4wn0HFHC3CR2Gtlc9guWhUdCgszrxmRra+OWFQZvvyU9RAEgLoULdS5/X9chyRJIlH2qHfcDt4SbrxmzRj3N62g3nsSgT1OUoYPRfeLIgfavv7QJzPkxWnIYzezaAzU01UW2XYJELuCbp8QxVPWpJ+tSJqX+r1wZnHLSr8WagiTbj+2RZtoJ6eEMh+KOW+MeJRAKkQvP3KO5cgjamWiPH0AloUqcK9q6jo8/gAFTZzpBhjBHeKhd7Ra6w2FHEfmW2SpNCoMCsf69wsRl7RsWWVxtR52WU8Hg9LN2I+sv6z0J6uIy/5MtAJfTA0gwTWGuKBinCeoIMv9So5u41MTNCKPQod7LCabBmEQGSUsHoNyXtwaVwIdcBgWmu0K+3Xbl82l71SYeddRT3cFqf3uJjVRGtm0l+YAr+YZJ4QJWXCXyAFCoZp6g+k/RarKxhSTsLm98Y8s9FkJZB4bHOKcED5SDBIO9n2UW9ZH1BPo3Kb5KMGSF8fxJDbvafvGthry7i8abLX/0K2sVPIrJZa1slODCiDq/K7+wQqevk7mpnlaCMnAPpJXFDL3jeI+v0xiVt7Sx5LVoiCIhuIY/t0gMEsrsIziAupB+sMvPW5PNdphRk1DCeMSmi4aXc8baC7eLX8+Ohh039enGBGkVPk+UysxnprJve553W/+1V6E+iqkS36tP7gp4D/EXyPXxOOCC+GlVkrz1fvuBfYO1UrR8LKmmB+nMQawufpGPIBN1X5DTgrujK8e+CNftVJM5yfB+sXrp1iKsXO4jHhv82zqJ9ucVdjbWsJY2xscsIeOCDAW0R7S2b5cf7rc4rck78ogHA4FoAb2UCpr35yR5yUFRw45ukNjaW5/4CyLaR9G6bDkORyNltcia1ua+3KjeA2VsYpy4d6/bTT+vAehzZBfRWsYGr8MLoCx4P1v1yiJl6l15HwlIbwmkCScUuoUtKdX5WlqhNYda3hpoK3gW/zyz6Pg4HVyUujKJS/MRQy7Wi1twJOuiU1/BqGq9igUIPzMx8dqf5kKw069otId+egejEZMW0JUDvt+qCAoCHLtuM1ce83/Qcw8vCVWRZBnPdiCraZSTMfst95i3CC73F3Au6RLamqTVOUeyOIg/CXgXjioTHF65X336VOW6nPa3h6vfmaGNs1nc6QlCSTcFtbNxZ/63r5vjBuuH4k7Uv2YY0gkxDDVQYVesWMsCJMKMpwKd/AxYWAaltayyAhN37H2ecLirQ2EDGS5TNnqw9XGc3927m/XX9AV/eDQEM1CWJmva9O+uYUiO4u3+uTeQo/dyJxNRMlUWNegIaebDPVqwkvy+MWTT4gLm/90gN6ukZEAFCXcfG6hg8/BqYPQbVxfiw176P8aGEYSs6gfkAyiScIAAA" align="right" />
+A composition of ***async*** + ***cassandra*** + ***scylla*** words.
 
-![Logo](logo/cassandra-scylladb.svg)
+
 ## A high performance Python Asyncio client library for Cassandra and ScyllaDB 
 Under the hood, **_acsylla_** has modern, feature-rich and shard-aware [C/C++ client](https://github.com/scylladb/cpp-driver) library for [Cassandra](https://cassandra.apache.org) and [ScyllaDB](https://www.scylladb.com).
 
@@ -73,443 +73,380 @@ Modifying the cluster object configuration once a session is established does no
 
 List of named arguments to configure cluster with  `acsylla.create_cluster` helper. 
 
-contact_points 
-: Sets contact points. This MUST be set. White space is
-striped from the contact points.
-: ***Examples:*** “127.0.0.1”,  “127.0.0.1,127.0.0.2”, “server1.domain.com”
+- ***contact_points:*** Sets contact points. This MUST be set. White space is striped from the contact points.    
+    *Examples:* “127.0.0.1”,  “127.0.0.1,127.0.0.2”, “server1.domain.com”
 
-port 
-: Sets the port.
-: ***Default***: 9042
+- ***port:*** Sets the port.  
+    *Default:* 9042
 
-local_address
-: Sets the local address to bind when connecting to the
+- ***local_address:*** Sets the local address to bind when connecting to the
     cluster, if desired. IP address to bind, or empty string for no
     binding. Only numeric addresses are supported; no resolution is done.
 
-local_port_range_min
-: Sets the range of outgoing port numbers (ephemeral
+- ***local_port_range_min:*** Sets the range of outgoing port numbers (ephemeral
     ports) to be used when establishing the shard-aware connections. This
     is applicable when the routing of connection to shard is based on the
-    client-side port number.
-: When application connects to multiple CassCluster-s it is advised
+    client-side port number.  
+    When application connects to multiple CassCluster-s it is advised
     to assign mutually non-overlapping port intervals to each. It is assumed
     that the supplied range is allowed by the OS (e.g. it fits inside
-    /proc/sys/net/ipv4/ip_local_port_range on *nix systems)
-: ***Default:*** 49152
+    /proc/sys/net/ipv4/ip_local_port_range on *nix systems)  
+    *Default:* `49152`
 
-local_port_range_max
-: See `local_port_range_min`
-: ***Default:*** 65535
+- ***local_port_range_max:*** See `local_port_range_min`  
+    *Default:* `65535`
 
-username
-: Set username for plain text authentication.
+- ***username:*** Set username for plain text authentication.
 
-password
-: Set password for plain text authentication.
+- ***password:*** Set password for plain text authentication.
 
-connect_timeout
-: Sets the timeout for connecting to a node.
-: ***Default:*** 5 seconds
+- ***connect_timeout:*** Sets the timeout for connecting to a node.  
+    *Default:* `5` seconds
 
-request_timeout
-: Sets the timeout for waiting for a response from a node.
-    Use 0 for no timeout.
-: ***Default:*** 12 seconds
+- ***request_timeout:*** Sets the timeout for waiting for a response from a node.
+    Use 0 for no timeout.  
+    *Default:* `12` seconds
 
-resolve_timeout
-: Sets the timeout for waiting for DNS name resolution.
-: ***Default:*** 2 seconds
+- ***resolve_timeout:*** Sets the timeout for waiting for DNS name resolution.  
+    *Default:* `2` seconds
 
-log_level
-: Sets the log level.
-    Available levels: `disabled`, `critical`, `error`, `warn`, `info`, `debug`, `trace`
-: ***Default:*** `warn`
+- ***log_level:*** Sets the log level.
+    Available levels: 
+  - `disabled`
+  - `critical`
+  - `error`
+  - `warn`
+  - `info`
+  - `debug`
+  - `trace`  
+      *Default:* `warn`
 
-logging_callback
-: Sets a callback function to catch log messages.
-: ***Default:*** An internal logger with "acsylla" name.
-    logging.getLogger('acsylla')
+- ***logging_callback:*** Sets a callback function to catch log messages.  
+    *Default:* An internal logger with "acsylla" name.
+    `logging.getLogger('acsylla')`
 
-ssl_enable
-: Enable SSL connection
-: ***Default:*** False
+- ***ssl_enable:*** Enable SSL connection  
+    *Default:* `False`
 
-ssl_cert
-: Set client-side certificate chain. This is used to authenticate
+- ***ssl_cert:*** Set client-side certificate chain. This is used to authenticate
     the client on the server-side. This should contain the entire
     Certificate chain starting with the certificate itself
 
-ssl_private_key
-: Set client-side private key. This is used to authenticate
+- ***ssl_private_key:*** Set client-side private key. This is used to authenticate
     the client on the server-side.
 
-ssl_private_key_password
-: Password for `ssl_private_key`
+- ***ssl_private_key_password:*** Password for `ssl_private_key`
 
-ssl_trusted_cert
-: Adds a trusted certificate. This is used to verify the
+- ***ssl_trusted_cert:*** Adds a trusted certificate. This is used to verify the
     peer’s certificate.
 
-ssl_verify_flags
-: Sets verification performed on the peer’s certificate.
-:    `NONE` No verification is performed
-:    `PEER_CERT` Certificate is present and valid
-:    `PEER_IDENTITY` IP address matches the certificate’s common name or one
-        of its subject alternative names. This implies the certificate is
-        also present.
-:    `PEER_IDENTITY_DNS` Hostname matches the certificate’s common name or
-        one of its subject alternative names. This implies the certificate
-        is also present.
-: ***Default:*** `PEER_CERT`
+- ***ssl_verify_flags:*** Sets verification performed on the peer’s certificate.
+    - `NONE` No verification is performed
+    - `PEER_CERT` Certificate is present and valid
+    - `PEER_IDENTITY` IP address matches the certificate’s common name or one
+          of its subject alternative names. This implies the certificate is
+          also present.
+    - `PEER_IDENTITY_DNS` Hostname matches the certificate’s common name or
+          one of its subject alternative names. This implies the certificate
+          is also present.  
+      *Default:* `PEER_CERT`
 
-protocol_version
-: Sets the protocol version. The driver will automatically
-    downgrade to the lowest supported protocol version.
-: ***Default:*** `acsylla.ProtocolVersion.V4` or `acsylla.ProtocolVersion.DSEV1` when
+- ***protocol_version:*** Sets the protocol version. The driver will automatically
+    downgrade to the lowest supported protocol version.  
+    *Default:* `acsylla.ProtocolVersion.V4` or `acsylla.ProtocolVersion.DSEV1` when
     using the DSE driver with DataStax Enterprise.
 
-use_beta_protocol_version
-: Use the newest beta protocol version. This
+- ***use_beta_protocol_version:*** Use the newest beta protocol version. This
     currently enables the use of protocol version `cyacsylla.ProtocolVersion.V5`
-    or `cyacsylla.ProtocolVersion.DSEV2 when using the DSE driver with
-    DataStax Enterprise.
-: ***Default:*** False
+    or `cyacsylla.ProtocolVersion.DSEV2` when using the DSE driver with
+    DataStax Enterprise.  
+    *Default:* `False`
 
-consistency
-: Sets default consistency level of statement. `acsylla.Consistency`
-: ***Default:*** LOCAL_ONE
+- ***consistency:*** Sets default consistency level of statement. `acsylla.Consistency`  
+    *Default:* `LOCAL_ONE`
 
-serial_consistency
-: Sets default serial consistency level of statement. `acsylla.Consistency` 
-: ***Default:*** ANY
+- ***serial_consistency:*** Sets default serial consistency level of statement. `acsylla.Consistency`   
+    *Default:* `ANY`
 
-queue_size_io
-: Sets the size of the fixed size queue that stores pending
-    requests.
-: ***Default:*** 8192
+- ***queue_size_io:*** Sets the size of the fixed size queue that stores pending
+    requests.  
+    *Default:* `8192`
 
-core_connections_per_host
-: Sets the number of connections made to each
-    server in each IO thread.
-: ***Default:*** 1
+- ***core_connections_per_host:*** Sets the number of connections made to each
+    server in each IO thread.  
+    *Default:* `1`
 
-constant_reconnect_delay_ms
-: Configures the cluster to use a reconnection
+- ***constant_reconnect_delay_ms:*** Configures the cluster to use a reconnection
     policy that waits a constant time between each reconnection attempt.
     Time in milliseconds to delay attempting a reconnection; 0 to perform
-    a reconnection immediately.
-: ***Default:*** Not set
+    a reconnection immediately.  
+    *Default:* Not set
 
-exponential_reconnect_base_delay_ms
-: The base delay (in milliseconds) to
+- ***exponential_reconnect_base_delay_ms:*** The base delay (in milliseconds) to
     use for scheduling reconnection attempts.
     Configures the cluster to use a reconnection policy that waits
     exponentially longer between each reconnection attempt; however will
-    maintain a constant delay once the maximum delay is reached.
-: ***Note:*** A random amount of jitter (+/- 15%) will be added to the pure
+    maintain a constant delay once the maximum delay is reached.    
+    *Note:* A random amount of jitter (+/- 15%) will be added to the pure
     exponential delay value. This helps to prevent situations where
     multiple connections are in the reconnection process at exactly the
     same time. The jitter will never cause the delay to be less than the
-    base delay, or more than the max delay.
-: ***Default:*** 2000
+    base delay, or more than the max delay.  
+    *Default:* `2000`
 
-exponential_reconnect_max_delay_ms
-: The maximum delay to wait between two
-    reconnection attempts. See `exponential_reconnect_max_delay_ms`
-: ***Default:*** 60000
+- ***exponential_reconnect_max_delay_ms:*** The maximum delay to wait between two
+    reconnection attempts. See `exponential_reconnect_max_delay_ms`  
+    *Default:* `60000`
 
-coalesce_delay_us
-: Sets the amount of time, in microseconds, to wait for
+- ***coalesce_delay_us:*** Sets the amount of time, in microseconds, to wait for
     new requests to coalesce into a single system call. This should be set
     to a value around the latency SLA of your application’s requests while
     also considering the request’s roundtrip time. Larger values should be
     used for throughput bound workloads and lower values should be used for
-    latency bound workloads.
-: ***Default:*** 200 us
+    latency bound workloads.  
+    *Default:* `200` us
 
-new_request_ratio
-: Sets the ratio of time spent processing new requests
+- ***new_request_ratio:*** Sets the ratio of time spent processing new requests
     versus handling the I/O and processing of outstanding requests. The
     range of this setting is 1 to 100, where larger values allocate more
     time to processing new requests and smaller values allocate more time
-    to processing outstanding requests.
-: ***Default:*** 50
+    to processing outstanding requests.  
+    *Default:* `50`
 
-max_schema_wait_time_ms
-: Sets the maximum time to wait for schema
+- ***max_schema_wait_time_ms:*** Sets the maximum time to wait for schema
     agreement after a schema change is made (e.g. creating, altering,
-    dropping a table/keyspace/view/index etc).
-: ***Default:*** 10000 milliseconds
+    dropping a table/keyspace/view/index etc).  
+    *Default:* `10000` milliseconds
 
-tracing_max_wait_time_ms
-: Sets the maximum time to wait for tracing data to become available.
-: ***Default:*** 15 milliseconds
+- ***tracing_max_wait_time_ms:*** Sets the maximum time to wait for tracing data to become available.  
+    *Default:* `15` milliseconds
 
-tracing_retry_wait_time_ms
-: Sets the amount of time to wait between attempts to check to see if tracing is available.
-: ***Default:***  3 milliseconds
+- ***tracing_retry_wait_time_ms:*** Sets the amount of time to wait between attempts to check to see if tracing is available.  
+    *Default:*  `3` milliseconds
 
-tracing_consistency
-: Sets the consistency level to use for checking to see if tracing data is available.
-: ***Default:*** ONE
+- ***tracing_consistency:*** Sets the consistency level to use for checking to see if tracing data is available.  
+    *Default:* `ONE`
 
-load_balance_round_robin
-: Configures the cluster to use round-robin load
+- ***load_balance_round_robin:*** Configures the cluster to use round-robin load
     balancing. The driver discovers all nodes in a cluster and cycles
-    through them per request. All are considered ‘local’.
+    through them per request. All are considered local.
 
-load_balance_dc_aware
-: The primary data center to try first.
+- ***load_balance_dc_aware:*** The primary data center to try first.
     Configures the cluster to use DC-aware load balancing. For each query,
     all live nodes in a primary ‘local’ DC are tried first, followed by any
-    node from other DCs.
-: ***Note:*** This is the default, and does not need to be called unless
+    node from other DCs.  
+    *Note:* This is the default, and does not need to be called unless
     switching an existing from another policy or changing settings. Without
     further configuration, a default local_dc is chosen from the first
     connected contact point, and no remote hosts are considered in query
     plans. If relying on this mechanism, be sure to use only contact points
     from the local DC.
 
-token_aware_routing
-: Configures the cluster to use token-aware request
+- ***token_aware_routing:*** Configures the cluster to use token-aware request
     routing or not. This routing policy composes the base routing policy,
     routing requests first to replicas on nodes considered ‘local’ by the
-    base load balancing policy.
-: ***Important:*** Token-aware routing depends on keyspace metadata. For this
+    base load balancing policy.  
+    *Important:* Token-aware routing depends on keyspace metadata. For this
     reason enabling token-aware routing will also enable retrieving and
-    updating keyspace schema metadata.
-: ***Default:*** True (enabled).
+    updating keyspace schema metadata.  
+    *Default:* `True` (enabled).
 
-token_aware_routing_shuffle_replicas
-: Configures token-aware routing to
+- ***token_aware_routing_shuffle_replicas:*** Configures token-aware routing to
     randomly shuffle replicas. This can reduce the effectiveness of
     server-side caching, but it can better distribute load over replicas
-    for a given partition key.
-: ***Note:*** Token-aware routing `token_aware_routing` must be enabled for the
-    setting to be  applicable.
-: ***Default:*** True (enabled).
+    for a given partition key.  
+    *Note:* Token-aware routing `token_aware_routing` must be enabled for the
+    setting to be  applicable.    
+    *Default:* `True` (enabled).
 
-latency_aware_routing
-: Configures the cluster to use latency-aware request
+- ***latency_aware_routing:*** Configures the cluster to use latency-aware request
     routing or not. This routing policy is a top-level routing policy. It
     uses the base routing policy to determine locality (dc-aware) and/or
-    placement (token-aware) before considering the latency.
-: ***Default:*** False (disabled).
+    placement (token-aware) before considering the latency.  
+    *Default:* `False` (disabled).
 
-latency_aware_routing_settings
-: Configures the settings for latency-aware
-    request routing. Instance of `acsylla.LatencyAwareRoutingSettings`
-: ***Default:***
-:        `exclusion_threshold` ***2.0*** *Controls how much worse the latency
-                                    be compared to the average latency of
-                                    the best performing node before it
-                                    penalized.*
-:        `scale_ms` ***100 milliseconds*** *Controls the weight given to older
-                                    latencies when calculating the average
-                                    latency of a node. A bigger scale will
-                                    give more weight to older latency
-                                    measurements.*
-:        `retry_period_ms` ***10,000 milliseconds*** *The amount of time a node is
-                                    penalized by the policy before being
-                                    given a second chance when the current
-                                    average latency exceeds the calculated
-                                    threshold (exclusion_threshold *
-                                    best_average_latency).*
-:        `update_rate_ms` ***100 milliseconds*** *The rate at which the best
-                                    average latency is recomputed.*
-:        `min_measured` ***50*** *The minimum number of measurements per-host
-                                    required to be considered by the policy*
+- ***latency_aware_routing_settings:*** Configures the settings for latency-aware
+    request routing. Instance of `acsylla.LatencyAwareRoutingSettings`  
+    *Default:* 
+    - `exclusion_threshold` ***2.0*** *Controls how much worse the latency
+                                      be compared to the average latency of
+                                      the best performing node before it
+                                      penalized.*
+    - `scale_ms` ***100 milliseconds*** *Controls the weight given to older
+                                      latencies when calculating the average
+                                      latency of a node. A bigger scale will
+                                      give more weight to older latency
+                                      measurements.*
+    - `retry_period_ms` ***10,000 milliseconds*** *The amount of time a node is
+                                      penalized by the policy before being
+                                      given a second chance when the current
+                                      average latency exceeds the calculated
+                                      threshold (exclusion_threshold *
+                                      best_average_latency).*
+    - `update_rate_ms` ***100 milliseconds*** *The rate at which the best
+                                      average latency is recomputed.*
+    - `min_measured` ***50*** *The minimum number of measurements per-host
+                                      required to be considered by the policy*
 
-whitelist_hosts
-: Sets whitelist hosts. The first call sets the whitelist
+- ***whitelist_hosts:*** Sets whitelist hosts. The first call sets the whitelist
     hosts and any subsequent calls appends additional hosts. Passing an
     empty string will clear and disable the whitelist. White space is
-    striped from the hosts.
-: This policy filters requests to all other policies, only allowing
+    striped from the hosts.  
+    This policy filters requests to all other policies, only allowing
     requests to the hosts contained in the whitelist. Any host not in the
     whitelist will be ignored and a connection will not be established.
     This policy is useful for ensuring that the driver will only connect to
-    a predefined set of hosts.
-: ***Examples***: “127.0.0.1”, “127.0.0.1,127.0.0.2”
+    a predefined set of hosts.  
+    *Examples*: “127.0.0.1”, “127.0.0.1,127.0.0.2”
 
-blacklist_hosts
-: Sets blacklist hosts. The first call sets the blacklist
+- ***blacklist_hosts:*** Sets blacklist hosts. The first call sets the blacklist
     hosts and any subsequent calls appends additional hosts. Passing an
     empty string will clear and disable the blacklist. White space is
-    striped from the hosts.
-: This policy filters requests to all other policies, only allowing
+    striped from the hosts.  
+    This policy filters requests to all other policies, only allowing
     requests to the hosts not contained in the blacklist. Any host in the
     blacklist will be ignored and a connection will not be established.
     This policy is useful for ensuring that the driver will not connect to
-    a predefined set of hosts.
-: ***Examples***: “127.0.0.1”, “127.0.0.1,127.0.0.2”
+    a predefined set of hosts.  
+    *Examples*: “127.0.0.1”, “127.0.0.1,127.0.0.2”
 
-whitelist_dc
-: Same as `whitelist_hosts`, but whitelist all hosts of a dc
-: ***Examples***: “dc1”, “dc1,dc2”
+- ***whitelist_dc:*** Same as `whitelist_hosts`, but whitelist all hosts of a dc  
+    *Examples*: “dc1”, “dc1,dc2”
 
-blacklist_dc
-: Same as `blacklist_hosts`, but blacklist all hosts of a dc
-: ***Examples***: “dc1”, “dc1,dc2”
+- ***blacklist_dc:*** Same as `blacklist_hosts`, but blacklist all hosts of a dc  
+    *Examples*: “dc1”, “dc1,dc2”
 
-tcp_nodelay
-: Enable/Disable Nagle’s algorithm on connections.
-: ***Default:*** True
+- ***tcp_nodelay:*** Enable/Disable Nagle’s algorithm on connections.  
+    *Default:* True
 
-tcp_keepalive_sec
-: Set keep-alive delay in seconds.
-: ***Default:*** disabled
+- ***tcp_keepalive_sec:*** Set keep-alive delay in seconds.  
+    *Default:* disabled
 
-timestamp_gen
-: "server_side" or "monotonic" Sets the timestamp generator
+- ***timestamp_gen:*** "server_side" or "monotonic" Sets the timestamp generator
     used to assign timestamps to all requests unless overridden by setting
-    the timestamp on a statement or a batch.
-: ***Default:*** Monotonically increasing, client-side timestamp generator.
+    the timestamp on a statement or a batch.  
+    *Default:* Monotonically increasing, client-side timestamp generator.
 
-heartbeat_interval_sec
-: Sets the amount of time between heartbeat messages
+- ***heartbeat_interval_sec:*** Sets the amount of time between heartbeat messages
     and controls the amount of time the connection must be idle before
     sending heartbeat messages. This is useful for preventing intermediate
-    network devices from dropping connections.
-: ***Default:*** 30 seconds
+    network devices from dropping connections.  
+    *Default:* 30 seconds
 
-idle_timeout_sec
-: Sets the amount of time a connection is allowed to be
+- ***idle_timeout_sec:*** Sets the amount of time a connection is allowed to be
     without a successful heartbeat response before being terminated and
-    scheduled for reconnection.
-: ***Default:*** 60 seconds
+    scheduled for reconnection.  
+    *Default:* 60 seconds
 
-retry_policy
-: May be set to `default` or `fallthrough` Sets the retry policy used for
+- ***retry_policy:*** May be set to `default` or `fallthrough` Sets the retry policy used for
     all requests unless overridden by setting a retry policy on a statement
     or a batch.
-: `default` This policy retries queries in the following cases:
-:        – *On a read timeout, if enough replicas replied but data was not
-            received.*
-:        – *On a write timeout, if a timeout occurs while writing the
-            distributed batch log*
-:        – *On unavailable, it will move to the next host*
-:        – *In all other cases the error will be returned.*
-:        This policy always uses the query’s original consistency level.
-:    `fallthrough` This policy never retries or ignores a server-side
-        failure. The error is always returned.
-: ***Default:*** `default` This policy will retry on a read timeout if there
+    - `default` This policy retries queries in the following cases:
+      - On a read timeout, if enough replicas replied but data was not received.
+      - On a write timeout, if a timeout occurs while writing the distributed batch log 
+      - On unavailable, it will move to the next host
+      - In all other cases the error will be returned. This policy always uses the query’s original consistency level.
+    - `fallthrough` This policy never retries or ignores a server-side
+        failure. The error is always returned.  
+
+    *Default:* `default` This policy will retry on a read timeout if there
     was enough replicas, but no data present, on a write timeout if a
     logged batch request failed to write the batch log, and on a
     unavailable error it retries using a new host. In all other cases the
     default policy will return an error.
 
-retry_policy_logging
-: This policy logs the retry decision of its child
-    policy. Logging is done using INFO level.
-: ***Default:*** False
+- ***retry_policy_logging:*** This policy logs the retry decision of its child
+    policy. Logging is done using INFO level.  
+    *Default:* False
 
-use_schema
-: Enable/Disable retrieving and updating schema metadata. If
+- ***use_schema:*** Enable/Disable retrieving and updating schema metadata. If
     disabled this is allows the driver to skip over retrieving and updating
-    schema metadata and `session.meta` will
+    schema metadata and `session.get_metadata()` will
     always return an empty object. This can be useful for reducing the
-    startup overhead of short-lived sessions.
-: ***Default:*** True (enabled)
+    startup overhead of short-lived sessions.  
+    *Default:* True (enabled)
 
-hostname_resolution
-: Enable/Disable retrieving hostnames for IP addresses
+- ***hostname_resolution:*** Enable retrieving hostnames for IP addresses
     using reverse IP lookup. This is useful for authentication (Kerberos)
     or encryption (SSL) services that require a valid hostname for
-    verification.
-: ***Default:*** False (disabled)
+    verification.  
+    *Default:* False (disabled)
 
-randomized_contact_points
-: Enable/Disable the randomization of the contact
-    points list.
-: ***Important:*** This setting should only be disabled for debugging or tests.
-: ***Default:*** True (enabled)
+- ***randomized_contact_points:*** Enable/Disable the randomization of the contact
+    points list.  
+    *Important:* This setting should only be disabled for debugging or tests.  
+    *Default:* True (enabled)
 
-speculative_execution_policy
-: Enable constant speculative executions with
+- ***speculative_execution_policy:*** Enable constant speculative executions with
     the supplied settings `acsylla.SpeculativeExecutionPolicy`.
 
-max_reusable_write_objects
-: Sets the maximum number of “pending write”
+- ***max_reusable_write_objects:*** Sets the maximum number of “pending write”
     objects that will be saved for re-use for marshalling new requests.
     These objects may hold on to a significant amount of memory and
     reducing the number of these objects may reduce memory usage of the
-    application.
-:    The cost of reducing the value of this setting is potentially slower
-    marshalling of requests prior to sending.
-: ***Default:*** Max unsigned integer value
+    application.  
+       The cost of reducing the value of this setting is potentially slower
+    marshalling of requests prior to sending.  
+    *Default:* Max unsigned integer value
 
-prepare_on_all_hosts
-: Prepare statements on all available hosts.
-: ***Default:*** True
+- ***prepare_on_all_hosts:*** Prepare statements on all available hosts.  
+    *Default:* True
 
-no_compact
-: Enable the NO_COMPACT startup option. This can help facilitate
+- ***no_compact:*** Enable the NO_COMPACT startup option. This can help facilitate
     uninterrupted cluster upgrades where tables using COMPACT_STORAGE will
     operate in “compatibility mode” for BATCH, DELETE, SELECT, and UPDATE
-    CQL operations.
-: ***Default:*** False
+    CQL operations.  
+    *Default:* False
 
-host_listener_callback
-: Sets a callback for handling host state changes in
+- ***host_listener_callback:*** Sets a callback for handling host state changes in
     the cluster.
     Note: The callback is invoked only when state changes in the cluster
     are applicable to the configured load balancing policy(s).
     NOT IMPLEMENTED YET
 
-application_name
-: Set the application name. This is optional; however it
+- ***application_name:*** Set the application name. This is optional; however it
     provides the server with the application name that can aid in debugging
     issues with larger clusters where there are a lot of client (or
     application) connections.
 
-application_version
-: Set the application version. This is optional;
+- ***application_version:*** Set the application version. This is optional;
     however it provides the server with the application version that can
     aid in debugging issues with large clusters where there are a lot of
     client (or application) connections that may have different versions
     in use.
 
-client_id
-: Set the client id. This is optional; however it provides the
+- ***client_id:*** Set the client id. This is optional; however it provides the
     server with the client ID that can aid in debugging issues with large
-    clusters where there are a lot of client connections.
-: ***Default:*** UUID v4 generated
+    clusters where there are a lot of client connections.  
+    *Default:* UUID v4 generated
 
-monitor_reporting_interval_sec
-: Sets the amount of time between monitor
-    reporting event messages.
-: ***Default:*** 300 seconds.
+- ***monitor_reporting_interval_sec:*** Sets the amount of time between monitor
+    reporting event messages.  
+    *Default:* 300 seconds.
 
-cloud_secure_connection_bundle
-: Absolute path to DBaaS credentials file.
-: Sets the secure connection bundle path for processing DBaaS credentials.
+- ***cloud_secure_connection_bundle:*** Absolute path to DBaaS credentials file.  
+    Sets the secure connection bundle path for processing DBaaS credentials.
     This will pre-configure a cluster using the credentials format provided
-    by the DBaaS cloud provider.
-: ***Note:*** `contact_points` and `ssl_enable` should not used in conjunction
+    by the DBaaS cloud provider.  
+    *Note:* `contact_points` and `ssl_enable` should not used in conjunction
     with `cloud_secure_connection_bundle`.
+  
+    ***Example:*** "/path/to/secure-connect-database_name.zip"  
+    *Default:* None
 
-: ***Example:*** "/path/to/secure-connect-database_name.zip"
-: ***Default:*** None
-
-dse_gssapi_authenticator
-: Enables GSSAPI authentication for DSE clusters
+- ***dse_gssapi_authenticator:*** Enables GSSAPI authentication for DSE clusters
     secured with the DseAuthenticator.
     Instance of `acsylla.DseGssapiAuthenticator`
 
-dse_gssapi_authenticator_proxy
-: Enables GSSAPI authentication with proxy
+- ***dse_gssapi_authenticator_proxy:*** Enables GSSAPI authentication with proxy
     authorization for DSE clusters secured with the DseAuthenticator.
     Instance of `acsylla.DseGssapiAuthenticatorProxy`
 
-dse_plaintext_authenticator
-: Enables plaintext authentication for DSE
+- ***dse_plaintext_authenticator:*** Enables plaintext authentication for DSE
     clusters secured with the DseAuthenticator.
     Instance of `acsylla.DsePlaintextAuthenticator`
 
-dse_plaintext_authenticator_proxy
-: Enables plaintext authentication with
+- ***dse_plaintext_authenticator_proxy:*** Enables plaintext authentication with
     proxy authorization for DSE clusters secured with the DseAuthenticator.
     Instance of `acsylla.DsePlaintextAuthenticatorProxy`
 
@@ -529,35 +466,35 @@ session = await cluster.create_session(keyspace="acsylla")
 
 ### Methods of `Session` object
 
-async def close(self):
-: Closes the session instance, outputs a close future which can be used to 
+- ***async def close(self):***  
+ Closes the session instance, outputs a close future which can be used to 
     determine when the session has been terminated. This allows in-flight 
     requests to finish.
 
-async def set_keyspace(self, keyspace: str) -> "Result":
-: Sets the keyspace for session
+- ***async def set_keyspace(self, keyspace: str) -> "Result":***  
+ Sets the keyspace for session
 
-def get_client_id(self) -> str:
-: Get the client id.
+- ***def get_client_id(self) -> str:***  
+ Get the client id.
 
-def get_metadata(self):
-: Returns `Metadata` instance class for retrieving metadata from cluster.
+- ***def get_metadata(self):***  
+ Returns `Metadata` instance class for retrieving metadata from cluster.
 
-async def create_prepared(self, statement: str, timeout: Optional[float] = None) -> PreparedStatement:
-: Create a prepared statement.
-: By providing a `timeout` all requests built by the prepared statement will use it, otherwise timeout provided during the `Cluster` instantantation will be used. Value expected is seconds.
+- ***async def create_prepared(self, statement: str, timeout: Optional[float] = None) -> PreparedStatement:***  
+ Create a prepared statement.  
+ By providing a `timeout` all requests built by the prepared statement will use it, otherwise timeout provided during the `Cluster` instantantation will be used. Value expected is seconds.
 
-async def execute(self, statement: "Statement") -> Result
-: Executes an statement and returns the `Result` instance.
+- ***async def execute(self, statement: "Statement") -> Result***  
+ Executes an statement and returns the `Result` instance.
 
-async def execute_batch(self, batch: Batch) -> Result:
-: Executes a batch of statements.
+- ***async def execute_batch(self, batch: Batch) -> Result:***  
+ Executes a batch of statements.
 
-def metrics(self) -> SessionMetrics:
-: Returns the metrics related to the session.
+- ***def metrics(self) -> SessionMetrics:***  
+ Returns the metrics related to the session.
 
-def speculative_execution_metrics(self) -> SpeculativeExecutionMetrics:
-: Returns speculative execution performance metrics gathered by the driver.
+- ***def speculative_execution_metrics(self) -> SpeculativeExecutionMetrics:***  
+ Returns speculative execution performance metrics gathered by the driver.
 
 ## Statement
 
@@ -567,83 +504,81 @@ values along with query options (consistency level, paging state, etc.)
 
 ### Methods of `Statement` object
 
-def add_key_index(self, index: int):
-: Adds a key index specifier to this a statement. When using
+- ***def add_key_index(self, index: int):***  
+ Adds a key index specifier to this a statement. When using
     token-aware routing, this can be used to tell the driver which
     parameters within a non-prepared, parameterized statement are part of
-    the partition key.
-: Use consecutive calls for composite partition keys.
-: This is not necessary for prepared statements, as the key parameters
+    the partition key.  
+ Use consecutive calls for composite partition keys.  
+ This is not necessary for prepared statements, as the key parameters
     are determined in the metadata processed in the prepare phase.
 
-def reset_parameters(self, count: int):
-: Clear and/or resize the statement’s parameters.
+- ***def reset_parameters(self, count: int):***  
+ Clear and/or resize the statement’s parameters.
 
-def set_page_size(self, page_size: int) -> None:
-: Sets the statement's page size.
+- ***def set_page_size(self, page_size: int) -> None:***  
+ Sets the statement's page size.
 
-def set_page_state(self, page_state: bytes) -> None:
-: Sets the statement's paging state. This can be used to get the next
-    page of data in a multi-page query.
-: ***Warning:*** The paging state should not be exposed to or come from
+- ***def set_page_state(self, page_state: bytes) -> None:***  
+ Sets the statement's paging state. This can be used to get the next
+    page of data in a multi-page query.  
+ *Warning:* The paging state should not be exposed to or come from
     untrusted environments. The paging state could be spoofed and potentially
     used to gain access to other data.
 
 
-def set_timeout(self, timeout: float) -> None:
-: Sets the statement's timeout in seconds for waiting for a response from a node.
-: ***Default:*** Disabled (use the cluster-level request timeout)
+- ***def set_timeout(self, timeout: float) -> None:***  
+ Sets the statement's timeout in seconds for waiting for a response from a node.  
+ *Default:* Disabled (use the cluster-level request timeout)
 
 
-def set_consistency(self, timeout: float) -> None:
-: Sets the statement’s consistency level.
-: ***Default:*** LOCAL_ONE
+- ***def set_consistency(self, timeout: float) -> None:***  
+ Sets the statement’s consistency level.  
+ *Default:* LOCAL_ONE
 
-def set_serial_consistency(self, timeout: float) -> None:
-: Sets the statement’s serial consistency level.
-: ***Default:*** Not set
+- ***def set_serial_consistency(self, timeout: float) -> None:***  
+ Sets the statement’s serial consistency level.  
+ *Default:* Not set
 
-def set_timestamp(self, timestamp: int):
-: Sets the statement’s timestamp.
+- ***def set_timestamp(self, timestamp: int):***  
+ Sets the statement’s timestamp.
 
-def set_is_idempotent(self, is_idempotent: bool):
-: Sets whether the statement is idempotent. Idempotent statements are
+- ***def set_is_idempotent(self, is_idempotent: bool):***  
+ Sets whether the statement is idempotent. Idempotent statements are
     able to be automatically retried after timeouts/errors and can be
     speculatively executed.
 
-def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
-: Sets the statement’s retry policy.
-: `default` This policy retries queries in the following cases:
-:        – *On a read timeout, if enough replicas replied but data was not
-            received.*
-:        – *On a write timeout, if a timeout occurs while writing the
-            distributed batch log*
-:        – *On unavailable, it will move to the next host*
-:        – *In all other cases the error will be returned.*
-:        This policy always uses the query’s original consistency level.
-:    `fallthrough` This policy never retries or ignores a server-side
-        failure. The error is always returned.
-: ***Default:*** `default` This policy will retry on a read timeout if there
+- ***def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):***  
+ Sets the statement’s retry policy.  
+ May be set to `default` or `fallthrough`
+    - `default` This policy retries queries in the following cases:
+      - On a read timeout, if enough replicas replied but data was not received.
+      - On a write timeout, if a timeout occurs while writing the distributed batch log 
+      - On unavailable, it will move to the next host
+      - In all other cases the error will be returned. This policy always uses the query’s original consistency level.
+    - `fallthrough` This policy never retries or ignores a server-side
+        failure. The error is always returned.   
+    *Default:* `default` This policy will retry on a read timeout if there
     was enough replicas, but no data present, on a write timeout if a
     logged batch request failed to write the batch log, and on a
     unavailable error it retries using a new host. In all other cases the
     default policy will return an error.
-: ***retry_policy_logging*** If set to true, this policy logs the retry decision of its child
-        policy. Logging is done using INFO level. ***Default:*** False
+    - `retry_policy_logging` If set to `True`, this policy logs the retry decision of its child
+        policy. Logging is done using `INFO` level. *Default:* `False`
 
-def set_tracing(self, enabled: bool = None):
-: Sets whether the statement should use tracing.
+- ***def set_tracing(self, enabled: bool = None):***  
+ Sets whether the statement should use tracing.
 
-def set_host(self, host: str, port: int = 9042):
-: Sets a specific host that should run the query.
-: In general, this should not be used, but it can be useful in the
-    following situations:
-: To query node-local tables such as system and virtual tables.
-: To apply a sequence of schema changes where it makes sense for all 
+- ***def set_host(self, host: str, port: int = 9042):***  
+ Sets a specific host that should run the query.  
+ In general, this should not be used, but it can be useful in the
+    following situations:  
+ To query node-local tables such as system and virtual tables.  
+ To apply a sequence of schema changes where it makes sense for all 
     the changes to be applied on a single node.
 
-def set_execution_profile(self, name: str) -> None:
-: Sets the execution profile to execute the statement with.
+- ***def set_execution_profile(self, name: str) -> None:***  
+ Sets the execution profile to execute the statement with.
     Note: Empty string will clear execution profile from statement
 
 ## PreparedStatement
@@ -657,12 +592,12 @@ Use the `session.create_prepared()` coroutine for creating a new instance of `Pr
 prepared = await session.create_prepared("SELECT id, value FROM test")
 statement = prepared.bind(page_size=10)
 ```
-def bind(self, page_size: Optional[int] = None, page_state: Optional[bytes] = None, execution_profile: Optional[str] = None,) -> Statement:
-: Returns a new `Statement` using the prepared.
+- ***def bind(self, page_size: Optional[int] = None, page_state: Optional[bytes] = None, execution_profile: Optional[str] = None,) -> Statement:***  
+ Returns a new `Statement` using the prepared.
 
-def set_execution_profile(self, statement: Statement, name: str) -> None:
-: Sets the execution profile to execute the statement with.
-: ***Note:*** Empty string will clear execution profile from statement
+- ***def set_execution_profile(self, statement: Statement, name: str) -> None:***  
+ Sets the execution profile to execute the statement with.  
+ ***Note:*** Empty string will clear execution profile from statement
 
 ## Batch
 A group of statements that are executed as a single batch.
@@ -671,53 +606,51 @@ A group of statements that are executed as a single batch.
 Use the `acsylla.create_batch_logged()`, `acsylla.create_batch_unlogged()` and 
 `acsylla.create_batch_counter()` factories for creating a new instance.
 
-def set_consistency(self, consistency: int):
-: Sets the batch’s consistency level
+- ***def set_consistency(self, consistency: int):***  
+ Sets the batch’s consistency level
 
-def set_serial_consistency(self, consistency: int):
-: Sets the batch’s serial consistency level.
+- ***def set_serial_consistency(self, consistency: int):***  
+ Sets the batch’s serial consistency level.
 
-def set_timestamp(self, timestamp: int):
-: Sets the batch’s timestamp.
+- ***def set_timestamp(self, timestamp: int):***  
+ Sets the batch’s timestamp.
 
-def set_request_timeout(self, timeout_ms: int):
-: Sets the batch’s timeout for waiting for a response from a node.
-: ****Default:**** Disabled (use the cluster-level request timeout)
+- ***def set_request_timeout(self, timeout_ms: int):***  
+ Sets the batch’s timeout for waiting for a response from a node.  
+ ***Default:*** Disabled (use the cluster-level request timeout)
 
-def set_is_idempotent(self, is_idempotent):
-: Sets whether the statements in a batch are idempotent. Idempotent
+- ***def set_is_idempotent(self, is_idempotent):***  
+ Sets whether the statements in a batch are idempotent. Idempotent
     batches are able to be automatically retried after timeouts/errors and
     can be speculatively executed.
 
-def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
-: Sets the batch’s retry policy.
-: `default` This policy retries queries in the following cases:
-:        – *On a read timeout, if enough replicas replied but data was not
-            received.*
-:        – *On a write timeout, if a timeout occurs while writing the
-            distributed batch log*
-:        – *On unavailable, it will move to the next host*
-:        – *In all other cases the error will be returned.*
-:        This policy always uses the query’s original consistency level.
-:    `fallthrough` This policy never retries or ignores a server-side
-        failure. The error is always returned.
-: ***Default:*** `default` This policy will retry on a read timeout if there
+- ***def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):***  
+ Sets the batch’s retry policy.  
+ May be set to `default` or `fallthrough`
+    - `default` This policy retries queries in the following cases:
+      - On a read timeout, if enough replicas replied but data was not received.
+      - On a write timeout, if a timeout occurs while writing the distributed batch log 
+      - On unavailable, it will move to the next host
+      - In all other cases the error will be returned. This policy always uses the query’s original consistency level.
+    - `fallthrough` This policy never retries or ignores a server-side
+        failure. The error is always returned.   
+    *Default:* `default` This policy will retry on a read timeout if there
     was enough replicas, but no data present, on a write timeout if a
     logged batch request failed to write the batch log, and on a
     unavailable error it retries using a new host. In all other cases the
     default policy will return an error.
-: ***retry_policy_logging*** If set to true, this policy logs the retry decision of its child
-        policy. Logging is done using INFO level. ***Default:*** False
+    - `retry_policy_logging` If set to `True`, this policy logs the retry decision of its child
+        policy. Logging is done using `INFO` level. *Default:* `False`
 
-def set_tracing(self, enabled: bool):
-: Sets whether the batch should use tracing.
+- ***def set_tracing(self, enabled: bool):***  
+ Sets whether the batch should use tracing.
 
-def add_statement(self, statement: Statement) -> None:
-: Adds a new statement to the batch.
+- ***def add_statement(self, statement: Statement) -> None:***  
+ Adds a new statement to the batch.
 
-def set_execution_profile(self, name: str) -> None:
-: Sets the execution profile to execute the statement with.
-: ***Note:*** Empty string will clear execution profile from statement
+- ***def set_execution_profile(self, name: str) -> None:***  
+ Sets the execution profile to execute the statement with.  
+ *Note:* Empty string will clear execution profile from statement
 
 ## Result
 The result of a query.
@@ -726,29 +659,29 @@ The result of a query.
 Provides a result instance class. Use the `session.execute()` coroutine for 
 getting the result  from a query
 
-def count(self) -> int:
-: Returns the total rows of the result
+- ***def count(self) -> int:***  
+ Returns the total rows of the result
 
-def column_count(self) -> int:
-: Returns the total columns returned
+- ***def column_count(self) -> int:***  
+ Returns the total columns returned
 
-def columns_names(self):
-: Returns the columns names
+- ***def columns_names(self):***  
+ Returns the columns names
 
-def first(self) -> Optional["Row"]:
-: Return the first result, if there is no row returns None.
+- ***def first(self) -> Optional["Row"]:***  
+ Return the first result, if there is no row returns None.
 
-def all(self) -> Iterable["Row"]:
-: Return the all rows using of a result, using an iterator. 
-: If there is no rows iterator returns no rows.
+- ***def all(self) -> Iterable["Row"]:***  
+ Return the all rows using of a result, using an iterator.   
+ If there is no rows iterator returns no rows.
 
-def has_more_pages(self) -> bool:
-: Returns true if there is still pages to be fetched
+- ***def has_more_pages(self) -> bool:***  
+ Returns true if there is still pages to be fetched
 
-def page_state(self) -> bytes:
-: Returns a token with the page state for continuing fetching
-    new results.
-: Before calling this method you must first checks if there are more
+- ***def page_state(self) -> bytes:***  
+ Returns a token with the page state for continuing fetching
+    new results.  
+ Before calling this method you must first checks if there are more
     results using the `has_more_pages` function, and if there are use the
     token returned by this function as an argument of the factories for creating
     an statement for returning the next page.
@@ -763,30 +696,30 @@ for row in result:
     print(row.as_dict())
 ```
 
-def as_dict(self) -> dict:
-: Returns the row as dict.
+- ***def as_dict(self) -> dict:***  
+ Returns the row as dict.
 
-def as_list(self) -> list:
-: Returns the row as list.
+- ***def as_list(self) -> list:***  
+ Returns the row as list.
 
-def as_tuple(self) -> tuple:
-: Returns the row as tuple.
+- ***def as_tuple(self) -> tuple:***  
+ Returns the row as tuple.
 
-def as_named_tuple(self) -> tuple:
-: Returns the row as named tuple.
+- ***def as_named_tuple(self) -> tuple:***  
+ Returns the row as named tuple.
 
-def column_count(self) -> int:
-: Returns column count.
+- ***def column_count(self) -> int:***  
+ Returns column count.
 
-def column_value(self, name: str) -> SupportedType:
-: Returns the row column value called by `name`.
-: Raises a `CassException` derived exception if the column can not be found
-: Type is inferred by using the Cassandra driver
+- ***def column_value(self, name: str) -> SupportedType:***  
+ Returns the row column value called by `name`.  
+ Raises a `CassException` derived exception if the column can not be found  
+ Type is inferred by using the Cassandra driver
     and converted, if supported, to a Python type or one
     of the extended types provided by Acsylla.
 
-def column_value_by_index(self, index):
-: Returns the column value by `column index`.
+- ***def column_value_by_index(self, index):***  
+ Returns the column value by `column index`.
     Raises an exception if the column can not be found
 
 ## Examples

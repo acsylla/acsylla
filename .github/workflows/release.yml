@@ -13,11 +13,11 @@ jobs:
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: true
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Generate macos-wheel
@@ -96,7 +96,7 @@ jobs:
         make test
     - name: Get the version
       id: get_version
-      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
     - uses: actions/upload-artifact@v2
       with:
         name: ${{ steps.get_version.outputs.VERSION }}
@@ -105,7 +105,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - uses: actions/download-artifact@v2
       with:
         name: ${{ needs.build.outputs.version }}

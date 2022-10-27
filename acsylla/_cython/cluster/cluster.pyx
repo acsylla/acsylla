@@ -8,6 +8,8 @@ cdef class Cluster:
         _initialize_posix_to_python_thread()
         self.ssl = NULL
         self.cass_cluster = NULL
+        self.logger = Logger()
+        cass_log_set_callback(cb_log_message, <void*>self.logger)
 
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
@@ -16,276 +18,386 @@ cdef class Cluster:
 
     def __init__(
         self,
-        str contact_points=None, # const char * contact_points
-        object port=None, # int port Default: 9042
-        str local_address=None, # const char * name
+        str contact_points=None,
+        object port=None,
+        str local_address=None,
         object local_port_range_min=None,
         object local_port_range_max=None,
-        str log_level=None, # Default: CASS_LOG_WARN
+        str log_level=None,
         object logging_callback=None,
-        object ssl_enabled=False, # bool Default: False
-        str ssl_cert=None, # const char* cert
-        str ssl_private_key=None, # const char * key,
-        str ssl_private_key_password=None, # const char* password
-        str ssl_trusted_cert=None, # const char * cert
-        object ssl_verify_flags=None, # int flags Default: CASS_SSL_VERIFY_PEER_CERT
-        object protocol_version=None, # int protocol_version Default: CASS_PROTOCOL_VERSION_V4
-        object use_beta_protocol_version=False, # cass_bool_t enable Default: cass_false
-        object consistency=None, # CassConsistency consistency Default: CASS_CONSISTENCY_LOCAL_ONE
-        object serial_consistency=None, # CassConsistency consistency Default: CASS_CONSISTENCY_ANY
-        object num_threads_io=None, # unsigned num_threads Default: 1
-        object queue_size_io=None, # unsigned queue_size Default: 8192
-        object core_connections_per_host=None, # unsigned num_connections Default: 1
-        object constant_reconnect_delay_ms=None, # cass_uint64_t delay_ms
-        object exponential_reconnect_base_delay_ms=None, # cass_uint64_t base_delay_ms Default: 2000 milliseconds base delay
-        object exponential_reconnect_max_delay_ms=None, # cass_uint64_t max_delay_ms Default: 60000 milliseconds max delay
-        object coalesce_delay_us=None, # cass_int64_t delay_us Default: 200 us
-        object new_request_ratio=None, # cass_int32_t ratio Default: 50
-        object connect_timeout=None, # unsigned timeout_ms Default: 5000 milliseconds
-        object request_timeout=None, # unsigned timeout_ms Default: 12000 milliseconds
-        object resolve_timeout=None, # unsigned timeout_ms Default: 2000 milliseconds
-        object max_schema_wait_time_ms=None, # unsigned wait_time_ms Default: 10000 milliseconds
-        object tracing_max_wait_time_ms=None, # max_wait_time_ms Default: 15 milliseconds
-        object tracing_retry_wait_time_ms=None, # retry_wait_time_ms Default: 3 milliseconds
-        object tracing_consistency=None, # Default: CASS_CONSISTENCY_ONE
-        object username=None, # const char * username
-        object password=None, # const char * password
+        object ssl_enabled=False,
+        str ssl_cert=None,
+        str ssl_private_key=None,
+        str ssl_private_key_password=None,
+        str ssl_trusted_cert=None,
+        object ssl_verify_flags=None,
+        object protocol_version=None,
+        object use_beta_protocol_version=False,
+        object consistency=None,
+        object serial_consistency=None,
+        object num_threads_io=None,
+        object queue_size_io=None,
+        object core_connections_per_host=None,
+        object constant_reconnect_delay_ms=None,
+        object exponential_reconnect_base_delay_ms=None,
+        object exponential_reconnect_max_delay_ms=None,
+        object coalesce_delay_us=None,
+        object new_request_ratio=None,
+        object connect_timeout=None,
+        object request_timeout=None,
+        object resolve_timeout=None,
+        object max_schema_wait_time_ms=None,
+        object tracing_max_wait_time_ms=None,
+        object tracing_retry_wait_time_ms=None,
+        object tracing_consistency=None,
+        object username=None,
+        object password=None,
         object load_balance_round_robin=False,
-        str load_balance_dc_aware=None, # const char * local_dc
-        object token_aware_routing=None, # cass_bool_t enabled Default: cass_true (enabled)
-        object token_aware_routing_shuffle_replicas=None, # cass_bool_t enabled Default: cass_true (enabled)
-        object latency_aware_routing=None, # cass_bool_t enabled Default: cass_false (disabled)
-        object latency_aware_routing_settings=None, # instance of LatencyAwareRoutingSettings
-                                            # Defaults:
-                                            # cass_double_t exclusion_threshold: 2.0
-                                            # cass_uint64_t scale_ms: 100 milliseconds
-                                            # cass_uint64_t retry_period_ms: 10,000 milliseconds (10 seconds)
-                                            # cass_uint64_t min_measured: 50
-        str whitelist_dc=None, # const char * dcs
-        str blacklist_dc=None, # const char * dcs
-        str whitelist_hosts=None, # const char * hosts
-        str blacklist_hosts=None, # const char * hosts
-        object tcp_nodelay=None, # cass_bool_t enabled Default: cass_true
-        object tcp_keepalive_sec=None, # unsigned delay_secs Default: disabled
-        str timestamp_gen=None, # server_side or monotonic
-        object heartbeat_interval_sec=None, # unsigned interval_secs Default: 30 seconds
-        object idle_timeout_sec=None, # unsigned timeout_secs Default: 60 seconds
-        str retry_policy=None, # default or fallthrough
-        object retry_policy_logging=False, # logs the retry decision of its child policy
-        object use_schema=None, # cass_bool_t enabled Default: cass_true (enabled)
-        object hostname_resolution=None, # cass_bool_t enabled Default: cass_false (disabled)
-        object randomized_contact_points=None, # cass_bool_t enabled Default: cass_true (enabled)
-        object speculative_execution_policy=None, # instance of SpeculativeExecutionPolicy
-                                                  # cass_int64_t constant_delay_ms
-                                                  # int max_speculative_executions
-        object max_reusable_write_objects=None, # unsigned num_objects Default: Max unsigned integer value
-        object prepare_on_all_hosts=None, # cass_bool_t enabled Default: cass_true
-        object no_compact=None, # cass_bool_t enabled Default: cass_false
-        object host_listener_callback=None, # Not implemented yet
-        str application_name=None, # const char * application_name
-        str application_version=None, # const char * application_version
-        object client_id=None, # CassUuid client_id Default: UUID v4 generated
-        object monitor_reporting_interval_sec=None, # unsigned interval_secs Default: 300 seconds.
+        str load_balance_dc_aware=None,
+        object token_aware_routing=None,
+        object token_aware_routing_shuffle_replicas=None,
+        object latency_aware_routing=None,
+        object latency_aware_routing_settings=None,
+        str whitelist_dc=None,
+        str blacklist_dc=None,
+        str whitelist_hosts=None,
+        str blacklist_hosts=None,
+        object tcp_nodelay=None,
+        object tcp_keepalive_sec=None,
+        str timestamp_gen=None,
+        object heartbeat_interval_sec=None,
+        object idle_timeout_sec=None,
+        str retry_policy=None,
+        object retry_policy_logging=False,
+        object use_schema=None,
+        object hostname_resolution=None,
+        object randomized_contact_points=None,
+        object speculative_execution_policy=None,
+
+
+        object max_reusable_write_objects=None,
+        object prepare_on_all_hosts=None,
+        object no_compact=None,
+        object host_listener_callback=None,
+        str application_name=None,
+        str application_version=None,
+        object client_id=None,
+        object monitor_reporting_interval_sec=None,
         object cloud_secure_connection_bundle=None,
-        object dse_gssapi_authenticator=None, # Dict const char * service, const char * principal
-        object dse_gssapi_authenticator_proxy=None, # Dict const char * service, const char * principal, const char * authorization_id
-        object dse_plaintext_authenticator=None, # Dict const char * username, const char * password
-        object dse_plaintext_authenticator_proxy=None # Dict const char * username, const char * password, const char * authorization_id
-    ):
-
-        cdef CassError error
-        cdef CassUuid cass_client_id
-        cdef CassRetryPolicy* cass_policy
-        cdef CassRetryPolicy* cass_log_policy
-        cdef CassTimestampGen* cass_timestamp_gen
-
-        if not contact_points and not cloud_secure_connection_bundle:
-            raise ValueError("Contact points can not be an empty value")
-
-        logger = Logger(log_level, logging_callback=logging_callback)
-        Py_INCREF(logger)
-        cass_log_set_callback(cb_log_message, <void*>logger)
-        if log_level is not None:
-            cass_log_set_level(log_level_from_str(log_level))
+        object dse_gssapi_authenticator=None,
+        object dse_gssapi_authenticator_proxy=None,
+        object dse_plaintext_authenticator=None,
+        object dse_plaintext_authenticator_proxy=None):
 
         self.cass_cluster = cass_cluster_new()
 
-        error = cass_cluster_set_contact_points(self.cass_cluster, contact_points.encode())
-        raise_if_error(error)
+        self.set_contact_points(contact_points)
+        self.set_port(port)
+        self.set_local_address(local_address)
+        self.set_local_port_range(local_port_range_min, local_port_range_max)
+        self.set_log_level(log_level)
+        self.set_logging_callback(logging_callback)
+        self.set_protocol_version(protocol_version)
+        self.set_use_beta_protocol_version(use_beta_protocol_version)
+        self.set_connect_timeout(connect_timeout)
+        self.set_request_timeout(request_timeout)
+        self.set_resolve_timeout(resolve_timeout)
+        self.set_credentials(username, password)
+        self.set_consistency(consistency)
+        self.set_serial_consistency(serial_consistency)
+        self.set_hostname_resolution(hostname_resolution)
+        self.set_ssl(ssl_enabled, ssl_cert, ssl_private_key, ssl_private_key_password, ssl_trusted_cert, ssl_verify_flags)
+        self.set_num_threads_io(num_threads_io)
+        self.set_queue_size_io(queue_size_io)
+        self.set_core_connections_per_host(core_connections_per_host)
+        self.set_constant_reconnect(constant_reconnect_delay_ms)
+        self.set_exponential_reconnect(exponential_reconnect_base_delay_ms, exponential_reconnect_max_delay_ms)
+        self.set_coalesce_delay(coalesce_delay_us)
+        self.set_new_request_ratio(new_request_ratio)
+        self.set_max_schema_wait_time(max_schema_wait_time_ms)
+        self.set_tracing_max_wait_time(tracing_max_wait_time_ms)
+        self.set_tracing_retry_wait_time(tracing_retry_wait_time_ms)
+        self.set_tracing_consistency(tracing_consistency)
+        self.set_load_balance_round_robin(load_balance_round_robin)
+        self.set_load_balance_dc_aware(load_balance_dc_aware)
+        self.set_token_aware_routing(token_aware_routing)
+        self.set_token_aware_routing_shuffle_replicas(token_aware_routing_shuffle_replicas)
+        self.set_latency_aware_routing(latency_aware_routing)
+        if latency_aware_routing_settings is not None:
+            self.set_latency_aware_routing_settings(
+                latency_aware_routing_settings.exclusion_threshold,
+                latency_aware_routing_settings.scale_ms,
+                latency_aware_routing_settings.retry_period_ms,
+                latency_aware_routing_settings.update_rate_ms,
+                latency_aware_routing_settings.min_measured
+            )
+        self.set_application_name(application_name)
+        self.set_application_version(application_version)
+        self.set_whitelist_dc(whitelist_dc)
+        self.set_blacklist_dc(blacklist_dc)
+        self.set_whitelist_hosts(whitelist_hosts)
+        self.set_blacklist_hosts(blacklist_hosts)
+        self.set_tcp_nodelay(tcp_nodelay)
+        if tcp_keepalive_sec is not None:
+            self.set_tcp_keepalive(True, tcp_keepalive_sec)
+        self.set_timestamp_gen(timestamp_gen)
+        self.set_heartbeat_interval(heartbeat_interval_sec)
+        self.set_idle_timeout(idle_timeout_sec)
+        self.set_retry_policy(retry_policy, retry_policy_logging)
+        self.set_use_schema(use_schema)
+        self.set_randomized_contact_points(randomized_contact_points)
+        if speculative_execution_policy is not None:
+            self.set_speculative_execution_policy(
+                speculative_execution_policy.constant_delay_ms,
+                speculative_execution_policy.max_speculative_executions)
+        self.set_max_reusable_write_objects(max_reusable_write_objects)
+        self.set_prepare_on_all_hosts(prepare_on_all_hosts)
+        self.set_no_compact(no_compact)
+        self.set_host_listener_callback(host_listener_callback)
+        self.set_client_id(client_id)
+        self.set_monitor_reporting_interval(monitor_reporting_interval_sec)
+        self.set_cloud_secure_connection_bundle(cloud_secure_connection_bundle)
+        if dse_gssapi_authenticator is not None:
+            self.set_dse_gssapi_authenticator(dse_gssapi_authenticator.service, dse_gssapi_authenticator.principal)
+        if dse_gssapi_authenticator_proxy is not None:
+            self.set_dse_gssapi_authenticator_proxy(
+                dse_gssapi_authenticator_proxy.service,
+                dse_gssapi_authenticator_proxy.principal,
+                dse_gssapi_authenticator_proxy.authorization_id
+            )
+        if dse_plaintext_authenticator is not None:
+            self.set_dse_plaintext_authenticator(
+                dse_plaintext_authenticator.username.encode(),
+                dse_gssapi_authenticator.password.encode()
+            )
+        if dse_plaintext_authenticator_proxy is not None:
+            self.set_dse_plaintext_authenticator_proxy(
+                dse_plaintext_authenticator_proxy.username.encode(),
+                dse_plaintext_authenticator_proxy.password.encode(),
+                dse_plaintext_authenticator_proxy.authorization_id.encode()
+            )
 
+    def set_contact_points(self, contact_points):
+        if contact_points is not None:
+            error = cass_cluster_set_contact_points(self.cass_cluster, contact_points.encode())
+            raise_if_error(error)
+
+    def set_port(self, port):
         if port is not None:
             error = cass_cluster_set_port(self.cass_cluster, port)
             raise_if_error(error)
 
+    def set_local_address(self, local_address):
         if local_address is not None:
             error = cass_cluster_set_local_address(self.cass_cluster, local_address.encode())
             raise_if_error(error)
 
-        if local_port_range_min is not None:
-            if local_port_range_max is None:
-                local_port_range_max = 65535
-            error = cass_cluster_set_local_port_range(self.cass_cluster, local_port_range_min, local_port_range_max)
+    def set_local_port_range(self, min, max):
+        if min is not None and max is not None:
+            error = cass_cluster_set_local_port_range(self.cass_cluster, min, max)
             raise_if_error(error)
 
+    def set_credentials(self, username, password=''):
+        if username is not None and password is not None:
+            cass_cluster_set_credentials(self.cass_cluster, username.encode(), password.encode())
+        elif username is not None or password is not None:
+            raise ValueError("For using credentials both parameters (username and password) must be set")
+
+    def set_connect_timeout(self, timeout_ms):
+        if timeout_ms is not None:
+            cass_cluster_set_connect_timeout(self.cass_cluster, timeout_ms)
+
+    def set_request_timeout(self, timeout_ms):
+        if timeout_ms is not None:
+            cass_cluster_set_request_timeout(self.cass_cluster, timeout_ms)
+
+    def set_resolve_timeout(self, timeout_ms):
+        if timeout_ms is not None:
+            cass_cluster_set_resolve_timeout(self.cass_cluster, timeout_ms)
+
+    def set_log_level(self, level):
+        if level is not None:
+            cass_log_set_level(log_level_from_str(level))
+            self.logger.set_log_level(level)
+
+    def set_logging_callback(self, callback):
+        if callback is not None:
+            self.logger.set_logging_callback(callback)
+
+    def set_ssl(self, enabled, cert=None, private_key=None, private_key_password='', trusted_cert=None, verify_flags=None):
+        if enabled is True:
+            self.ssl = cass_ssl_new()
+            if cert is not None:
+                error = cass_ssl_set_cert(self.ssl, cert.encode())
+                raise_if_error(error)
+            if private_key is not None:
+                error = cass_ssl_set_private_key(self.ssl, private_key.encode(), private_key_password.encode())
+                raise_if_error(error)
+            if trusted_cert is not None:
+                error = cass_ssl_add_trusted_cert(self.ssl, trusted_cert.encode())
+                raise_if_error(error)
+            if verify_flags is not None:
+                if verify_flags == CASS_SSL_VERIFY_PEER_IDENTITY_DNS:
+                    self.set_hostname_resolution(True)
+                cass_ssl_set_verify_flags(self.ssl, verify_flags)
+            cass_cluster_set_ssl(self.cass_cluster, self.ssl)
+
+    def set_protocol_version(self, protocol_version):
         if protocol_version is not None:
             error = cass_cluster_set_protocol_version(self.cass_cluster, protocol_version)
             raise_if_error(error)
 
-        if use_beta_protocol_version is True:
-            error = cass_cluster_set_use_beta_protocol_version(self.cass_cluster, cass_true)
+    def set_use_beta_protocol_version(self, enabled):
+        if enabled is not None:
+            error = cass_cluster_set_use_beta_protocol_version(self.cass_cluster, enabled)
             raise_if_error(error)
 
-        if connect_timeout is not None:
-            cass_cluster_set_connect_timeout(self.cass_cluster, connect_timeout)
-
-        if request_timeout is not None:
-            cass_cluster_set_request_timeout(self.cass_cluster, request_timeout)
-
-        if resolve_timeout is not None:
-            cass_cluster_set_resolve_timeout(self.cass_cluster, resolve_timeout)
-
-        if username is not None and password is not None:
-            cass_cluster_set_credentials(self.cass_cluster, username.encode(), password.encode())
-        elif username is not None or password is not None:
-            raise ValueError("For using credentials both parameters (username and password) need to be set")
-
+    def set_consistency(self, consistency):
         if consistency is not None:
             error = cass_cluster_set_consistency(self.cass_cluster, consistency)
             raise_if_error(error)
 
-        if serial_consistency is not None:
-            error = cass_cluster_set_serial_consistency(self.cass_cluster, serial_consistency)
+    def set_serial_consistency(self, consistency):
+        if consistency is not None:
+            error = cass_cluster_set_serial_consistency(self.cass_cluster, consistency)
             raise_if_error(error)
 
-        if hostname_resolution is not None:
-            error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, hostname_resolution)
+    def set_num_threads_io(self, num_threads):
+        if num_threads is not None:
+            error = cass_cluster_set_num_threads_io(self.cass_cluster, num_threads)
             raise_if_error(error)
 
-        if ssl_enabled:
-            self.ssl = cass_ssl_new()
-            if ssl_cert is not None:
-                error = cass_ssl_set_cert(self.ssl, ssl_cert.encode())
-                raise_if_error(error)
-            if ssl_private_key is not None:
-                error = cass_ssl_set_private_key(self.ssl, ssl_private_key.encode(), ssl_private_key_password.encode())
-                raise_if_error(error)
-            if ssl_verify_flags == CASS_SSL_VERIFY_PEER_IDENTITY_DNS:
-                error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, cass_true)
-                raise_if_error(error)
-            if ssl_trusted_cert is not None:
-                error = cass_ssl_add_trusted_cert(self.ssl, ssl_trusted_cert.encode())
-                raise_if_error(error)
-            if ssl_verify_flags is not None:
-                cass_ssl_set_verify_flags(self.ssl, ssl_verify_flags)
-            cass_cluster_set_ssl(self.cass_cluster, self.ssl)
-
-        if num_threads_io is not None:
-            error = cass_cluster_set_num_threads_io(self.cass_cluster, num_threads_io)
+    def set_queue_size_io(self, queue_size):
+        if queue_size is not None:
+            error = cass_cluster_set_queue_size_io(self.cass_cluster, queue_size)
             raise_if_error(error)
 
-        if queue_size_io is not None:
-            error = cass_cluster_set_queue_size_io(self.cass_cluster, queue_size_io)
+    def set_core_connections_per_host(self, num_connections):
+        if num_connections is not None:
+            error = cass_cluster_set_core_connections_per_host(self.cass_cluster, num_connections)
             raise_if_error(error)
 
-        if core_connections_per_host is not None:
-            error = cass_cluster_set_core_connections_per_host(self.cass_cluster, core_connections_per_host)
+    def set_constant_reconnect(self, delay_ms):
+        if delay_ms is not None:
+            cass_cluster_set_constant_reconnect(self.cass_cluster, delay_ms)
+
+    def set_exponential_reconnect(self, base_delay_ms, max_delay_ms):
+        if base_delay_ms is not None and max_delay_ms is not None:
+            error = cass_cluster_set_exponential_reconnect(self.cass_cluster, base_delay_ms, max_delay_ms)
             raise_if_error(error)
 
-        if constant_reconnect_delay_ms is not None:
-            cass_cluster_set_constant_reconnect(self.cass_cluster, constant_reconnect_delay_ms)
+    def set_coalesce_delay(self, delay_us):
+        if delay_us is not None:
+            error = cass_cluster_set_coalesce_delay(self.cass_cluster, delay_us)
+            raise_if_error(error)
 
-        if exponential_reconnect_base_delay_ms is not None:
-            error = cass_cluster_set_exponential_reconnect(self.cass_cluster, exponential_reconnect_base_delay_ms, exponential_reconnect_max_delay_ms)
+    def set_new_request_ratio(self, request_ratio):
+        if request_ratio is not None:
+            error = cass_cluster_set_new_request_ratio(self.cass_cluster, request_ratio)
+            raise_if_error(error)
 
-        if coalesce_delay_us is not None:
-            error = cass_cluster_set_coalesce_delay(self.cass_cluster, coalesce_delay_us)
+    def set_max_schema_wait_time(self, wait_time_ms):
+        if wait_time_ms is not None:
+            cass_cluster_set_max_schema_wait_time(self.cass_cluster, wait_time_ms)
 
-        if new_request_ratio is not None:
-            error = cass_cluster_set_new_request_ratio(self.cass_cluster, new_request_ratio)
+    def set_tracing_max_wait_time(self, max_wait_time_ms):
+        if max_wait_time_ms is not None:
+            cass_cluster_set_tracing_max_wait_time(self.cass_cluster, max_wait_time_ms)
 
-        if max_schema_wait_time_ms is not None:
-            cass_cluster_set_max_schema_wait_time(self.cass_cluster, max_schema_wait_time_ms)
+    def set_tracing_retry_wait_time(self, retry_wait_time_ms):
+        if retry_wait_time_ms is not None:
+            cass_cluster_set_tracing_retry_wait_time(self.cass_cluster, retry_wait_time_ms)
 
-        if tracing_max_wait_time_ms is not None:
-            cass_cluster_set_tracing_max_wait_time(self.cass_cluster, tracing_max_wait_time_ms)
+    def set_tracing_consistency(self, consistency):
+        if consistency is not None:
+            cass_cluster_set_tracing_consistency(self.cass_cluster, consistency)
 
-        if tracing_retry_wait_time_ms is not None:
-            cass_cluster_set_tracing_retry_wait_time(self.cass_cluster, tracing_retry_wait_time_ms)
-
-        if tracing_consistency is not None:
-            cass_cluster_set_tracing_consistency(self.cass_cluster, tracing_consistency)
-
-        if load_balance_round_robin is not None:
+    def set_load_balance_round_robin(self, enabled):
+        if enabled is not True:
             cass_cluster_set_load_balance_round_robin(self.cass_cluster)
 
-        if load_balance_dc_aware is not None:
-            error = cass_cluster_set_load_balance_dc_aware(self.cass_cluster, load_balance_dc_aware.encode(), 0, cass_false)
+    def set_load_balance_dc_aware(self, dc):
+        if dc is not None:
+            error = cass_cluster_set_load_balance_dc_aware(self.cass_cluster, dc.encode(), 0, cass_false)
             raise_if_error(error)
 
-        if token_aware_routing is not None:
-            cass_cluster_set_token_aware_routing(self.cass_cluster, token_aware_routing)
+    def set_token_aware_routing(self, enabled):
+        if enabled is not None:
+            cass_cluster_set_token_aware_routing(self.cass_cluster, enabled)
 
-        if token_aware_routing_shuffle_replicas is not None:
-            cass_cluster_set_token_aware_routing_shuffle_replicas(self.cass_cluster, token_aware_routing_shuffle_replicas)
+    def set_token_aware_routing_shuffle_replicas(self, enabled):
+        if enabled is not None:
+            cass_cluster_set_token_aware_routing_shuffle_replicas(self.cass_cluster, enabled)
 
-        if latency_aware_routing is not None:
-            cass_cluster_set_latency_aware_routing(self.cass_cluster, latency_aware_routing)
-            if latency_aware_routing_settings is not None:
-                cass_cluster_set_latency_aware_routing_settings(
-                    self.cass_cluster,
-                    latency_aware_routing_settings.exclusion_threshold,
-                    latency_aware_routing_settings.scale_ms,
-                    latency_aware_routing_settings.retry_period_ms,
-                    latency_aware_routing_settings.update_rate_ms,
-                    latency_aware_routing_settings.min_measured
+    def set_latency_aware_routing(self, enabled):
+        if enabled is not None:
+            cass_cluster_set_latency_aware_routing(self.cass_cluster, enabled)
 
-                )
+    def set_latency_aware_routing_settings(self,
+                                           exclusion_threshold,
+                                           scale_ms,
+                                           retry_period_ms,
+                                           update_rate_ms,
+                                           min_measured):
+        cass_cluster_set_latency_aware_routing_settings(
+            self.cass_cluster,
+            exclusion_threshold,
+            scale_ms,
+            retry_period_ms,
+            update_rate_ms,
+            min_measured)
 
-        if application_name is not None:
-            cass_cluster_set_application_name(self.cass_cluster, application_name.encode())
+    def set_whitelist_dc(self, dcs):
+        if dcs is not None:
+            cass_cluster_set_whitelist_dc_filtering(self.cass_cluster, dcs.encode())
 
-        if application_version is not None:
-            cass_cluster_set_application_version(self.cass_cluster, application_version.encode())
+    def set_blacklist_dc(self, dcs):
+        if dcs is not None:
+            cass_cluster_set_blacklist_dc_filtering(self.cass_cluster, dcs.encode())
 
-        if whitelist_dc is not None:
-            cass_cluster_set_whitelist_dc_filtering(self.cass_cluster, whitelist_dc.encode())
+    def set_whitelist_hosts(self, hosts):
+        if hosts is not None:
+            cass_cluster_set_whitelist_filtering(self.cass_cluster, hosts.encode())
 
-        if blacklist_dc is not None:
-            cass_cluster_set_blacklist_dc_filtering(self.cass_cluster, blacklist_dc.encode())
+    def set_blacklist_hosts(self, hosts):
+        if hosts is not None:
+            cass_cluster_set_blacklist_filtering(self.cass_cluster, hosts.encode())
 
-        if whitelist_hosts is not None:
-            cass_cluster_set_whitelist_filtering(self.cass_cluster, whitelist_hosts.encode())
+    def set_tcp_nodelay(self, enabled):
+        if enabled is not None:
+            cass_cluster_set_tcp_nodelay(self.cass_cluster, enabled)
 
-        if blacklist_hosts is not None:
-            cass_cluster_set_blacklist_filtering(self.cass_cluster, blacklist_hosts.encode())
+    def set_tcp_keepalive(self, enabled, delay_secs):
+        if enabled is not None:
+            cass_cluster_set_tcp_keepalive(self.cass_cluster, enabled, delay_secs)
 
-        if tcp_nodelay is not None:
-            cass_cluster_set_tcp_nodelay(self.cass_cluster, tcp_nodelay)
-
-        if tcp_keepalive_sec is not None:
-            cass_cluster_set_tcp_keepalive(self.cass_cluster, cass_true, tcp_keepalive_sec)
-
+    def set_timestamp_gen(self, timestamp_gen):
         if timestamp_gen is not None:
             if timestamp_gen == 'server_side':
                 cass_timestamp_gen = cass_timestamp_gen_server_side_new()
             if timestamp_gen == 'monotonic':
                 cass_timestamp_gen = cass_timestamp_gen_monotonic_new()
+            else:
+                raise ValueError("Timestamp gen must be 'server_side' or 'monotonic'")
             cass_cluster_set_timestamp_gen(self.cass_cluster, cass_timestamp_gen)
 
-        if heartbeat_interval_sec is not None:
-            cass_cluster_set_connection_heartbeat_interval(self.cass_cluster, heartbeat_interval_sec)
+    def set_heartbeat_interval(self, interval_sec):
+        if interval_sec is not None:
+            cass_cluster_set_connection_heartbeat_interval(self.cass_cluster, interval_sec)
 
-        if idle_timeout_sec is not None:
-            cass_cluster_set_connection_idle_timeout(self.cass_cluster, idle_timeout_sec)
+    def set_idle_timeout(self, timeout_sec):
+        if timeout_sec is not None:
+            cass_cluster_set_connection_idle_timeout(self.cass_cluster, timeout_sec)
 
-        if retry_policy is not None:
-            if retry_policy == 'default':
+    def set_retry_policy(self, policy, logging=False):
+        if policy is not None:
+            if policy == 'default':
                 cass_policy = cass_retry_policy_default_new()
-            elif retry_policy == 'fallthrough':
+            elif policy == 'fallthrough':
                 cass_policy = cass_retry_policy_fallthrough_new()
             else:
                 raise ValueError("Retry policy must be 'default' or 'fallthrough'")
-            if retry_policy_logging is True:
+            if logging is True:
                 cass_log_policy = cass_retry_policy_logging_new(cass_policy)
                 cass_cluster_set_retry_policy(self.cass_cluster, cass_log_policy)
                 cass_retry_policy_free(cass_log_policy)
@@ -293,83 +405,107 @@ cdef class Cluster:
                 cass_cluster_set_retry_policy(self.cass_cluster, cass_policy)
             cass_retry_policy_free(cass_policy)
 
-        if use_schema is not None:
-            cass_cluster_set_use_schema(self.cass_cluster, use_schema)
-
-        if randomized_contact_points is not None:
-            error = cass_cluster_set_use_randomized_contact_points(self.cass_cluster, randomized_contact_points)
+    def set_hostname_resolution(self, enabled):
+        if enabled is not None:
+            error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, enabled)
             raise_if_error(error)
 
-        if speculative_execution_policy is not None:
+    def set_use_schema(self, enabled):
+        if enabled is not None:
+            cass_cluster_set_use_schema(self.cass_cluster, enabled)
+
+    def set_randomized_contact_points(self, enabled):
+        if enabled is not None:
+            error = cass_cluster_set_use_randomized_contact_points(self.cass_cluster, enabled)
+            raise_if_error(error)
+
+    def set_speculative_execution_policy(self, constant_delay_ms, max_speculative_executions):
+        if constant_delay_ms is not None:
             error = cass_cluster_set_constant_speculative_execution_policy(
                 self.cass_cluster,
-                speculative_execution_policy.constant_delay_ms,
-                speculative_execution_policy.max_speculative_executions
+                constant_delay_ms,
+                max_speculative_executions
             )
             raise_if_error(error)
 
-        if max_reusable_write_objects is not None:
-            error = cass_cluster_set_max_reusable_write_objects(self.cass_cluster, max_reusable_write_objects)
+    def set_no_speculative_execution_policy(self):
+        error = cass_cluster_set_no_speculative_execution_policy(self.cass_cluster)
+        raise_if_error(error)
+
+    def set_max_reusable_write_objects(self, num_objects):
+        if num_objects is not None:
+            error = cass_cluster_set_max_reusable_write_objects(self.cass_cluster, num_objects)
             raise_if_error(error)
 
-        if prepare_on_all_hosts is not None:
-            error = cass_cluster_set_prepare_on_all_hosts(self.cass_cluster, prepare_on_all_hosts)
+    def set_prepare_on_all_hosts(self, enabled):
+        if enabled is not None:
+            error = cass_cluster_set_prepare_on_all_hosts(self.cass_cluster, enabled)
             raise_if_error(error)
 
-        if no_compact is not None:
-            error = cass_cluster_set_no_compact(self.cass_cluster, no_compact)
+    def set_no_compact(self, enabled):
+        if enabled is not None:
+            error = cass_cluster_set_no_compact(self.cass_cluster, enabled)
             raise_if_error(error)
 
-        if host_listener_callback is not None:
-            raise NotImplementedError("host_listener_callback is not implemented yet")
+    def set_host_listener_callback(self, callback):
+        if callback is not None:
+            raise NotImplementedError("Host listener callback is not implemented yet")
 
+    def set_application_name(self, name):
+        if name is not None:
+            cass_cluster_set_application_name(self.cass_cluster, name.encode())
+
+    def set_application_version(self, version):
+        if version is not None:
+            cass_cluster_set_application_version(self.cass_cluster, version.encode())
+
+    def set_client_id(self, client_id):
+        cdef CassUuid cass_client_id
         if client_id is not None:
             error = cass_uuid_from_string(client_id.encode(), &cass_client_id)
             raise_if_error(error)
             cass_cluster_set_client_id(self.cass_cluster, cass_client_id)
 
-        if monitor_reporting_interval_sec is not None:
-            cass_cluster_set_monitor_reporting_interval(self.cass_cluster, monitor_reporting_interval_sec)
+    def set_monitor_reporting_interval(self, interval_sec):
+        if interval_sec is not None:
+            cass_cluster_set_monitor_reporting_interval(self.cass_cluster, interval_sec)
 
-        if cloud_secure_connection_bundle is not None:
-            error = cass_cluster_set_cloud_secure_connection_bundle(self.cass_cluster, cloud_secure_connection_bundle.encode())
+    def set_cloud_secure_connection_bundle(self, path):
+        if path is not None:
+            error = cass_cluster_set_cloud_secure_connection_bundle(self.cass_cluster, path.encode())
             raise_if_error(error)
 
-        if dse_gssapi_authenticator is not None:
+    def set_dse_gssapi_authenticator(self, service, principal):
+        if service is not None:
             error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, cass_true)
             raise_if_error(error)
-            error = cass_cluster_set_dse_gssapi_authenticator(
-                self.cass_cluster,
-                dse_gssapi_authenticator.service.encode(),
-                dse_gssapi_authenticator.principal.encode()
-            )
+            error = cass_cluster_set_dse_gssapi_authenticator(self.cass_cluster, service.encode(), principal.encode())
             raise_if_error(error)
 
-        if dse_gssapi_authenticator_proxy is not None:
+    def set_dse_gssapi_authenticator_proxy(self, service, principal, authorization_id):
+        if service is not None:
             error = cass_cluster_set_use_hostname_resolution(self.cass_cluster, cass_true)
             raise_if_error(error)
             error = cass_cluster_set_dse_gssapi_authenticator_proxy(
                 self.cass_cluster,
-                dse_gssapi_authenticator_proxy.service.encode(),
-                dse_gssapi_authenticator_proxy.principal.encode(),
-                dse_gssapi_authenticator_proxy.authorization_id.encode()
+                service.encode(),
+                principal.encode(),
+                authorization_id.encode()
             )
             raise_if_error(error)
 
-        if dse_plaintext_authenticator is not None:
-            error = cass_cluster_set_dse_plaintext_authenticator(
-                self.cass_cluster,
-                dse_plaintext_authenticator.username.encode(),
-                dse_gssapi_authenticator.password.encode()
-            )
+    def set_dse_plaintext_authenticator(self, username, password):
+        if username is not None:
+            error = cass_cluster_set_dse_plaintext_authenticator(self.cass_cluster, username.encode(), password.encode())
             raise_if_error(error)
 
-        if dse_plaintext_authenticator_proxy is not None:
+    def set_dse_plaintext_authenticator_proxy(self, username, password, authorization_id):
+        if username is not None:
             error = cass_cluster_set_dse_plaintext_authenticator_proxy(
                 self.cass_cluster,
-                dse_plaintext_authenticator_proxy.username.encode(),
-                dse_plaintext_authenticator_proxy.password.encode(),
-                dse_plaintext_authenticator_proxy.authorization_id.encode()
+                username.encode(),
+                password.encode(),
+                authorization_id.encode()
             )
             raise_if_error(error)
 

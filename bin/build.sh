@@ -13,7 +13,7 @@ apt update
 apt -y install build-essential git cmake libssl-dev libuv1-dev zlib1g-dev
 apt -y install libkrb5-dev clang-format pkg-config
 
-git clone https://github.com/whiteluna/acsylla.git
+git clone https://github.com/acsylla/acsylla.git
 cd acsylla
 git checkout -b $BRANCH origin/$BRANCH
 

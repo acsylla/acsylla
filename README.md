@@ -4,12 +4,49 @@
 [![Number of PyPI downloads](https://img.shields.io/pypi/dm/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Documentation Status](https://readthedocs.org/projects/acsylla/badge/?version=latest)](https://acsylla.readthedocs.io/en/latest/)
 
-# Acsylla <img align="right" width="200px" src="https://raw.githubusercontent.com/acsylla/acsylla/issue_16_17_25/logo/cassandra-scylladb.svg" />
+# Acsylla <img align="right" width="200px" src="https://raw.githubusercontent.com/acsylla/acsylla/master/logo/cassandra-scylladb.svg" />
 A composition of ***async*** + ***cassandra*** + ***scylla*** words.
 
 
 ## A high performance Python Asyncio client library for Cassandra and ScyllaDB 
-Under the hood, **_acsylla_** has modern, feature-rich and shard-aware [C/C++ client](https://github.com/scylladb/cpp-driver) library for [Cassandra](https://cassandra.apache.org) and [ScyllaDB](https://www.scylladb.com).
+Under the hood **_acsylla_** has modern, feature-rich and shard-aware [C/C++ client](https://github.com/scylladb/cpp-driver) library for [Cassandra](https://cassandra.apache.org) and [ScyllaDB](https://www.scylladb.com).
+
+## Table of Contents
+  * [Features](#features)
+  * [Compatibility](#compatibility)
+  * [Install](#install)
+    * [Build your own package](#build-your-own-package) 
+  * [Cluster](#cluster) 
+    * [Configuration options](#configuration-options)
+    * [Configuration methods](#configuration-methods)
+  * [Session](#session)
+    * [Methods of Session object](#methods-of-session-object)
+  * [Statement](#statement)
+    * [Methods of Statement object](#methods-of-statement-object)
+  * [PreparedStatement](#preparedstatement)
+    * [Methods of PreparedStatement object](#methods-of-preparedstatement-object)
+  * [Batch](#batch)
+    * [Methods of Batch object](#methods-of-batch-object)
+  * [Result](#result)
+    * [Methods of Result object](#methods-of-result-object)
+  * [Row](#row)
+    * [Methods of Row object](#methods-of-row-object)
+  * [Examples](#examples)
+    * [Basic usage](#basic-usage)
+    * [Binding Parameters](#binding-parameters)
+      * [Non Prepared Statement](#non-prepared-statement)
+      * [Prepared Statement](#prepared-statement)
+    * [Use prepared statement and paging](#use-prepared-statement-and-paging)
+    * [Configure Shard-Awareness connection](#configure-shard-awareness-connection-to-scylladb-cluster)
+    * [SSL Example](#ssl-example)
+    * [Retrieving metadata](#retrieving-metadata)
+    * [Configure logging](#configure-logging)
+      * [Set log level](#set-log-level)
+      * [Set callback for capture log messages](#set-callback-for-capture-log-messages)
+    * [Execution profiles](#execution-profiles)
+    * [Tracing](#tracing)
+  * [Developing](#developing)
+  
 
 ## Features
 
@@ -35,7 +72,7 @@ Under the hood, **_acsylla_** has modern, feature-rich and shard-aware [C/C++ cl
 * Support for materialized view and secondary index metadata
 * Support for clustering key order, `frozen<>` and Cassandra version metadata
 * Whitelist/blacklist DC, and whitelist/blacklist hosts load balancing policies
-* **[In progress]** Custom authenticators
+* Custom authenticators
 * Reverse DNS with SSL peer identity verification support
 * Randomized contact points
 * Speculative execution
@@ -47,23 +84,35 @@ Cassandra's native protocol. The current version works with:
 
 * Scylla and Scylla Enterprise
 * Apache Cassandra® versions 2.1, 2.2 and 3.0+
-* Python 3.7, 3.8, 3.9 and 3.10 for Linux and MacOS 
+* Python 3.7, 3.8, 3.9, 3.10 and 3.11 for Linux and MacOS 
 
 ## Install
 
-There is an Beta realease compabitble with Python 3.7, 3.8, 3.9 and 3.10 for Linux and MacOS environments uploaded as a Pypi package. Use the following
+There is an Beta realease compabitble with Python 3.7, 3.8, 3.9, 3.10 and 3.11 for Linux and MacOS environments uploaded as a Pypi package. Use the following
 command for installing it:
 
 ```bash
 pip install acsylla
 ```
 
-## Cluster configuration
+### Build your own package
+You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
+
+Example for build wheel for Python 3.11 aarch64 from master branch
+```bash
+curl -O https://raw.githubusercontent.com/acsylla/acsylla/master/bin/build.sh
+curl -O https://raw.githubusercontent.com/acsylla/acsylla/master/bin/build_in_docker.sh
+chmod +x build.sh build_in_docker.sh
+./build_in_docker.sh 3.11 master aarch64
+```
+
+## Cluster
 
 The `Cluster` object describes a Cassandra/ScyllaDB cluster’s configuration. 
 The ***default cluster object is good for most clusters*** and only requires a single 
-or multiple list of contact points in order to establish a session connection. 
-***For example:*** `cluster = acsylla.create_cluster('127.0.0.1, 127.0.0.2')`
+or multiple list of contact points in order to establish a session connection.   
+***For example:***   
+`cluster = acsylla.create_cluster('127.0.0.1, 127.0.0.2')`
 
 Once a session is connected using a cluster object its configuration is constant. 
 
@@ -451,6 +500,10 @@ List of named arguments to configure cluster with  `acsylla.create_cluster` help
     proxy authorization for DSE clusters secured with the DseAuthenticator.
     Instance of `acsylla.DsePlaintextAuthenticatorProxy`
 
+### Configuration methods
+
+For full list of methods to configure `Cluster` see [base.py](./acsylla/base.py)
+
 ## Session
 
 A session object is used to execute queries and maintains cluster state through 
@@ -505,7 +558,7 @@ values along with query options (consistency level, paging state, etc.)
 
 ### Methods of `Statement` object
 
-- ***def add_key_index(self, index: int):***  
+- ***def add_key_index(self, index: int) -> None:***  
  Adds a key index specifier to this a statement. When using
     token-aware routing, this can be used to tell the driver which
     parameters within a non-prepared, parameterized statement are part of
@@ -514,8 +567,33 @@ values along with query options (consistency level, paging state, etc.)
  This is not necessary for prepared statements, as the key parameters
     are determined in the metadata processed in the prepare phase.
 
-- ***def reset_parameters(self, count: int):***  
+- ***def reset_parameters(self, count: int) -> None:***  
  Clear and/or resize the statement’s parameters.
+
+- ***def bind(self, index: int, value: SupportedType) -> None:***   
+Binds the value to a specific index parameter.   
+If an invalid type is used for a prepared statement this will raise
+    immediately an error. If a none prepared exception is used error will
+    be raised later during the execution statement.   
+If an invalid index is used this will raise immediately an error
+
+- ***def bind_by_name(self, name: str, value: SupportedType) -> None:***   
+Binds the the value to a specific parameter by name.   
+If an invalid type is used for this will raise immediately an error. If an
+    invalid name is used this will raise immediately an error
+
+- ***def bind_list(self, values: Sequence[SupportedType]) -> None:***    
+Binds the values into all parameters from left to right.    
+For types supported and errors that this function might raise take
+    a look at the `Statement.bind` function.
+
+- ***def bind_dict(self, values: Mapping[str, SupportedType]) -> None:***    
+Binds the values into all parameter names. Names are the keys
+    of the mapping provided.
+For types supported and errors that this function might raise take    
+    look at the `Statement.bind_dict` function.
+Note: This method are only allowed for statements created using
+    prepared statements
 
 - ***def set_page_size(self, page_size: int) -> None:***  
  Sets the statement's page size.
@@ -731,7 +809,7 @@ The driver includes several examples in the [examples](./examples/) directory.
 
 The following snippet shows the minimal stuff that would be needed for creating a new ``Session``
 object for the keyspace ``acsylla`` and then peform a query for reading a set of rows. 
-For more info see [base](./acsylla/base.py) and [factories](./acsylla/factories.py)
+For more info see [base.py](./acsylla/base.py) and [factories.py](./acsylla/factories.py)
 Acsylla supports all native datatypes including `Collections` and `UDT`
 
 ```python
@@ -750,7 +828,111 @@ async def main():
 asyncio.run(main())
 ```
 
-### Example for use prepared statement and paging
+### Binding Parameters
+The ‘?’ marker is used to denote the bind variables in a query string. 
+This can be used for both regular and prepared parameterized queries. 
+
+#### Non Prepared Statement
+In addition to adding the bind marker to your query string your application 
+must also provide the number of bind variables to 
+`acsylla.create_statement()` via `parameters` kwargs when constructing a new 
+statement.
+
+```python
+import asyncio
+import acsylla
+
+
+async def bind_by_index():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    statement = acsylla.create_statement(
+        "INSERT INTO test (id, value) VALUES (?, ?)", parameters=2)
+    statement.bind(0, 1)
+    statement.bind(1, 1)
+    await session.execute(statement)
+
+
+async def bind_list():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    statement = acsylla.create_statement(
+        "INSERT INTO test (id, value) VALUES (?, ?)", parameters=2)
+    statement.bind_list([1, 1])
+    await session.execute(statement)
+    
+asyncio.run(bind_by_index())
+asyncio.run(bind_list())
+```
+
+#### Prepared Statement
+Bind variables can be bound by the marker’s index or by name and must be 
+supplied for all bound variables.
+
+```python
+import asyncio
+import acsylla
+
+
+async def bind_by_index():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    prepared = await session.create_prepared("INSERT INTO test (id, value) VALUES (?, ?)")
+    statement = prepared.bind()
+    statement.bind(0, 1)
+    statement.bind(1, 1)
+    await session.execute(statement)
+
+
+async def bind_by_name():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    prepared = await session.create_prepared(
+        "INSERT INTO test (id, value) VALUES (?, ?)")
+    statement = prepared.bind()
+    statement.bind_by_name("id", 1)
+    statement.bind_by_name("value", 1)
+    await session.execute(statement)
+
+
+async def bind_list():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    prepared = await session.create_prepared(
+        "INSERT INTO test (id, value) VALUES (?, ?)")
+    statement = prepared.bind()
+    statement.bind_list([0, 1])
+    await session.execute(statement)
+
+
+async def bind_dict():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    prepared = await session.create_prepared(
+        "INSERT INTO test (id, value) VALUES (?, ?)")
+    statement = prepared.bind()
+    statement.bind_dict({'id': 1, 'value': 1})
+    await session.execute(statement)
+
+
+async def bind_named_parameters():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")
+    prepared = await session.create_prepared(
+        "INSERT INTO test (id, value) VALUES (:test_id, :test_value)")
+    statement = prepared.bind()
+    statement.bind_dict({'test_id': 1, 'test_value': 1})
+    await session.execute(statement)
+
+
+asyncio.run(bind_by_index())
+asyncio.run(bind_by_name())
+asyncio.run(bind_list())
+asyncio.run(bind_dict())
+asyncio.run(bind_named_parameters())
+```
+
+### Use prepared statement and paging
 
 ```python
 import asyncio
@@ -826,7 +1008,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Example for configure [Shard-Awareness](https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific) connection to ScyllaDB cluster
+### Configure [Shard-Awareness](https://github.com/scylladb/cpp-driver/tree/master/topics/scylla_specific) connection to ScyllaDB cluster
 
 ```python
 import acsylla
@@ -860,7 +1042,6 @@ cluster = acsylla.create_cluster(
     ssl_verify_flags=acsylla.SSLVerifyFlags.PEER_IDENTITY)
 ```
 
-
 ### Retrieving metadata
 
 ```python
@@ -883,14 +1064,7 @@ asyncio.run(main())
 
 #### Set log level
 
-Available levels:
-* `DISABLED` 
-* `CRITICAL`
-* `ERROR`
-* `WARN`
-* `INFO`
-* `DEBUG`
-* `TRACE`
+Available levels: `disabled` `critical` `error` `warn` `info` `debug` `trace`
 
 ```python
 import logging
@@ -902,6 +1076,7 @@ logging.basicConfig(format="[%(levelname)1.1s %(asctime)s] (%(name)s) %(message)
 async def main():
     cluster = acsylla.create_cluster(['localhost'], log_level='trace')
     session = await cluster.create_session(keyspace="acsylla")
+    cluster.set_log_level('info')
     await session.close()
 
 asyncio.run(main())
@@ -931,7 +1106,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Execution profiles example
+### Execution profiles
 
 ```python
 import asyncio
@@ -968,7 +1143,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Tracing example
+### Tracing
 
 ```python
 import acsylla

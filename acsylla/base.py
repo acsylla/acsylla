@@ -1657,30 +1657,30 @@ class MaterializedViewMeta:
 class TableMeta:
     """Table metadata."""
 
-    id: UUID
-    name: str
-    table_name: str
-    keyspace_name: str
-    is_virtual: bool
-    bloom_filter_fp_chance: float
-    caching: Dict[str, str]
-    comment: str
-    compaction: Dict[str, str]
-    compression: Dict[str, str]
-    crc_check_chance: float
-    dclocal_read_repair_chance: float
-    default_time_to_live: int
-    extensions: Dict[str, str]
-    flags: Set[str]
-    gc_grace_seconds: int
-    max_index_interval: int
-    memtable_flush_period_in_ms: int
-    min_index_interval: int
-    read_repair_chance: float
-    speculative_retry: str
-    columns: List[ColumnMeta]
-    indexes: List[IndexMeta]
-    materialized_views: List[MaterializedViewMeta]
+    id: UUID = None
+    name: str = None
+    table_name: str = None
+    keyspace_name: str = None
+    is_virtual: bool = None
+    bloom_filter_fp_chance: float = None
+    caching: Dict[str, str] = None
+    comment: str = None
+    compaction: Dict[str, str] = None
+    compression: Dict[str, str] = None
+    crc_check_chance: float = None
+    dclocal_read_repair_chance: float = None
+    default_time_to_live: int = None
+    extensions: Dict[str, str] = None
+    flags: Set[str] = None
+    gc_grace_seconds: int = None
+    max_index_interval: int = None
+    memtable_flush_period_in_ms: int = None
+    min_index_interval: int = None
+    read_repair_chance: float = None
+    speculative_retry: str = None
+    columns: List[ColumnMeta] = None
+    indexes: List[IndexMeta] = None
+    materialized_views: List[MaterializedViewMeta] = None
 
     def as_cql_query(self, formatted=False, with_keyspace=True, full_schema=True) -> List[str]:
         """If full_schema is set to True returns a CQL query that can be used
@@ -1742,15 +1742,15 @@ class TableMeta:
 class KeyspaceMeta:
     """Keyspace metadata."""
 
-    name: str
-    is_virtual: bool
-    durable_writes: bool
-    keyspace_name: str
-    replication: Dict[str, str]
-    user_types: List[UserTypeMeta]
-    functions: List[FunctionMeta]
-    aggregates: List[AggregateMeta]
-    tables: List[TableMeta]
+    name: str = None
+    is_virtual: bool = None
+    durable_writes: bool = None
+    keyspace_name: str = None
+    replication: Dict[str, str] = None
+    user_types: List[UserTypeMeta] = None
+    functions: List[FunctionMeta] = None
+    aggregates: List[AggregateMeta] = None
+    tables: List[TableMeta] = None
 
     def as_cql_query(self, formatted=False, with_keyspace=True, full_schema=True) -> List[str]:
         """If full_schema is set to True returns a CQL query string that can

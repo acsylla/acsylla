@@ -9,113 +9,113 @@ jobs:
       version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest ]
-        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
+        os: [macos-latest, ubuntu-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Generate macos-wheel
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew install cmake libuv openssl
-          make install-driver
-          python -m pip install --upgrade pip
-          export LDFLAGS="-L/usr/local/opt/openssl/lib"
-          export CPPFLAGS="-I/usr/local/opt/openssl/include"
-          export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
-          export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
-          pip install wheel
-          make compile
-          python setup.py bdist_wheel
-      - name: Test dependencies for macos-wheel
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew install cassandra
-          make certs
-          sed -i '' -e 's/\/certs/\.\/certs/g' ./conf/cassandra/cassandra.yaml
-          cassandra -Dcassandra.config=./conf/cassandra/cassandra.yaml
-          # wait till casssandra server is up, to be improved
-          # by checking the readiness of the serivce
-          sleep 120
-          cqlsh -e "describe keyspaces"
-      - name: Test generated macos-wheel
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          mkdir test_wheel
-          cp dist/acsylla-*.whl test_wheel
-          pip install virtualenv
-          python -m virtualenv env
-          source env/bin/activate
-          rm -f .install-cython
-          export LDFLAGS="-L/usr/local/opt/openssl/lib"
-          export CPPFLAGS="-I/usr/local/opt/openssl/include"
-          export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
-          export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
-          make install-driver
-          make install-dev
-          rm -r acsylla
-          pip install test_wheel/acsylla-*.whl --upgrade
-          make test
-      - name: Generate manylinux2014_x86_64-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          mkdir /tmp/acsylla
-          cp -r . /tmp/acsylla
-          docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
-          mkdir dist
-          cp /tmp/acsylla/dist/acsylla-*.whl dist/
-      - name: Test dependencies for manylinux2010-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libuv1 libuv1-dev default-jre
-          make certs
-          docker-compose up -d
-          # wait till casssandra server is up, to be improved
-          # by checking the readiness of the serivce
-          sleep 90
-      - name: Test generated manylinux2010-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          mkdir test_wheel
-          cp dist/acsylla-*.whl test_wheel
-          pip install virtualenv
-          python -m virtualenv env
-          source env/bin/activate
-          rm -f .install-cython
-          make install-driver
-          make install-dev
-          sudo apt-get remove libuv1 libuv1-dev
-          rm -r acsylla
-          pip install test_wheel/acsylla-*.whl --upgrade
-          make test
-      - name: Get the version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v2
-        with:
-          name: ${{ steps.get_version.outputs.VERSION }}
-          path: test_wheel/acsylla-*.whl
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Generate macos-wheel
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install cmake libuv openssl
+        make install-driver
+        python -m pip install --upgrade pip
+        export LDFLAGS="-L/usr/local/opt/openssl/lib"
+        export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
+        export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
+        pip install wheel
+        make compile
+        python setup.py bdist_wheel
+    - name: Test dependencies for macos-wheel
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install cassandra
+        make certs
+        sed -i '' -e 's/\/certs/\.\/certs/g' ./conf/cassandra/cassandra.yaml
+        cassandra -Dcassandra.config=./conf/cassandra/cassandra.yaml
+        # wait till casssandra server is up, to be improved
+        # by checking the readiness of the serivce
+        sleep 120
+        cqlsh -e "describe keyspaces"
+    - name: Test generated macos-wheel
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        mkdir test_wheel
+        cp dist/acsylla-*.whl test_wheel
+        pip install virtualenv
+        python -m virtualenv env
+        source env/bin/activate
+        rm -f .install-cython
+        export LDFLAGS="-L/usr/local/opt/openssl/lib"
+        export CPPFLAGS="-I/usr/local/opt/openssl/include"
+        export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
+        export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
+        make install-driver
+        make install-dev
+        rm -r acsylla
+        pip install test_wheel/acsylla-*.whl --upgrade
+        make test
+    - name: Generate manylinux2010-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        mkdir /tmp/acsylla
+        cp -r . /tmp/acsylla
+        docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2010_x86_64 /io/bin/build_manylinux2010_wheel.sh
+        mkdir dist
+        cp /tmp/acsylla/dist/acsylla-*.whl dist/
+    - name: Test dependencies for manylinux2010-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libuv1 libuv1-dev default-jre
+        make certs
+        docker-compose up -d
+        # wait till casssandra server is up, to be improved
+        # by checking the readiness of the serivce
+        sleep 90
+    - name: Test generated manylinux2010-wheel
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        mkdir test_wheel
+        cp dist/acsylla-*.whl test_wheel
+        pip install virtualenv
+        python -m virtualenv env
+        source env/bin/activate
+        rm -f .install-cython
+        make install-driver
+        make install-dev
+        sudo apt-get remove libuv1 libuv1-dev
+        rm -r acsylla
+        pip install test_wheel/acsylla-*.whl --upgrade
+        make test
+    - name: Get the version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ steps.get_version.outputs.VERSION }}
+        path: test_wheel/acsylla-*.whl
   upload:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v2
-        with:
-          name: ${{ needs.build.outputs.version }}
-          path: wheelhouse/
-      - name: Display content
-        run: ls -R
-        working-directory: wheelhouse/
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          packages_dir: wheelhouse/
-          password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
-          repository_url: https://upload.pypi.org/legacy/
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v2
+      with:
+        name: ${{ needs.build.outputs.version }}
+        path: wheelhouse/
+    - name: Display content
+      run: ls -R
+      working-directory: wheelhouse/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        packages_dir: wheelhouse/
+        password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
+        repository_url: https://upload.pypi.org/legacy/

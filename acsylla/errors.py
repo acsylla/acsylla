@@ -71,10 +71,12 @@ from acsylla._cython.cyacsylla import FunctionNotFound
 from acsylla._cython.cyacsylla import IndexNotFound
 from acsylla._cython.cyacsylla import KeyspaceNotFound
 from acsylla._cython.cyacsylla import MaterializedViewNotFound
+from acsylla._cython.cyacsylla import SchemaNotAvailable
 from acsylla._cython.cyacsylla import TableNotFound
 from acsylla._cython.cyacsylla import UserTypeNotFound
 
 __all__ = (
+    "SchemaNotAvailable",
     "KeyspaceNotFound",
     "UserTypeNotFound",
     "FunctionNotFound",

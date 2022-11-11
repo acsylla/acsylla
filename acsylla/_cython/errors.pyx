@@ -1,3 +1,6 @@
+class SchemaNotAvailable(CassException):
+    pass
+
 class KeyspaceNotFound(CassException):
     pass
 

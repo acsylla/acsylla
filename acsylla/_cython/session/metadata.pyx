@@ -504,10 +504,12 @@ cdef class Metadata:
         if self.cass_schema_meta:
             cass_schema_meta_free(self.cass_schema_meta)
 
-    cdef const CassSchemaMeta* _get_schema_meta(self):
+    cdef const CassSchemaMeta* _get_schema_meta(self) except *:
         if self.cass_schema_meta:
             cass_schema_meta_free(self.cass_schema_meta)
         self.cass_schema_meta = cass_session_get_schema_meta(self.cass_session)
+        if self.cass_schema_meta == NULL:
+            raise SchemaNotAvailable("Could not retrieve schema metadata from cluster!")
         return self.cass_schema_meta
 
     cdef const CassKeyspaceMeta* _get_keyspace_meta(self, object keyspace) except *:
@@ -536,8 +538,11 @@ cdef class Metadata:
         cdef size_t length = 0
         cdef char* keyspace_name = NULL
         keyspaces = []
+        schema_meta = self._get_schema_meta()
+        if not schema_meta:
+            return keyspaces
         try:
-            cass_iterator = cass_iterator_keyspaces_from_schema_meta(self._get_schema_meta())
+            cass_iterator = cass_iterator_keyspaces_from_schema_meta(schema_meta)
             while cass_iterator_next(cass_iterator) == cass_true:
                 keyspace_meta = cass_iterator_get_keyspace_meta(cass_iterator)
                 cass_keyspace_meta_name(keyspace_meta, <const char**> &keyspace_name, <size_t*> &length)

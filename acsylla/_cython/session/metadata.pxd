@@ -2,7 +2,7 @@ cdef class Metadata:
     cdef:
         CassSession* cass_session
         const CassSchemaMeta* cass_schema_meta
-        const CassSchemaMeta* _get_schema_meta(self)
+        const CassSchemaMeta* _get_schema_meta(self) except *
         const CassKeyspaceMeta* _get_keyspace_meta(self, object keyspace) except *
         const CassTableMeta* _get_table_meta(self, object keyspace, object table)  except *
     @staticmethod

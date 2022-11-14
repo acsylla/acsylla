@@ -1,6 +1,7 @@
 from acsylla import create_cluster
 from acsylla import create_statement
 
+import asyncio
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -24,6 +25,8 @@ class TestMeta:
         assert "test_index" in [k.name for k in meta.get_indexes_meta(keyspace)]
         assert "test_index" == meta.get_index_meta(keyspace, "test_index").name
 
+        # Sometimes we need to wait for the materialized view to be created.
+        await asyncio.sleep(3)
         assert "test_materialized_view" in meta.get_materialized_views(keyspace)
         assert "test_materialized_view" in [k.name for k in meta.get_materialized_views_meta(keyspace)]
         assert "test_materialized_view" == meta.get_materialized_view_meta(keyspace, "test_materialized_view").name

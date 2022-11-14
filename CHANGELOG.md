@@ -1,14 +1,18 @@
-NOT RELEASED YET
-================
+Changelog
+=========
 
-0.1.8a0
+0.1.8b0
 ========
 - Add metadata support
 - Add logging
 - Add Blacklist, whitelist DC, and blacklist, whitelist hosts load balancing policies
 - Add execution profiles
+- Add Speculative retry support
+- Add Retry policy configuration support
+- Add all configuration options for `Cluster`, `Statement` and `Batch`
 - Update cpp-driver to latest version
 - Static link OpenSSL and libuv for MacOS wheel
+- Support for Pyhton 3.11
 
 0.1.7a0
 ========

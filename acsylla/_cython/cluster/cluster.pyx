@@ -9,6 +9,7 @@ cdef class Cluster:
         self.ssl = NULL
         self.cass_cluster = NULL
         self.logger = Logger()
+        Py_INCREF(self.logger)
         cass_log_set_callback(cb_log_message, <void*>self.logger)
 
     def __dealloc__(self):

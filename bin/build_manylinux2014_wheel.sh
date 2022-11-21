@@ -50,14 +50,10 @@ make
 make install
 cd ..
 
-mkdir -p vendor/cpp-driver/build
-cd vendor/cpp-driver/build
-cmake -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS=-fPIC -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS=-fPIC ..
-make
-cd ../../..
+make install-driver
 
 ${PYTHON} -m pip install --upgrade pip
-${PIP} install auditwheel
+${PIP} install auditwheel cython
 PYTHON=${PYTHON} PIP=${PIP} CYTHON=${CYTHON} make compile
 ${PYTHON} setup.py bdist_wheel
 ${AUDITWHEEL} repair dist/acsylla-*.whl -w dist

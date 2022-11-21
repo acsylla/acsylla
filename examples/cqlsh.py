@@ -57,6 +57,8 @@ class Printer:
             return Colors.RESET
 
     def table(self, header, rows):
+        if not rows:
+            return
         max_len = list(map(max, *[[len(str(k)) for k in row] for row in rows + [header]]))
         f_header = " "
         f_values = " "
@@ -259,7 +261,6 @@ class AcsyllaCQLSH:
 
     def describe(self, query):
         query = query.replace(";", "")
-        print("query:", query)
         keyspace_re = re.compile(r"[desc|describe] keyspace (\S+)$")
         type_re = re.compile(r"[desc|describe] type (\S+)$")
         function_re = re.compile(r"[desc|describe] function (\S+)$")
@@ -274,11 +275,11 @@ class AcsyllaCQLSH:
         try:
             meta = self.session.get_metadata()
             if query.endswith("keyspaces"):
-                self.print.table(["keyspaces"], [[k] for k in meta.keyspaces()])
+                self.print.table(["keyspaces"], [[k] for k in meta.get_keyspaces()])
             elif query.endswith("keyspace"):
                 print("\n\n".join(meta.get_keyspace_meta(keyspace).as_cql_query(formatted=True)))
             elif query.endswith("types"):
-                self.print.table(["types"], [[k] for k in meta.user_types(keyspace)])
+                self.print.table(["types"], [[k] for k in meta.get_user_types(keyspace)])
             elif query.endswith("functions"):
                 self.print.table(["functions"], [[k] for k in meta.get_functions(keyspace)])
             elif query.endswith("aggregates"):
@@ -419,6 +420,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "contact_points", nargs="*", default=["127.0.0.1"], help="Set contact points, default: 127.0.0.1:9042"
     )
+    parser.add_argument("-P", "--port", default=9042, type=int)
     parser.add_argument("-v", "--protocol-version", default=4, type=int)
     parser.add_argument("-u", "--username", help="Authenticate as user.")
     parser.add_argument("-p", "--password", help="Authenticate using password.")

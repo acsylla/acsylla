@@ -183,6 +183,10 @@ def create_cluster(
     `serial_consistency` Sets default serial consistency level of statement.
         Default: ANY
 
+    `num_threads_io` Sets the number of IO threads. This is the number of
+        threads that will handle query requests.
+        Default: 1
+
     `queue_size_io` Sets the size of the fixed size queue that stores pending
         requests.
         Default: 8192

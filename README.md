@@ -98,12 +98,18 @@ pip install acsylla
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 
-Example for build wheel for Python 3.11 aarch64 from master branch
+Example for build wheel for Python 3.11 ***x86_64*** from master branch
 ```bash
-curl -O https://raw.githubusercontent.com/acsylla/acsylla/master/bin/build.sh
-curl -O https://raw.githubusercontent.com/acsylla/acsylla/master/bin/build_in_docker.sh
-chmod +x build.sh build_in_docker.sh
-./build_in_docker.sh 3.11 master aarch64
+git clone https://github.com/acsylla/acsylla.git
+cd acsylla
+docker run -v `pwd`:/io -e PYTHON_VERSION=3.11 quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
+```
+
+Example for build wheel for Python 3.11 ***aarch64*** from master branch
+```bash
+git clone https://github.com/acsylla/acsylla.git
+cd acsylla
+docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.11 quay.io/pypa/manylinux2014_aarch64 /io/bin/build_manylinux2014_wheel.sh
 ```
 
 ## Cluster
@@ -221,6 +227,10 @@ List of named arguments to configure cluster with  `acsylla.create_cluster` help
 - ***queue_size_io:*** Sets the size of the fixed size queue that stores pending
     requests.  
     *Default:* `8192`
+
+- ***num_threads_io:*** Sets the number of IO threads. This is the number of threads that
+    will handle query requests.  
+    *Default:* `1`
 
 - ***core_connections_per_host:*** Sets the number of connections made to each
     server in each IO thread.  

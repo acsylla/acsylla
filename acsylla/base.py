@@ -168,11 +168,20 @@ class Cluster(metaclass=ABCMeta):
 
     @abstractmethod
     def set_log_level(self, level: str) -> None:
-        """ """
+        """Sets the log level.
+        Available levels: disabled, critical, error, warn, info, debug, trace
+        Default: warn
+        """
 
     @abstractmethod
     def set_logging_callback(self, callback: Callable) -> None:
-        """ """
+        """Sets a callback function to catch log messages.
+        Default: An internal logger with "acsylla" name.
+        logging.getLogger('acsylla')
+        Example:
+            def logging_callback(message: acsylla.LogMessage):
+                print(message)
+        """
 
     @abstractmethod
     def set_ssl(
@@ -295,15 +304,23 @@ class Cluster(metaclass=ABCMeta):
 
     @abstractmethod
     def set_tracing_max_wait_time(self, max_wait_time_ms: int) -> None:
-        """ """
+        """Sets the maximum time to wait for tracing data to become available.
+        Default: 15 milliseconds
+        """
 
     @abstractmethod
     def set_tracing_retry_wait_time(self, retry_wait_time_ms: int) -> None:
-        """ """
+        """Sets the amount of time to wait between attempts to check to see if
+            tracing is available.
+        Default: 3 milliseconds
+        """
 
     @abstractmethod
     def set_tracing_consistency(self, consistency: int) -> None:
-        """ """
+        """Sets the consistency level to use for checking to see if tracing
+            data is available.
+        Default: ONE
+        """
 
     @abstractmethod
     def set_load_balance_round_robin(self, enabled: bool) -> None:

@@ -34,22 +34,38 @@ cdef class Logger:
         'debug': logging.DEBUG,
         'trace': logging.DEBUG
     }
+    _instances = {}
+
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = None
+            cls._instances[cls] = cls(*args, **kwargs)
+        return cls._instances[cls]
+
+    def __cinit__(self):
+        if not self._instances:
+            raise RuntimeError('Use Logger.instance() for initializing Logger')
+        self.log = self._log_fn
+        cass_log_set_callback(cb_log_message, <void*>self)
+
     def __init__(self, log_level='warn', logging_callback=None):
+        self.set_log_level(log_level)
         self.logging_callback = logging_callback
-        log_level = self.levels[log_level.lower()]
-        self.log = self.log_fn
-        if logging_callback is None and log_level is not None:
-            logger.setLevel(log_level)
 
     def set_log_level(self, level):
         if level is not None:
+            cass_log_set_level(log_level_from_str(level))
             log_level = self.levels[level.lower()]
             logger.setLevel(log_level)
 
     def set_logging_callback(self, callback):
         self.logging_callback = callback
 
-    def log_fn(self, msg):
+    def get_logger(self):
+        return logger
+
+    def _log_fn(self, msg):
         if self.logging_callback is not None:
             self.logging_callback(msg)
         else:

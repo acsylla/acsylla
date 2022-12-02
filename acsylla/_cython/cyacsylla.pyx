@@ -1,7 +1,7 @@
 include "callback_wrapper.pyx"
 include "cass_errors.pyx"
 include "cluster/cluster.pyx"
-include "cluster/logger.pyx"
+include "logger/logger.pyx"
 include "constants.pyx"
 include "errors.pyx"
 include "posix_to_python_thread.pyx"

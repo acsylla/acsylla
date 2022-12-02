@@ -8,9 +8,7 @@ cdef class Cluster:
         _initialize_posix_to_python_thread()
         self.ssl = NULL
         self.cass_cluster = NULL
-        self.logger = Logger()
-        Py_INCREF(self.logger)
-        cass_log_set_callback(cb_log_message, <void*>self.logger)
+        self.logger = Logger.instance()
 
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
@@ -218,12 +216,10 @@ cdef class Cluster:
 
     def set_log_level(self, level):
         if level is not None:
-            cass_log_set_level(log_level_from_str(level))
             self.logger.set_log_level(level)
 
     def set_logging_callback(self, callback):
-        if callback is not None:
-            self.logger.set_logging_callback(callback)
+        self.logger.set_logging_callback(callback)
 
     def set_ssl(self, enabled, cert=None, private_key=None, private_key_password='', trusted_cert=None, verify_flags=None):
         if enabled is True:
@@ -509,6 +505,9 @@ cdef class Cluster:
                 authorization_id.encode()
             )
             raise_if_error(error)
+
+    def get_logger(self):
+        return self.logger
 
     async def create_session(self, keyspace=None):
         session = Session(self, keyspace=keyspace)

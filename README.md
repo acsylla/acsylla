@@ -15,22 +15,16 @@ Under the hood **_acsylla_** has modern, feature-rich and shard-aware [C/C++ cli
   * [Features](#features)
   * [Compatibility](#compatibility)
   * [Install](#install)
-    * [Build your own package](#build-your-own-package) 
   * [Cluster](#cluster) 
     * [Configuration options](#configuration-options)
     * [Configuration methods](#configuration-methods)
   * [Session](#session)
-    * [Methods of Session object](#methods-of-session-object)
   * [Statement](#statement)
-    * [Methods of Statement object](#methods-of-statement-object)
   * [PreparedStatement](#preparedstatement)
-    * [Methods of PreparedStatement object](#methods-of-preparedstatement-object)
   * [Batch](#batch)
-    * [Methods of Batch object](#methods-of-batch-object)
   * [Result](#result)
-    * [Methods of Result object](#methods-of-result-object)
   * [Row](#row)
-    * [Methods of Row object](#methods-of-row-object)
+  * [Logger](#logger)
   * [Examples](#examples)
     * [Basic usage](#basic-usage)
     * [Binding Parameters](#binding-parameters)
@@ -810,6 +804,28 @@ for row in result:
 - ***def column_value_by_index(self, index):***  
  Returns the column value by `column index`.
     Raises an exception if the column can not be found
+
+## Logger
+The driver’s logging system.
+
+### Methods of `Logger` object
+Use the `acsylla.get_logger()` for acces to `Logger` instance.
+
+```python
+logger = acsylla.get_logger()
+```
+
+- ***def set_log_level(self, level: str) -> None:***  
+ Sets the log level.  
+ Available levels: `disabled`, `critical`, `error`, `warn`, `info`, `debug`, `trace`
+
+- ***set_logging_callback(self, callback: Callable) -> None:***  
+ Sets a callback function to catch log messages.  
+ *Default:* An internal logger with "acsylla" name.
+
+- ***def get_logger(self) -> None:***  
+ Returns python logger.
+
 
 ## Examples
 

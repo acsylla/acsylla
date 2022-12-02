@@ -659,6 +659,9 @@ class Cluster(metaclass=ABCMeta):
         clusters secured with the DseAuthenticator.
         """
 
+    def get_logger(self) -> "Logger":
+        """Returns the `Logger` instance"""
+
     @abstractmethod
     async def create_session(self, keyspace: Optional[str] = None) -> "Session":
         """Returns a new session by using the Cluster configuration.
@@ -1267,6 +1270,32 @@ class Row(metaclass=ABCMeta):
     def column_value_by_index(self, index) -> SupportedType:
         """Returns the column value by `column index`.
         Raises an exception if the column can not be found"""
+
+
+class Logger(metaclass=ABCMeta):
+    """Provides a Logger instance class. Use the factory `get_logger` method
+    for creating a new instance"""
+
+    @abstractmethod
+    def set_log_level(self, level: str) -> None:
+        """Sets the log level.
+        Available levels: disabled, critical, error, warn, info, debug, trace
+        Default: warn
+        """
+
+    @abstractmethod
+    def set_logging_callback(self, callback: Callable) -> None:
+        """Sets a callback function to catch log messages.
+        Default: An internal logger with "acsylla" name.
+        logging.getLogger('acsylla')
+        Example:
+            def logging_callback(message: acsylla.LogMessage):
+                print(message)
+        """
+
+    @abstractmethod
+    def get_logger(self) -> None:
+        """Returns python logger"""
 
 
 @dataclass

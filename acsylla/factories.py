@@ -661,3 +661,10 @@ def create_batch_counter(timeout: Optional[float] = None, execution_profile: Opt
     `execution_profile` Assign the execution profile to the statement
     """
     return _cython.cyacsylla.create_batch_counter(timeout, execution_profile)
+
+
+def get_logger():
+    """
+    Returns the `Logger` instance
+    """
+    return _cython.cyacsylla.Logger.instance()

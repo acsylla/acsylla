@@ -1,0 +1,11 @@
+diff -ruN vendor/cpp-driver/src/cluster.cpp ../vendor/cpp-driver/src/cluster.cpp
+--- vendor/cpp-driver/src/cluster.cpp	2022-12-01 13:53:02
++++ ../vendor/cpp-driver/src/cluster.cpp	2022-11-27 20:18:21
+@@ -254,7 +254,6 @@
+     , supported_options_(supported_options)
+     , is_recording_events_(settings.disable_events_on_startup) {
+   static const auto optimized_msg = "===== Using optimized driver!!! =====\n";
+-  std::cout << optimized_msg;
+   LOG_INFO(optimized_msg);
+ 
+   inc_ref();

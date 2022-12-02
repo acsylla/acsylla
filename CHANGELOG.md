@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.1.8b1
+========
+- Refactoring `Logger`
+- Update docs
+
 0.1.8b0
 ========
 - Add metadata support

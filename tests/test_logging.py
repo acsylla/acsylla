@@ -35,3 +35,25 @@ class TestLogging:
         session = await cluster.create_session(keyspace=keyspace)
         await session.close()
         assert "DEBUG" in log.getvalue().split("\n")
+
+    async def test_set_log_levels(self, host, keyspace):
+        cluster = create_cluster([host], log_level="disabled")
+        cluster.set_log_level("disabled")
+        cluster = create_cluster([host], log_level="critical")
+        cluster.set_log_level("critical")
+        cluster = create_cluster([host], log_level="error")
+        cluster.set_log_level("error")
+        cluster = create_cluster([host], log_level="warn")
+        cluster.set_log_level("warn")
+        cluster = create_cluster([host], log_level="warning")
+        cluster.set_log_level("warning")
+        cluster = create_cluster([host], log_level="info")
+        cluster.set_log_level("info")
+        cluster = create_cluster([host], log_level="debug")
+        cluster.set_log_level("debug")
+        cluster = create_cluster([host], log_level="trace")
+        cluster.set_log_level("trace")
+        with pytest.raises(ValueError):
+            cluster = create_cluster([host], log_level="not_valid_level")
+        with pytest.raises(ValueError):
+            cluster.set_log_level("not_valid_level")

@@ -3,6 +3,7 @@ Changelog
 
 0.1.8b1
 ========
+- Add host listener callback 
 - Refactoring `Logger`
 - Update docs
 

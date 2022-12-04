@@ -9,8 +9,11 @@ cdef class Cluster:
         self.ssl = NULL
         self.cass_cluster = NULL
         self.logger = Logger.instance()
+        self.host_listener = None
 
     def __dealloc__(self):
+        if self.host_listener:
+            self.host_listener.free()
         cass_cluster_free(self.cass_cluster)
         if self.ssl != NULL:
             cass_ssl_free(self.ssl)
@@ -445,8 +448,12 @@ cdef class Cluster:
             raise_if_error(error)
 
     def set_host_listener_callback(self, callback):
+        if self.host_listener:
+            self.host_listener.set_host_listener_callback(callback)
+            return
         if callback is not None:
-            raise NotImplementedError("Host listener callback is not implemented yet")
+            self.host_listener = HostListener()
+            self.host_listener.init(self.cass_cluster, callback)
 
     def set_application_name(self, name):
         if name is not None:

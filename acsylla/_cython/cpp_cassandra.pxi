@@ -715,7 +715,7 @@ cdef extern from "cassandra.h":
 
   CassError cass_data_type_type_name(const CassDataType* data_type, const char** type_name, size_t* type_name_length)
 
-  CassError cass_user_type_set_null(CassUserType* user_type, size_t index); 
+  CassError cass_user_type_set_null(CassUserType* user_type, size_t index)
   CassError cass_user_type_set_null_by_name(CassUserType* user_type, const char* name)
   CassError cass_user_type_set_null_by_name_n(CassUserType* user_type, const char* name, size_t name_length)
   CassError cass_user_type_set_int8(CassUserType* user_type, size_t index,  cass_int8_t value)
@@ -748,30 +748,30 @@ cdef extern from "cassandra.h":
   CassError cass_user_type_set_string_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const char* value, size_t value_length)
   CassError cass_user_type_set_bytes(CassUserType* user_type, size_t index,  const cass_byte_t* value, size_t value_size)
   CassError cass_user_type_set_bytes_by_name(CassUserType* user_type, const char* name, const cass_byte_t* value, size_t value_size);
-  CassError cass_user_type_set_bytes_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size); 
-  CassError cass_user_type_set_custom(CassUserType* user_type, size_t index,  const char* class_name, const cass_byte_t* value, size_t value_size); 
-  CassError cass_user_type_set_custom_n(CassUserType* user_type, size_t index,  const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size); 
-  CassError cass_user_type_set_custom_by_name(CassUserType* user_type, const char* name, const char* class_name, const cass_byte_t* value, size_t value_size); 
-  CassError cass_user_type_set_custom_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size); 
-  CassError cass_user_type_set_uuid(CassUserType* user_type, size_t index,  CassUuid value); 
-  CassError cass_user_type_set_uuid_by_name(CassUserType* user_type, const char* name, CassUuid value); 
-  CassError cass_user_type_set_uuid_by_name_n(CassUserType* user_type, const char* name, size_t name_length, CassUuid value); 
-  CassError cass_user_type_set_inet(CassUserType* user_type, size_t index,  CassInet value); 
-  CassError cass_user_type_set_inet_by_name(CassUserType* user_type, const char* name, CassInet value); 
-  CassError cass_user_type_set_inet_by_name_n(CassUserType* user_type, const char* name, size_t name_length, CassInet value); 
-  CassError cass_user_type_set_decimal(CassUserType* user_type, size_t index,  const cass_byte_t* varint, size_t varint_size, int scale); 
-  CassError cass_user_type_set_decimal_by_name(CassUserType* user_type, const char* name, const cass_byte_t* varint, size_t varint_size, int scale); 
-  CassError cass_user_type_set_decimal_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const cass_byte_t* varint, size_t varint_size, int scale); 
-  CassError cass_user_type_set_duration(CassUserType* user_type, size_t index,  cass_int32_t months, cass_int32_t days, cass_int64_t nanos); 
-  CassError cass_user_type_set_duration_by_name(CassUserType* user_type, const char* name, cass_int32_t months, cass_int32_t days, cass_int64_t nanos); 
-  CassError cass_user_type_set_duration_by_name_n(CassUserType* user_type, const char* name, size_t name_length, cass_int32_t months, cass_int32_t days, cass_int64_t nanos); 
-  CassError cass_user_type_set_collection(CassUserType* user_type, size_t index,  const CassCollection* value); 
-  CassError cass_user_type_set_collection_by_name(CassUserType* user_type, const char* name, const CassCollection* value); 
-  CassError cass_user_type_set_collection_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassCollection* value); 
-  CassError cass_user_type_set_tuple(CassUserType* user_type, size_t index,  const CassTuple* value); 
-  CassError cass_user_type_set_tuple_by_name(CassUserType* user_type, const char* name, const CassTuple* value); 
-  CassError cass_user_type_set_tuple_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassTuple* value); 
-  CassError cass_user_type_set_user_type(CassUserType* user_type, size_t index,  const CassUserType* value); 
+  CassError cass_user_type_set_bytes_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_user_type_set_custom(CassUserType* user_type, size_t index,  const char* class_name, const cass_byte_t* value, size_t value_size)
+  CassError cass_user_type_set_custom_n(CassUserType* user_type, size_t index,  const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_user_type_set_custom_by_name(CassUserType* user_type, const char* name, const char* class_name, const cass_byte_t* value, size_t value_size)
+  CassError cass_user_type_set_custom_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size)
+  CassError cass_user_type_set_uuid(CassUserType* user_type, size_t index,  CassUuid value)
+  CassError cass_user_type_set_uuid_by_name(CassUserType* user_type, const char* name, CassUuid value)
+  CassError cass_user_type_set_uuid_by_name_n(CassUserType* user_type, const char* name, size_t name_length, CassUuid value)
+  CassError cass_user_type_set_inet(CassUserType* user_type, size_t index,  CassInet value)
+  CassError cass_user_type_set_inet_by_name(CassUserType* user_type, const char* name, CassInet value)
+  CassError cass_user_type_set_inet_by_name_n(CassUserType* user_type, const char* name, size_t name_length, CassInet value)
+  CassError cass_user_type_set_decimal(CassUserType* user_type, size_t index,  const cass_byte_t* varint, size_t varint_size, int scale)
+  CassError cass_user_type_set_decimal_by_name(CassUserType* user_type, const char* name, const cass_byte_t* varint, size_t varint_size, int scale)
+  CassError cass_user_type_set_decimal_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const cass_byte_t* varint, size_t varint_size, int scale)
+  CassError cass_user_type_set_duration(CassUserType* user_type, size_t index,  cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_user_type_set_duration_by_name(CassUserType* user_type, const char* name, cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_user_type_set_duration_by_name_n(CassUserType* user_type, const char* name, size_t name_length, cass_int32_t months, cass_int32_t days, cass_int64_t nanos)
+  CassError cass_user_type_set_collection(CassUserType* user_type, size_t index,  const CassCollection* value)
+  CassError cass_user_type_set_collection_by_name(CassUserType* user_type, const char* name, const CassCollection* value)
+  CassError cass_user_type_set_collection_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassCollection* value)
+  CassError cass_user_type_set_tuple(CassUserType* user_type, size_t index,  const CassTuple* value)
+  CassError cass_user_type_set_tuple_by_name(CassUserType* user_type, const char* name, const CassTuple* value)
+  CassError cass_user_type_set_tuple_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const CassTuple* value)
+  CassError cass_user_type_set_user_type(CassUserType* user_type, size_t index,  const CassUserType* value)
   CassError cass_user_type_set_user_type_by_name(CassUserType* user_type, const char* name, const CassUserType* value)
   CassRetryPolicy* cass_retry_policy_default_new()
   CassRetryPolicy* cass_retry_policy_fallthrough_new()

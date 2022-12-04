@@ -3,3 +3,4 @@ cdef class Cluster:
         CassCluster* cass_cluster
         CassSsl* ssl
         Logger logger
+        HostListener host_listener

@@ -39,6 +39,7 @@ Under the hood **_acsylla_** has modern, feature-rich and shard-aware [C/C++ cli
       * [Set callback for capture log messages](#set-callback-for-capture-log-messages)
     * [Execution profiles](#execution-profiles)
     * [Tracing](#tracing)
+    * [Host State Changes](#host-state-changes)
   * [Developing](#developing)
   
 
@@ -456,7 +457,6 @@ List of named arguments to configure cluster with  `acsylla.create_cluster` help
     the cluster.
     Note: The callback is invoked only when state changes in the cluster
     are applicable to the configured load balancing policy(s).
-    NOT IMPLEMENTED YET
 
 - ***application_name:*** Set the application name. This is optional; however it
     provides the server with the application name that can aid in debugging
@@ -1209,6 +1209,31 @@ async def tracing_example():
 
 
 asyncio.run(tracing_example())
+```
+
+### Host State Changes
+The status and membership of a node can change within the life-cycle of the cluster. A host listener callback can be used to detect these changes.
+
+
+```python
+import acsylla
+import asyncio
+
+
+def host_listener_callback(event: acsylla.HostListenerEvent, host: str):
+    if event == acsylla.HostListenerEvent.UP:
+        print('Host', host, 'is UP')
+    else:
+        print(event.name, host)
+
+
+async def main():
+    cluster = acsylla.create_cluster(["localhost"], host_listener_callback=host_listener_callback)
+    session = await cluster.create_session(keyspace="acsylla")
+    await session.close()
+
+
+asyncio.run(main())
 ```
 
 ## Developing

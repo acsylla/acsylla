@@ -30,6 +30,7 @@ cdef class Logger:
         'critical': logging.CRITICAL,
         'error': logging.ERROR,
         'warn': logging.WARNING,
+        'warning': logging.WARNING,
         'info': logging.INFO,
         'debug': logging.DEBUG,
         'trace': logging.DEBUG
@@ -55,9 +56,14 @@ cdef class Logger:
 
     def set_log_level(self, level):
         if level is not None:
-            cass_log_set_level(log_level_from_str(level))
+            try:
+                cass_log_set_level(log_level_from_str(level))
+            except KeyError:
+                raise ValueError(f'Unknown log_level "{level}". '
+                                 f'Log level must be one of ({", ".join(self.levels.keys())})')
             log_level = self.levels[level.lower()]
-            logger.setLevel(log_level)
+            if log_level is not None:
+                logger.setLevel(log_level)
 
     def set_logging_callback(self, callback):
         self.logging_callback = callback

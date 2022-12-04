@@ -9,6 +9,7 @@ from .base import DseGssapiAuthenticatorProxy
 from .base import DsePlaintextAuthenticator
 from .base import DsePlaintextAuthenticatorProxy
 from .base import FunctionMeta
+from .base import HostListenerEvent
 from .base import IndexMeta
 from .base import KeyspaceMeta
 from .base import LatencyAwareRoutingSettings
@@ -62,6 +63,7 @@ __all__ = (
     "UserTypeFieldMeta",
     "NestedTypeMeta",
     "FunctionMeta",
+    "HostListenerEvent",
     "AggregateMeta",
     "LogMessage",
     "create_cluster",

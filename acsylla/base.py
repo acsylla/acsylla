@@ -1402,6 +1402,13 @@ class SSLVerifyFlags(Enum):
     PEER_IDENTITY_DNS = cyacsylla.SSLVerifyFlags.PEER_IDENTITY_DNS
 
 
+class HostListenerEvent(Enum):
+    UP = cyacsylla.HostListenerEvent.UP
+    DOWN = cyacsylla.HostListenerEvent.DOWN
+    ADD = cyacsylla.HostListenerEvent.ADD
+    REMOVE = cyacsylla.HostListenerEvent.REMOVE
+
+
 @dataclass
 class LogMessage:
     """Log message"""

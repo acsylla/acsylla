@@ -1,3 +1,13 @@
+from datetime import date
+from datetime import datetime
+from datetime import time
+from datetime import timedelta
+from decimal import Decimal
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
+from uuid import UUID
+
+
 cdef class Statement:
 
     def __cinit__(self):
@@ -171,14 +181,6 @@ cdef class Statement:
         return cass_value_type
 
     cpdef bind(self, int idx, object value):
-        from datetime import date
-        from datetime import datetime
-        from datetime import time
-        from datetime import timedelta
-        from decimal import Decimal
-        from ipaddress import IPv4Address
-        from ipaddress import IPv6Address
-        from uuid import UUID
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
 

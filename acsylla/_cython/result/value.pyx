@@ -1,3 +1,10 @@
+from datetime import datetime
+from datetime import timedelta
+from decimal import Decimal
+from ipaddress import ip_address
+from uuid import UUID
+
+
 cdef object get_cass_value(const CassValue* cass_value):
     cdef CassValueType cass_type
 
@@ -111,7 +118,6 @@ cdef object _int64(const CassValue* cass_value):
     return output
 
 cdef object _uuid(const CassValue* cass_value):
-    from uuid import UUID
     cdef char output[CASS_UUID_STRING_LENGTH]
     cdef CassError error
     cdef CassUuid uuid
@@ -159,7 +165,6 @@ cdef object _decimal(const CassValue* cass_value):
     """ Returns the decimal value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
-    from decimal import Decimal
     cdef Py_ssize_t varint_size = 0
     cdef cass_byte_t* varint = NULL
     cdef cass_int32_t scale
@@ -242,7 +247,6 @@ cdef object _inet(const CassValue* cass_value):
     """ Returns the inet value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
-    from ipaddress import ip_address
     cdef CassInet output
     cdef char address[CASS_INET_STRING_LENGTH]
     cdef CassError error
@@ -255,7 +259,6 @@ cdef object _inet(const CassValue* cass_value):
     return ip_address(address.decode())
 
 cdef object _date(const CassValue* cass_value):
-    from datetime import datetime
     cdef cass_uint32_t output
     cdef CassError error
     error = cass_value_get_uint32(cass_value, <cass_uint32_t *> &output)
@@ -266,7 +269,6 @@ cdef object _date(const CassValue* cass_value):
     return datetime.utcfromtimestamp(cass_date_time_to_epoch(output, 0)).date()
 
 cdef object _time(const CassValue* cass_value):
-    from datetime import datetime
     cdef cass_int64_t output
     cdef cass_int64_t epoch_secs
     cdef cass_uint32_t year_month_day
@@ -282,7 +284,6 @@ cdef object _time(const CassValue* cass_value):
     return datetime.utcfromtimestamp(epoch_secs).time()
 
 cdef object _timestamp(const CassValue* cass_value):
-    from datetime import datetime
     cdef cass_int64_t output
     cdef double epoch_secs
     cdef CassError error
@@ -296,7 +297,6 @@ cdef object _timestamp(const CassValue* cass_value):
     return datetime.utcfromtimestamp(epoch_secs)
 
 cdef object _duration(const CassValue* cass_value):
-    from datetime import timedelta
     cdef cass_int32_t months
     cdef cass_int32_t days
     cdef cass_int64_t nanos

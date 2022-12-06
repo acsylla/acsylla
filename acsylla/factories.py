@@ -20,7 +20,7 @@ from uuid import UUID
 
 
 def create_cluster(
-    contact_points: Union[str, List[str]],
+    contact_points: Union[str, List[str]] = None,
     port: Optional[int] = 9042,
     local_address: Optional[str] = None,
     local_port_range_min: Optional[int] = 49152,

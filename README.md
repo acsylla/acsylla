@@ -664,6 +664,10 @@ Note: This method are only allowed for statements created using
  Sets the execution profile to execute the statement with.
     Note: Empty string will clear execution profile from statement
 
+- ***def set_execute_as(self, name: str) -> None:***  
+ Sets the name of the user to execute the statement as.
+
+
 ## PreparedStatement
 
 A statement that has been prepared cluster-side (It has been pre-parsed and cached).

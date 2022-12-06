@@ -155,48 +155,25 @@ cdef class Statement:
             error = cass_statement_set_execution_profile(self.cass_statement, name.encode())
             raise_if_error(error)
 
-    cdef const CassDataType* _get_data_type(self, int index):
-        cdef const CassDataType* data_type
-
-        if self.cass_prepared:
-            data_type = cass_prepared_parameter_data_type(self.cass_prepared, index)
-            return data_type
-        else:
-            raise ValueError(
-                "Method only availabe for statements created from prepared statements")
-
-    cdef const CassDataType* _get_data_type_by_name(self, bytes name):
-        cdef const CassDataType* data_type
-
-        if self.cass_prepared:
-            data_type = cass_prepared_parameter_data_type_by_name(self.cass_prepared, name)
-            return data_type
-        else:
-            raise ValueError(
-                "Method only availabe for statements created from prepared statements")
-
-    cdef CassValueType _get_value_type(self, const CassDataType* data_type):
-        cdef CassValueType cass_value_type
-        cass_value_type = cass_data_type_type(data_type)
-        return cass_value_type
+    def set_execute_as(self, name: str) -> None:
+        if name is not None:
+            error = cass_statement_set_execute_as(self.cass_statement, name.encode())
+            raise_if_error(error)
 
     cpdef bind(self, int idx, object value):
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
 
-        try:
-            bind_null(self.cass_statement, idx)
-        except CassErrorLibIndexOutOfBounds:
-            raise CassErrorLibIndexOutOfBounds()
-
-        if value is None:
-            return
-
         if self.cass_prepared:
-            cass_data_type = self._get_data_type(idx)
-            cass_value_type = self._get_value_type(cass_data_type)
+            cass_data_type = cass_prepared_parameter_data_type(self.cass_prepared, idx)
+            if cass_data_type == NULL:
+                raise CassErrorLibIndexOutOfBounds()
+            cass_value_type = cass_data_type_type(cass_data_type)
 
-            if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
+            if value is None:
+                bind_null(self.cass_statement, idx)
+                return
+            elif cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
                 raise ValueError(f"Unknown type for column index {idx}")
             elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
                 bind_bool(self.cass_statement, idx, value)
@@ -247,9 +224,12 @@ cdef class Statement:
                 bind_udt(self.cass_statement, idx, value, cass_data_type)
             return
 
+        if value is None:
+            bind_null(self.cass_statement, idx)
+            return
         # Bool needs to be the first one, since boolean types
         # are implemented using integers.
-        if isinstance(value, bool):
+        elif isinstance(value, bool):
             bind_bool(self.cass_statement, idx, value)
         elif isinstance(value, int):
             bind_int32(self.cass_statement, idx, value)
@@ -296,15 +276,15 @@ cdef class Statement:
         if self.prepared == 0:
             raise ValueError("Method only availabe for statements created from prepared statements")
 
-        bind_null_by_name(self.cass_statement, name.encode())
+        cass_data_type = cass_prepared_parameter_data_type_by_name(self.cass_prepared, name.encode())
+        if cass_data_type == NULL:
+            raise CassErrorLibNameDoesNotExist(f"Unknown column: {name}")
+        cass_value_type = cass_data_type_type(cass_data_type)
 
         if value is None:
+            bind_null_by_name(self.cass_statement, name.encode())
             return
-
-        cass_data_type = self._get_data_type_by_name(name.encode())
-        cass_value_type = self._get_value_type(cass_data_type)
-
-        if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
+        elif cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
             raise ValueError(f"Unknown type for column {name}")
         elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
             bind_bool_by_name(self.cass_statement, name.encode(), value)

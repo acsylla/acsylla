@@ -98,6 +98,9 @@ class TestStatement:
         statement.set_host("127.0.0.1", port=123)
         statement.set_host(None)
 
+    async def test_set_execute_as(self, statement):
+        statement.set_execute_as("cassandra")
+
     @pytest.mark.parametrize(
         "consistency",
         [

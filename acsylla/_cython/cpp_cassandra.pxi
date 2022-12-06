@@ -382,7 +382,7 @@ cdef extern from "cassandra.h":
   void cass_cluster_set_load_balance_round_robin(CassCluster * cluster)
   CassError cass_cluster_set_load_balance_dc_aware(CassCluster * cluster, const char * local_dc, unsigned used_hosts_per_remote_dc, cass_bool_t allow_remote_dcs_for_local_cl)
   void cass_cluster_set_token_aware_routing(CassCluster * cluster, cass_bool_t enabled)
-  CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi);
+  CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi)
   void cass_cluster_set_token_aware_routing_shuffle_replicas(CassCluster * cluster, cass_bool_t enabled)
   void cass_cluster_set_latency_aware_routing(CassCluster * cluster, cass_bool_t enabled)
   void cass_cluster_set_latency_aware_routing_settings(CassCluster * cluster,
@@ -747,7 +747,7 @@ cdef extern from "cassandra.h":
   CassError cass_user_type_set_string_by_name(CassUserType* user_type, const char* name, const char* value)
   CassError cass_user_type_set_string_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const char* value, size_t value_length)
   CassError cass_user_type_set_bytes(CassUserType* user_type, size_t index,  const cass_byte_t* value, size_t value_size)
-  CassError cass_user_type_set_bytes_by_name(CassUserType* user_type, const char* name, const cass_byte_t* value, size_t value_size);
+  CassError cass_user_type_set_bytes_by_name(CassUserType* user_type, const char* name, const cass_byte_t* value, size_t value_size)
   CassError cass_user_type_set_bytes_by_name_n(CassUserType* user_type, const char* name, size_t name_length, const cass_byte_t* value, size_t value_size)
   CassError cass_user_type_set_custom(CassUserType* user_type, size_t index,  const char* class_name, const cass_byte_t* value, size_t value_size)
   CassError cass_user_type_set_custom_n(CassUserType* user_type, size_t index,  const char* class_name, size_t class_name_length, const cass_byte_t* value, size_t value_size)
@@ -803,6 +803,7 @@ cdef extern from "cassandra.h":
   CassError cass_execution_profile_set_constant_speculative_execution_policy(CassExecProfile * profile, cass_int64_t constant_delay_ms, int max_speculative_executions)
 
 cdef extern from "dse.h":
+  CassError cass_statement_set_execute_as(CassStatement* statement, const char* name)
   CassError cass_cluster_set_dse_gssapi_authenticator(CassCluster * cluster, const char * service, const char * principal)
   CassError cass_cluster_set_dse_gssapi_authenticator_proxy(CassCluster* cluster, const char* service, const char* principal, const char* authorization_id)
   CassError cass_cluster_set_dse_plaintext_authenticator(CassCluster * cluster, const char * username, const char * password)

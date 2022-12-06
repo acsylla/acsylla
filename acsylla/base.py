@@ -1093,6 +1093,10 @@ class Statement(metaclass=ABCMeta):
         Note: Empty string will clear execution profile from statement
         """
 
+    @abstractmethod
+    def set_execute_as(self, name: str) -> None:
+        """Sets the name of the user to execute the statement as."""
+
 
 class PreparedStatement(metaclass=ABCMeta):
     """Provides a PreparedStatement instance class. Use the

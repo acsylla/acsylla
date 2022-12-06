@@ -25,9 +25,5 @@ cdef class Statement:
                                      object serial_consistency,
                                      str execution_profile)
 
-    cdef const CassDataType* _get_data_type(self, int index)
-    cdef const CassDataType* _get_data_type_by_name(self, bytes name)
-    cdef CassValueType _get_value_type(self, const CassDataType* data_type)
-
     cpdef bind(self, int idx, object value)
     cpdef bind_by_name(self, str name, object value)

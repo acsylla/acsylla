@@ -10,6 +10,24 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
+class TestClosedSession:
+    async def test_execute_using_a_closed_session(self, session):
+        await session.close()
+        with pytest.raises(RuntimeError):
+            await session.execute(create_statement("foobar"))
+
+    async def test_create_prepared_using_a_closed_session(self, session):
+        await session.close()
+        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+        with pytest.raises(RuntimeError):
+            await session.create_prepared(statement_str)
+
+    async def test_execute_batch_using_a_closed_session(self, session):
+        await session.close()
+        with pytest.raises(RuntimeError):
+            await session.execute_batch(create_batch_unlogged())
+
+
 class TestSession:
     async def test_create_session(self, host, keyspace):
         cluster = create_cluster([host])
@@ -35,11 +53,6 @@ class TestSession:
         statement = create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         await session.execute(statement)
 
-    async def test_execute_using_a_closed_session(self, session):
-        await session.close()
-        with pytest.raises(RuntimeError):
-            await session.execute(create_statement("foobar"))
-
     async def test_execute_syntax_error(self, session):
         with pytest.raises(CassErrorServerSyntaxError):
             await session.execute(create_statement("foobar"))
@@ -53,11 +66,11 @@ class TestSession:
         prepared = await session.create_prepared(statement_str)
         assert prepared is not None
 
-    async def test_create_prepared_using_a_closed_session(self, session):
-        await session.close()
-        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
-        with pytest.raises(RuntimeError):
-            await session.create_prepared(statement_str)
+    # async def test_create_prepared_using_a_closed_session(self, session):
+    #     await session.close()
+    #     statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+    #     with pytest.raises(RuntimeError):
+    #         await session.create_prepared(statement_str)
 
     async def test_execute_batch(self, session, id_generation):
         batch = create_batch_unlogged()
@@ -70,11 +83,6 @@ class TestSession:
             create_statement("INSERT INTO test (id, value) values(" + key_and_value + "," + key_and_value + ")")
         )
         await session.execute_batch(batch)
-
-    async def test_execute_batch_using_a_closed_session(self, session):
-        await session.close()
-        with pytest.raises(RuntimeError):
-            await session.execute_batch(create_batch_unlogged())
 
     async def test_metrics(self, session, id_generation):
         # just for the sake of populate some metrics

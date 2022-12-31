@@ -351,6 +351,7 @@ cdef extern from "cassandra.h":
   ctypedef struct CassRetryPolicy:
     pass
 
+cdef extern from "cassandra.h" nogil:
   void cass_log_set_level(CassLogLevel log_level)
   void cass_log_set_callback(CassLogCallback callback, void* data)
   const char* cass_log_level_string(CassLogLevel log_level)
@@ -533,6 +534,7 @@ cdef extern from "cassandra.h":
   CassValueType cass_data_type_type(const CassDataType* data_type)
   const CassValue* cass_row_get_column(const CassRow* row, size_t index)
   const CassValue* cass_row_get_column_by_name(const CassRow* row, const char* name)
+  const CassValue* cass_row_get_column_by_name_n(const CassRow* row, const char* name, size_t name_length)
 
   CassIterator* cass_iterator_from_map(const CassValue* value)
   CassValue* cass_iterator_get_map_key(const CassIterator* iterator)
@@ -585,6 +587,7 @@ cdef extern from "cassandra.h":
   void cass_batch_free(CassBatch* cass_batch)
 
   CassError cass_uuid_from_string(const char* str, CassUuid* output)
+  CassError cass_uuid_from_string_n(const char* str, size_t str_length, CassUuid* output)
   void cass_uuid_string(CassUuid uuid, char* output)
 
   CassError cass_inet_from_string(const char* str, CassInet* output)

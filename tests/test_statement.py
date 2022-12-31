@@ -271,10 +271,12 @@ class TestStatementOnlyPrepared:
         statement.bind_by_name("value_int", 10)
 
     def test_bind_int_by_name_value_error(self, statement):
-        with pytest.raises(ValueError):
+        with pytest.raises(OverflowError):
             statement.bind_by_name("value_int", 2147483649)
-        with pytest.raises(ValueError):
+        with pytest.raises(OverflowError):
             statement.bind_by_name("value_int", -2147483649)
+        with pytest.raises(ValueError):
+            statement.bind_by_name("value_int", "bad_value")
 
     def test_bind_int_by_name_invalid_name(self, statement):
         with pytest.raises(errors.CassErrorLibNameDoesNotExist):

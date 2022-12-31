@@ -1,11 +1,10 @@
-from datetime import datetime
-from datetime import timedelta
+from cpython.datetime cimport datetime
+from cpython.datetime cimport time
+
 from decimal import Decimal
-from ipaddress import ip_address
-from uuid import UUID
 
 
-cdef object get_cass_value(const CassValue* cass_value):
+cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_types):
     cdef CassValueType cass_type
 
     cdef cass_bool_t value_is_null = cass_value_is_null(cass_value)
@@ -31,7 +30,7 @@ cdef object get_cass_value(const CassValue* cass_value):
     elif cass_type == CASS_VALUE_TYPE_DOUBLE:
         return _double(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DECIMAL:
-        return _decimal(cass_value)
+        return _decimal(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_BOOLEAN:
         return _bool(cass_value)
     elif cass_type in (CASS_VALUE_TYPE_ASCII,
@@ -45,27 +44,27 @@ cdef object get_cass_value(const CassValue* cass_value):
     elif cass_type == CASS_VALUE_TYPE_INET:
         return _inet(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DATE:
-        return _date(cass_value)
+        return _date(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_TIME:
-        return _time(cass_value)
+        return _time(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_TIMESTAMP:
-        return _timestamp(cass_value)
+        return _timestamp(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_DURATION:
-        return _duration(cass_value)
+        return _duration(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_MAP:
-        return _map(cass_value)
+        return _map(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_SET:
-        return _set(cass_value)
+        return _set(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_LIST:
-        return _list(cass_value)
+        return _list(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_TUPLE:
-        return _tuple(cass_value)
+        return _tuple(cass_value, native_types)
     elif cass_type == CASS_VALUE_TYPE_UDT:
-        return _udt(cass_value)
+        return _udt(cass_value, native_types)
     else:
         raise ValueError(f"Type not supported {cass_type}")
 
-cdef object _int8(const CassValue* cass_value):
+cdef inline object _int8(const CassValue* cass_value):
     """ Returns the int value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -78,7 +77,7 @@ cdef object _int8(const CassValue* cass_value):
         raise_if_error(error)
     return output
 
-cdef object _int16(const CassValue* cass_value):
+cdef inline object _int16(const CassValue* cass_value):
     """ Returns the int value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -91,7 +90,7 @@ cdef object _int16(const CassValue* cass_value):
         raise_if_error(error)
     return output
 
-cdef object _int32(const CassValue* cass_value):
+cdef inline object _int32(const CassValue* cass_value):
     """ Returns the int value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -104,7 +103,8 @@ cdef object _int32(const CassValue* cass_value):
         raise_if_error(error)
     return output
 
-cdef object _int64(const CassValue* cass_value):
+
+cdef inline object _int64(const CassValue* cass_value):
     """ Returns the int value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -117,7 +117,8 @@ cdef object _int64(const CassValue* cass_value):
         raise_if_error(error)
     return output
 
-cdef object _uuid(const CassValue* cass_value):
+
+cdef inline object _uuid(const CassValue* cass_value):
     cdef char output[CASS_UUID_STRING_LENGTH]
     cdef CassError error
     cdef CassUuid uuid
@@ -129,16 +130,17 @@ cdef object _uuid(const CassValue* cass_value):
         raise_if_error(error)
 
     cass_uuid_string(uuid, output)
-    return UUID(str(output.decode()))
+    return output.decode()
 
-cdef object _float(const CassValue* cass_value):
+
+cdef inline object _float(const CassValue* cass_value):
     """ Returns the float value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
-    cdef float output
+    cdef cass_float_t output
     cdef CassError error
 
-    error = cass_value_get_float(cass_value, <cass_float_t*> &output)
+    error = cass_value_get_float(cass_value, &output)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
@@ -146,7 +148,8 @@ cdef object _float(const CassValue* cass_value):
 
     return output
 
-cdef object _double(const CassValue* cass_value):
+
+cdef inline object _double(const CassValue* cass_value):
     """ Returns the double value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -161,7 +164,8 @@ cdef object _double(const CassValue* cass_value):
 
     return output
 
-cdef object _decimal(const CassValue* cass_value):
+
+cdef inline object _decimal(const CassValue* cass_value, int8_t native_types):
     """ Returns the decimal value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -181,9 +185,12 @@ cdef object _decimal(const CassValue* cass_value):
     # slice of the buffer kept by the Cassandra driver and related to
     # the result. When the result is free up all the space will be free up.
     decimal_ = varint[:varint_size]
+    if native_types:
+        return decimal_.decode()
     return Decimal(decimal_.decode())
 
-cdef object _bool(const CassValue* cass_value):
+
+cdef inline object _bool(const CassValue* cass_value):
     """ Returns the bool value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -201,7 +208,7 @@ cdef object _bool(const CassValue* cass_value):
     else:
         return False
 
-cdef object _string(const CassValue* cass_value):
+cdef inline object _string(const CassValue* cass_value):
     """ Returns the string value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -222,7 +229,7 @@ cdef object _string(const CassValue* cass_value):
     string = output[:length]
     return string.decode()
 
-cdef object _bytes(const CassValue* cass_value):
+cdef inline object _bytes(const CassValue* cass_value):
     """ Returns the bytes value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -243,7 +250,7 @@ cdef object _bytes(const CassValue* cass_value):
     bytes_ = output[:length]
     return bytes_
 
-cdef object _inet(const CassValue* cass_value):
+cdef inline object _inet(const CassValue* cass_value):
     """ Returns the inet value of a column.
 
     Raises a derived `CassException` if the value can not be retrieved"""
@@ -256,9 +263,9 @@ cdef object _inet(const CassValue* cass_value):
     else:
         raise_if_error(error)
     cass_inet_string(output, <char*>&address)
-    return ip_address(address.decode())
+    return address.decode()
 
-cdef object _date(const CassValue* cass_value):
+cdef inline object _date(const CassValue* cass_value, int8_t native_types):
     cdef cass_uint32_t output
     cdef CassError error
     error = cass_value_get_uint32(cass_value, <cass_uint32_t *> &output)
@@ -266,12 +273,28 @@ cdef object _date(const CassValue* cass_value):
         return None
     else:
         raise_if_error(error)
+    if native_types:
+        return cass_date_time_to_epoch(output, 0)
     return datetime.utcfromtimestamp(cass_date_time_to_epoch(output, 0)).date()
 
-cdef object _time(const CassValue* cass_value):
+cdef inline object _time(const CassValue* cass_value, int8_t native_types):
+    cdef cass_int64_t nanos
+    cdef CassError error
+
+    error = cass_value_get_int64(cass_value, <cass_int64_t *> &nanos)
+    if error == CASS_ERROR_LIB_NULL_VALUE:
+        return None
+    else:
+        raise_if_error(error)
+    if native_types:
+        return nanos / 1_000_000_000
+    second, nanosecond = divmod(nanos, 1_000_000_000)
+    minute, second = divmod(second, 60)
+    hour = int(minute/60)
+    return time(hour=hour, minute=minute-hour*60, second=second, microsecond=int(nanosecond/1_000))
+
+cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
     cdef cass_int64_t output
-    cdef cass_int64_t epoch_secs
-    cdef cass_uint32_t year_month_day
     cdef CassError error
 
     error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
@@ -279,24 +302,12 @@ cdef object _time(const CassValue* cass_value):
         return None
     else:
         raise_if_error(error)
-    year_month_day = cass_date_from_epoch(0)
-    epoch_secs = cass_date_time_to_epoch(year_month_day, output)
-    return datetime.utcfromtimestamp(epoch_secs).time()
+    if native_types:
+        return output / 1000.0
+    return datetime.utcfromtimestamp(output / 1000.0)
 
-cdef object _timestamp(const CassValue* cass_value):
-    cdef cass_int64_t output
-    cdef double epoch_secs
-    cdef CassError error
 
-    error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
-    if error == CASS_ERROR_LIB_NULL_VALUE:
-        return None
-    else:
-        raise_if_error(error)
-    epoch_secs = <double>output / 1000.0
-    return datetime.utcfromtimestamp(epoch_secs)
-
-cdef object _duration(const CassValue* cass_value):
+cdef inline object _duration(const CassValue* cass_value, int8_t native_types):
     cdef cass_int32_t months
     cdef cass_int32_t days
     cdef cass_int64_t nanos
@@ -307,11 +318,41 @@ cdef object _duration(const CassValue* cass_value):
         return None
     else:
         raise_if_error(error)
-    if nanos:
-        nanos = int(nanos / 1000)
-    return timedelta(days=days, microseconds=nanos)
 
-cdef object _map(const CassValue* cass_value):
+    if native_types:
+        return months, days, nanos
+
+    out = ''
+    if months < 0:
+        months = -months
+        out = '-'
+    y, mo = divmod(months, 12)
+    if y != 0: out+= f'{y}y'
+    if mo != 0: out+= f'{mo}mo'
+    if days < 0:
+        if not out: out = '-'
+        days = -days
+    if days != 0: out += f'{days}d'
+    if nanos < 0:
+        if not out: out = '-'
+        nanos = -nanos
+    if nanos != 0:
+        s, n = divmod(nanos, 1_000_000_000)
+        h, m = divmod(s, 3600)
+        m, s = divmod(m, 60)
+        if h !=0: out += f'{h}h'
+        if m !=0: out += f'{m}m'
+        if s !=0: out += f'{s}s'
+        ms, us = divmod(n, 1_000_000)
+        us, ns = divmod(us, 1_000)
+        if ms !=0: out += f'{ms}ms'
+        if us !=0: out += f'{us}us'
+        if ns !=0: out += f'{ns}ns'
+
+    return out
+
+
+cdef inline object _map(const CassValue* cass_value, int8_t native_types):
     cdef const CassValue* key
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_map(cass_value);
@@ -321,11 +362,12 @@ cdef object _map(const CassValue* cass_value):
     while cass_iterator_next(iterator) == cass_true:
         key = cass_iterator_get_map_key(iterator)
         value = cass_iterator_get_map_value(iterator)
-        data[get_cass_value(key)] = get_cass_value(value)
+        data[get_cass_value(key, native_types)] = get_cass_value(value, native_types)
     cass_iterator_free(iterator)
     return data
 
-cdef object _set(const CassValue* cass_value):
+
+cdef inline object _set(const CassValue* cass_value, int8_t native_types):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
     data = set()
@@ -333,23 +375,26 @@ cdef object _set(const CassValue* cass_value):
         return None
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.add(get_cass_value(value))
+        data.add(get_cass_value(value, native_types))
     cass_iterator_free(iterator)
     return data
 
-cdef object _list(const CassValue* cass_value):
+
+cdef inline object _list(const CassValue* cass_value, int8_t native_types):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
     data = list()
     if iterator == NULL:
         return None
+
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value))
+        data.append(get_cass_value(value, native_types))
     cass_iterator_free(iterator)
     return data
 
-cdef object _tuple(const CassValue* cass_value):
+
+cdef inline object _tuple(const CassValue* cass_value, int8_t native_types):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_tuple(cass_value);
     data = list()
@@ -357,11 +402,12 @@ cdef object _tuple(const CassValue* cass_value):
         return None
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value))
+        data.append(get_cass_value(value, native_types))
     cass_iterator_free(iterator)
     return tuple(data)
 
-cdef object _udt(const CassValue* cass_value):
+
+cdef inline object _udt(const CassValue* cass_value, int8_t native_types):
     cdef const char* field_name
     cdef size_t field_name_length
     cdef const CassValue* field_value
@@ -370,6 +416,6 @@ cdef object _udt(const CassValue* cass_value):
     while cass_iterator_next(iterator) == cass_true:
         cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
         field_value = cass_iterator_get_user_type_field_value(iterator)
-        data[field_name[:field_name_length].decode()] = get_cass_value(field_value)
+        data[field_name[:field_name_length].decode()] = get_cass_value(field_value, native_types)
     cass_iterator_free(iterator)
     return data

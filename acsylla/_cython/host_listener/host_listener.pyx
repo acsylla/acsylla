@@ -40,9 +40,10 @@ cdef class HostListener:
     def free(self):
         try:
             loop = asyncio.get_running_loop()
+            if self._read_socket.fileno():
+                loop.remove_reader(self._read_socket)
         except RuntimeError:
             return
-        loop.remove_reader(self._read_socket)
         self._read_socket.close()
         self._write_socket.close()
 

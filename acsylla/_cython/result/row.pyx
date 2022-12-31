@@ -27,20 +27,54 @@ cdef class Row:
         return self.result.column_count()
 
     def as_dict(self):
-        return dict(self.as_named_tuple())
+        cdef size_t length = 0
+        cdef char* name = NULL
+        cdef CassError error
+        cdef size_t column_count
+        cdef const CassValue* cass_value
+
+        column_count = cass_result_column_count(self.result.cass_result)
+        ret = {}
+        for i in range(column_count):
+            error = cass_result_column_name(self.result.cass_result, i, <const char**> &name, <size_t*> &length)
+            if error: raise_if_error(error)
+            cass_value = cass_row_get_column_by_name_n(self.cass_row, name, length)
+            if cass_value == NULL:
+                raise ColumnNotFound(name[:length])
+            ret[name[:length].decode()] = get_cass_value(cass_value, self.result.native_types)
+        return ret
 
     def as_list(self):
+        cdef size_t count
+        cdef const CassValue* cass_value
+        count = cass_result_column_count(self.result.cass_result)
         result = []
-        for index in range(self.result.column_count()):
-            result.append(self.column_value_by_index(index))
+        for index in range(count):
+            cass_value = cass_row_get_column(self.cass_row, index)
+            if cass_value == NULL:
+                raise ColumnNotFound(f'ColumnNotFound with index {index}')
+            result.append(get_cass_value(cass_value, self.result.native_types))
         return result
 
     def as_tuple(self):
         return tuple(self.as_list())
 
     def as_named_tuple(self):
-        for column in self.result.columns_names():
-            yield column, self.column_value(column)
+        cdef size_t length = 0
+        cdef char* name = NULL
+        cdef CassError error
+        cdef size_t column_count
+        cdef const CassValue* cass_value
+
+        column_count = cass_result_column_count(self.result.cass_result)
+
+        for i in range(column_count):
+            error = cass_result_column_name(self.result.cass_result, i, <const char**> &name, <size_t*> &length)
+            if error: raise_if_error(error)
+            cass_value = cass_row_get_column_by_name_n(self.cass_row, name, length)
+            if cass_value == NULL:
+                raise ColumnNotFound(name[:length])
+            yield name[:length].decode(), get_cass_value(cass_value, self.result.native_types)
 
     def column_value_by_index(self, size_t index):
         """ Returns the column value by `column index`.
@@ -51,7 +85,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(f'ColumnNotFound with index {index}')
 
-        return get_cass_value(cass_value)
+        return get_cass_value(cass_value, self.result.native_types)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
@@ -64,4 +98,4 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(column_name)
 
-        return get_cass_value(cass_value)
+        return get_cass_value(cass_value, self.result.native_types)

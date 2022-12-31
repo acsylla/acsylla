@@ -58,7 +58,7 @@ cdef object _fields_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta):
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char **> &field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -100,7 +100,7 @@ cdef object _fields_from_table_meta(const CassTableMeta* table_meta):
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -147,7 +147,7 @@ cdef object _fields_from_column_meta(const CassColumnMeta* column_meta):
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -220,7 +220,7 @@ cdef object _fields_from_index_meta(const CassIndexMeta* index_meta):
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -259,7 +259,7 @@ cdef object _indexes_meta_from_table_meta(const CassTableMeta* table_meta, objec
                     name=name[:length].decode(),
                     target=target[:length_t].decode(),
                     kind=index_type_map[cass_index_meta_type(index_meta)],
-                    options=get_cass_value(options)
+                    options=get_cass_value(options, False)
                 )
             )
     finally:
@@ -280,7 +280,7 @@ cdef object _fields_from_materialized_view_meta(const CassMaterializedViewMeta* 
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
     return fields
@@ -422,7 +422,7 @@ cdef object _fields_from_function_meta(const CassFunctionMeta* function_meta):
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -463,7 +463,7 @@ cdef object _fields_from_aggregate_meta(const CassAggregateMeta* aggregate_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value)
+            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 

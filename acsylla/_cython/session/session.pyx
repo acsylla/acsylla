@@ -1,5 +1,3 @@
-from uuid import UUID
-
 import asyncio
 
 
@@ -91,7 +89,7 @@ cdef class Session:
         finally:
             cass_future_free(cass_future)
 
-    async def execute(self, Statement statement):
+    async def execute(self, Statement statement, native_types=False):
         """ Execute an statement and returns the result.
 
         Is responsability of the caller to know what to do with
@@ -121,12 +119,12 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-            result = Result.new_(cass_result)
+            result = Result.new_(cass_result, native_types)
             if statement.tracing_enabled is True:
                 error = cass_future_tracing_id(cass_future, &tracing_id)
                 raise_if_error(error)
                 cass_uuid_string(tracing_id, tracing_id_str)
-                result.tracing_id = UUID(tracing_id_str.decode())
+                result.tracing_id = tracing_id_str.decode()
         finally:
             cass_future_free(cass_future)
 
@@ -165,7 +163,7 @@ cdef class Session:
 
         return prepared
 
-    async def execute_batch(self, Batch batch):
+    async def execute_batch(self, Batch batch, native_types=False):
         """ Execute a batch of statements and returns the result.
 
         Is responsability of the caller to know what to do with
@@ -195,12 +193,12 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-            result = Result.new_(cass_result)
+            result = Result.new_(cass_result, native_types)
             if batch.tracing_enabled is True:
                 error = cass_future_tracing_id(cass_future, &tracing_id)
                 raise_if_error(error)
                 cass_uuid_string(tracing_id, tracing_id_str)
-                result.tracing_id = UUID(tracing_id_str.decode())
+                result.tracing_id = tracing_id_str.decode()
         finally:
             cass_future_free(cass_future)
 

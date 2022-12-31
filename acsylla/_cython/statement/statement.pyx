@@ -161,6 +161,7 @@ cdef class Statement:
             raise_if_error(error)
 
     cpdef bind(self, int idx, object value):
+        cdef CassError error = CASS_OK
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
 
@@ -170,95 +171,102 @@ cdef class Statement:
                 raise CassErrorLibIndexOutOfBounds()
             cass_value_type = cass_data_type_type(cass_data_type)
 
-            if value is None:
-                bind_null(self.cass_statement, idx)
-                return
-            elif cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
+            if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
                 raise ValueError(f"Unknown type for column index {idx}")
+            elif value is None:
+                error = cass_statement_bind_null(self.cass_statement, idx)
             elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-                bind_bool(self.cass_statement, idx, value)
+                error = cass_statement_bind_bool(self.cass_statement, idx, as_bool(value))
             elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
-                bind_int8(self.cass_statement, idx, value)
+                error = cass_statement_bind_int8(self.cass_statement, idx, int(value))
             elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
-                bind_int16(self.cass_statement, idx, value)
+                error = cass_statement_bind_int16(self.cass_statement, idx, int(value))
             elif cass_value_type == CASS_VALUE_TYPE_INT:
-                bind_int32(self.cass_statement, idx, value)
+                error = cass_statement_bind_int32(self.cass_statement, idx, int(value))
             elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
-                               CASS_VALUE_TYPE_COUNTER):
-                bind_int64(self.cass_statement, idx, value)
+                                     CASS_VALUE_TYPE_COUNTER):
+                error = cass_statement_bind_int64(self.cass_statement, idx, int(value))
             elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
-                bind_float(self.cass_statement, idx, value)
+                error =  cass_statement_bind_float(self.cass_statement, idx, float(value))
             elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-                bind_double(self.cass_statement, idx, value)
+                error = cass_statement_bind_double(self.cass_statement, idx, float(value))
             elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-                bind_decimal(self.cass_statement, idx, value)
+                value, scale = as_cass_decimal(value)
+                error = cass_statement_bind_decimal(self.cass_statement, idx, value, len(value), scale)
             elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-                bind_ascii_string(self.cass_statement, idx, value)
+                error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value, 'ascii'))
             elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                      CASS_VALUE_TYPE_VARCHAR):
-                bind_string(self.cass_statement, idx, value)
+                error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value))
             elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                               CASS_VALUE_TYPE_VARINT,
-                               CASS_VALUE_TYPE_CUSTOM):
-                bind_bytes(self.cass_statement, idx, value)
+                                     CASS_VALUE_TYPE_VARINT,
+                                     CASS_VALUE_TYPE_CUSTOM):
+                error = cass_statement_bind_bytes(self.cass_statement, idx, as_blob(value), len(value))
             elif cass_value_type in (CASS_VALUE_TYPE_UUID,
-                               CASS_VALUE_TYPE_TIMEUUID):
-                bind_uuid(self.cass_statement, idx, value)
+                                     CASS_VALUE_TYPE_TIMEUUID):
+                error = cass_statement_bind_uuid(self.cass_statement, idx, as_cass_uuid(value))
             elif cass_value_type == CASS_VALUE_TYPE_INET:
-                bind_inet(self.cass_statement, idx, value)
+                error = cass_statement_bind_inet(self.cass_statement, idx, as_cass_inet(value))
             elif cass_value_type == CASS_VALUE_TYPE_DATE:
-                bind_date(self.cass_statement, idx, value)
+                error = cass_statement_bind_uint32(self.cass_statement, idx, as_cass_date(value))
             elif cass_value_type == CASS_VALUE_TYPE_TIME:
-                bind_time(self.cass_statement, idx, value)
+                error = cass_statement_bind_int64(self.cass_statement, idx, as_cass_time(value))
             elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
-                bind_timestamp(self.cass_statement, idx, value)
+                error = cass_statement_bind_int64(self.cass_statement, idx, as_cass_timestamp(value))
             elif cass_value_type == CASS_VALUE_TYPE_DURATION:
-                bind_duration(self.cass_statement, idx, value)
+                month, days, nanos = as_cass_duration(value)
+                error = cass_statement_bind_duration(self.cass_statement, idx, month, days, nanos)
             elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                                      CASS_VALUE_TYPE_SET,
                                      CASS_VALUE_TYPE_LIST):
-                bind_collection(self.cass_statement, idx, value, cass_data_type)
+                error = bind_collection(self.cass_statement, idx, value, cass_data_type)
             elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-                bind_tuple(self.cass_statement, idx, value, cass_data_type)
+                error = bind_tuple(self.cass_statement, idx, value, cass_data_type)
             elif cass_value_type == CASS_VALUE_TYPE_UDT:
-                bind_udt(self.cass_statement, idx, value, cass_data_type)
+                error = bind_udt(self.cass_statement, idx, value, cass_data_type)
+            if error:
+                raise_if_error(error)
             return
 
         if value is None:
-            bind_null(self.cass_statement, idx)
-            return
+            error = cass_statement_bind_null(self.cass_statement, idx)
         # Bool needs to be the first one, since boolean types
         # are implemented using integers.
         elif isinstance(value, bool):
-            bind_bool(self.cass_statement, idx, value)
+            error = cass_statement_bind_bool(self.cass_statement, idx, as_bool(value))
         elif isinstance(value, int):
-            bind_int32(self.cass_statement, idx, value)
+            error = cass_statement_bind_int32(self.cass_statement, idx, int(value))
         elif isinstance(value, float):
-            bind_float(self.cass_statement, idx, value)
+            error =  cass_statement_bind_float(self.cass_statement, idx, float(value))
         elif isinstance(value, str):
-            bind_string(self.cass_statement, idx, value)
+            error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value))
         elif isinstance(value, bytes):
-            bind_bytes(self.cass_statement, idx, value)
+            error = cass_statement_bind_bytes(self.cass_statement, idx, value, len(value))
         elif isinstance(value, Decimal):
-            bind_decimal(self.cass_statement, idx, value)
+            value, scale = as_cass_decimal(value)
+            error = cass_statement_bind_decimal(self.cass_statement, idx, value, len(value), scale)
         elif isinstance(value, UUID):
-            bind_uuid(self.cass_statement, idx, value)
+            error = cass_statement_bind_uuid(self.cass_statement, idx, as_cass_uuid(value))
         elif isinstance(value, (IPv4Address, IPv6Address)):
-            bind_inet(self.cass_statement, idx, value)
+            error = cass_statement_bind_inet(self.cass_statement, idx, as_cass_inet(value))
         elif isinstance(value, datetime):
-            bind_timestamp(self.cass_statement, idx, value)
+            error = cass_statement_bind_int64(self.cass_statement, idx, as_cass_timestamp(value))
         elif isinstance(value, date):
-            bind_date(self.cass_statement, idx, value)
+            error = cass_statement_bind_uint32(self.cass_statement, idx, as_cass_date(value))
         elif isinstance(value, time):
-            bind_time(self.cass_statement, idx, value)
+            error = cass_statement_bind_int64(self.cass_statement, idx, as_cass_time(value))
         elif isinstance(value, timedelta):
-            bind_duration(self.cass_statement, idx, value)
+            month, days, nanos = as_cass_duration(value)
+            error = cass_statement_bind_duration(self.cass_statement, idx, month, days, nanos)
         elif isinstance(value, (dict, set, list)):
             raise ValueError('Collections types (map, set, list) and UDT type only availabe for statements created from prepared statements')
         elif isinstance(value, tuple):
             raise ValueError('Type "tuple" only availabe for statements created from prepared statements')
         else:
             raise ValueError(f"Value {value} not supported for not prepared statements")
+
+        if error:
+            raise_if_error(error)
 
     def bind_list(self, list values):
         cdef int idx
@@ -281,60 +289,61 @@ cdef class Statement:
             raise CassErrorLibNameDoesNotExist(f"Unknown column: {name}")
         cass_value_type = cass_data_type_type(cass_data_type)
 
-        if value is None:
-            bind_null_by_name(self.cass_statement, name.encode())
-            return
-        elif cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
+        if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
             raise ValueError(f"Unknown type for column {name}")
+        elif value is None:
+            error = cass_statement_bind_null_by_name(self.cass_statement, name.encode())
         elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-            bind_bool_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_bool_by_name(self.cass_statement, name.encode(), as_bool(value))
         elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
-            bind_int8_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int8_by_name(self.cass_statement, name.encode(), int(value))
         elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
-            bind_int16_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int16_by_name(self.cass_statement, name.encode(), int(value))
         elif cass_value_type == CASS_VALUE_TYPE_INT:
-            bind_int32_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int32_by_name(self.cass_statement, name.encode(), int(value))
         elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
                                  CASS_VALUE_TYPE_COUNTER):
-            bind_int64_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int64_by_name(self.cass_statement, name.encode(), int(value))
         elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
-            bind_float_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_float_by_name(self.cass_statement, name.encode(), float(value))
         elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-            bind_double_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_double_by_name(self.cass_statement, name.encode(), float(value))
         elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-            bind_decimal_by_name(self.cass_statement, name.encode(), value)
+            value, scale = as_cass_decimal(value)
+            error = cass_statement_bind_decimal_by_name(self.cass_statement, name.encode(), value, len(value), scale)
         elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-            bind_ascii_string_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value, 'ascii'))
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
-            bind_string_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value))
         elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                                  CASS_VALUE_TYPE_VARINT,
                                  CASS_VALUE_TYPE_CUSTOM):
-            bind_bytes_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_bytes_by_name(self.cass_statement, name.encode(), as_blob(value), len(value))
         elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                                  CASS_VALUE_TYPE_TIMEUUID):
-            bind_uuid_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_uuid_by_name(self.cass_statement, name.encode(), as_cass_uuid(value))
         elif cass_value_type == CASS_VALUE_TYPE_INET:
-            bind_inet_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_inet_by_name(self.cass_statement, name.encode(), as_cass_inet(value))
         elif cass_value_type == CASS_VALUE_TYPE_DATE:
-            bind_date_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_uint32_by_name(self.cass_statement, name.encode(), as_cass_date(value))
         elif cass_value_type == CASS_VALUE_TYPE_TIME:
-            bind_time_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int64_by_name(self.cass_statement, name.encode(), as_cass_time(value))
         elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
-            bind_timestamp_by_name(self.cass_statement, name.encode(), value)
+            error = cass_statement_bind_int64_by_name(self.cass_statement, name.encode(), as_cass_timestamp(value))
         elif cass_value_type == CASS_VALUE_TYPE_DURATION:
-            bind_duration_by_name(self.cass_statement, name.encode(), value)
+            month, days, nanos = as_cass_duration(value)
+            error = cass_statement_bind_duration_by_name(self.cass_statement, name.encode(), month, days, nanos)
         elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                                  CASS_VALUE_TYPE_SET,
                                  CASS_VALUE_TYPE_LIST):
-            bind_collection_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+            error = bind_collection_by_name(self.cass_statement, name.encode(), value, cass_data_type)
         elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-            bind_tuple_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+            error = bind_tuple_by_name(self.cass_statement, name.encode(), value, cass_data_type)
         elif cass_value_type == CASS_VALUE_TYPE_UDT:
-            bind_udt_by_name(self.cass_statement, name.encode(), value, cass_data_type)
-        else:
-            raise ValueError(f"Type {cass_value_type} not supported")
+            error = bind_udt_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+        if error:
+            raise_if_error(error)
 
     def bind_dict(self, dict values):
         cdef str name

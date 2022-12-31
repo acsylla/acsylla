@@ -1,37 +1,53 @@
+from . import cql_types
 from acsylla import create_cluster
 from acsylla import create_statement
 
+import asyncio
 import os
 import pytest
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def keyspace():
     return "acsylla"
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def host():
     return "127.0.0.1"
 
 
-@pytest.fixture
-async def cluster(event_loop, host):
-    return create_cluster([host], connect_timeout=10.0, request_timeout=30.0, resolve_timeout=5.0)
+@pytest.fixture(scope="class")
+async def cluster(host):
+    return create_cluster([host], connect_timeout=10.0, request_timeout=30.0, resolve_timeout=5.0, log_level="critical")
 
 
-@pytest.fixture
-async def session(event_loop, cluster, keyspace):
+@pytest.fixture(scope="class")
+def event_loop():
+    loop = asyncio.get_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="class")
+async def session(cluster, keyspace):
     # Create the acsylla keyspace if it does not exist yet
     session_without_keyspace = await cluster.create_session()
-    create_keyspace_statement = create_statement(
-        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH REPLICATION = "
-        "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
+
+    await session_without_keyspace.execute(create_statement(f"DROP KEYSPACE IF EXISTS {keyspace}"))
+
+    await session_without_keyspace.execute(
+        create_statement(
+            f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH REPLICATION = "
+            "{ 'class': 'SimpleStrategy', 'replication_factor': 1}"
+        )
     )
-    await session_without_keyspace.execute(create_keyspace_statement)
     await session_without_keyspace.close()
 
     session = await cluster.create_session(keyspace=keyspace)
+
+    for query in cql_types.create_query():
+        await session.execute(create_statement(query))
 
     # Drop table if exits, will truncate any data used before
     # and will enforce in the next step that if the schema of

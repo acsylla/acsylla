@@ -13,8 +13,10 @@ from .base import HostListenerEvent
 from .base import IndexMeta
 from .base import KeyspaceMeta
 from .base import LatencyAwareRoutingSettings
+from .base import Logger
 from .base import LogMessage
 from .base import MaterializedViewMeta
+from .base import Metadata
 from .base import NestedTypeMeta
 from .base import PreparedStatement
 from .base import ProtocolVersion
@@ -34,6 +36,7 @@ from .factories import create_batch_logged
 from .factories import create_batch_unlogged
 from .factories import create_cluster
 from .factories import create_statement
+from .factories import get_logger
 
 __all__ = (
     "Cluster",
@@ -56,9 +59,11 @@ __all__ = (
     "TableMeta",
     "KeyspaceMeta",
     "LatencyAwareRoutingSettings",
+    "Logger",
     "SpeculativeExecutionMetrics",
     "SpeculativeExecutionPolicy",
     "MaterializedViewMeta",
+    "Metadata",
     "UserTypeMeta",
     "UserTypeFieldMeta",
     "NestedTypeMeta",
@@ -72,4 +77,5 @@ __all__ = (
     "create_batch_unlogged",
     "create_batch_counter",
     "errors",
+    "get_logger",
 )

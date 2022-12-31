@@ -7,11 +7,12 @@ cdef class Result:
         cass_result_free(self.cass_result)
 
     @staticmethod
-    cdef Result new_(const CassResult* cass_result):
+    cdef Result new_(const CassResult* cass_result, int8_t native_types):
         cdef Result result
 
         result = Result()
         result.cass_result = cass_result
+        result.native_types = native_types
         return result
 
     def has_more_pages(self):

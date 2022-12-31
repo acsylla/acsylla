@@ -1,502 +1,271 @@
-from datetime import date
-from datetime import datetime
-from datetime import time
-from datetime import timedelta
-from datetime import timezone
-from decimal import Decimal
-from ipaddress import IPv4Address
-from ipaddress import IPv6Address
-from uuid import UUID
+from cpython.datetime cimport date
+from cpython.datetime cimport datetime
+from cpython.datetime cimport time
+from cpython.datetime cimport timedelta
+from libc.time cimport time_t
+
+import re
+
+_duration_re = re.compile(r"(\d+)(y|Y|mo|MO|mO|Mo|w|W|d|D|h|H|s|S|ms|MS|mS|Ms|us|US|uS|Us|µs|µS|ns|NS|nS|Ns|m|M)")
 
 
-cdef inline bind_null(CassStatement* statement, int index):
-    cdef CassError error
-    error = cass_statement_bind_null(statement, index)
-    raise_if_error(error)
+cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s) except *:
+    cdef cass_int32_t months = 0
+    cdef cass_int32_t days = 0
+    cdef cass_int64_t nanos = 0
+    cdef list matched = _duration_re.findall(s)
 
-cdef inline bind_null_by_name(CassStatement* statement, bytes name):
-    cdef CassError error
-    error = cass_statement_bind_null_by_name(statement, name)
-    raise_if_error(error)
+    for value, key in matched:
+        if key in ('y', 'Y'):
+            months += int(value) * 12
+        elif key in ('mo', 'MO'):
+            months += int(value)
+        elif key in ('w', 'W'):
+            days += int(value) * 7
+        elif key in ('d', 'D'):
+            days += int(value)
+        elif key in ('h', 'H'):
+            nanos += int(value) * 60 * 60 * 1000 * 1000 * 1000
+        elif key in ('m', 'M'):
+            nanos += int(value) * 60 * 1000 * 1000 * 1000
+        elif key in ('s', 'S'):
+            nanos += int(value) * 1000 * 1000 * 1000
+        elif key in ('ms', 'MS'):
+            nanos += int(value) * 1000 * 1000
+        elif key in ('us', 'µs', 'US'):
+            nanos += int(value) * 1000
+        elif key in ('ns', 'NS'):
+            nanos += int(value)
+    if not matched:
+        raise ValueError(f'Unknown duration format for value: "{s}"')
+    if s[0] == '-':
+        return -months, -days, -nanos
+    return months, days, nanos
 
-# CASS_VALUE_TYPE_BOOLEAN
-cdef get_bool(object value):
-    if value:
-        return cass_true
-    return cass_false
 
-cdef inline bind_bool(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_bool(statement, index, get_bool(value))
-    raise_if_error(error)
-
-cdef inline bind_bool_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_bool_by_name(statement, name, get_bool(value))
-
-# CASS_VALUE_TYPE_TINY_INT
-cdef get_int8(object value):
-    if isinstance(value, float) or (isinstance(value, str) and value.isdigit()):
-        value = int(value)
-    elif not isinstance(value, int):
-        raise ValueError(f'Value "{value}" is not int8')
-    if value < -128 or value > 127:
-        raise ValueError(f'Value int8 must be between -128 and 127 got {value}')
-    return <cass_int8_t>value
-
-cdef inline bind_int8(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int8(statement, index, get_int8(value))
-    raise_if_error(error)
-
-cdef inline bind_int8_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int8_by_name(statement, name, get_int8(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_SMALL_INT
-cdef get_int16(object value):
-    if isinstance(value, float) or (isinstance(value, str) and value.isdigit()):
-        value = int(value)
-    elif not isinstance(value, int):
-        raise ValueError(f'Value "{value}" is not int16')
-    if value < -32768 or value > 32767:
-        raise ValueError(f'Value int16 must be between -32768 and 32767 got {value}')
-    return <cass_int16_t>value
-
-cdef inline bind_int16(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int16(statement, index, get_int16(value))
-    raise_if_error(error)
-
-cdef inline bind_int16_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int8_by_name(statement, name, get_int16(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_INT
-cdef get_int32(object value):
-    if isinstance(value, float) or (isinstance(value, str) and value.isdigit()):
-        value = int(value)
-    elif not isinstance(value, int):
-        raise ValueError(f'Value "{value}" is not int32')
-    if value < -2147483648 or value > 2147483647:
-        raise ValueError(f'Value int32 must be between -2147483648 and 2147483647 got {value}')
-    return <cass_int32_t>value
-
-cdef bind_int32(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int32(statement, index, get_int32(value))
-    raise_if_error(error)
-
-cdef bind_int32_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int32_by_name(statement, name, get_int32(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_BIGINT
-cdef get_int64(object value):
-    if isinstance(value, float) or (isinstance(value, str) and value.isdigit()):
-        value = int(value)
-    elif not isinstance(value, int):
-        raise ValueError(f'Value "{value}" is not int64')
-    if value < -9223372036854775808 or value > 9223372036854775807:
-        raise ValueError(f'Value int64 must be between -9223372036854775808 and 9223372036854775807 got {value}')
-
-    return <cass_int64_t>value
-
-cdef inline bind_int64(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64(statement, index, get_int64(value))
-    raise_if_error(error)
-
-cdef inline bind_int64_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64_by_name(statement, name, get_int64(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_FLOAT
-cdef get_float(object value):
-    try:
-        value = float(value)
-    except ValueError:
-        raise ValueError(f'Value "{value}" is not float')
-    return <cass_float_t>value
-
-cdef inline bind_float(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_float(statement, index, get_float(value))
-    raise_if_error(error)
-
-cdef inline bind_float_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_float_by_name(statement, name, get_float(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_DECIMAL
-cdef tuple get_cass_decimal(object value):
-    cdef object t
-    cdef cass_int32_t scale
-    if not isinstance(value, Decimal):
-        value = Decimal(str(value))
-    t = value.as_tuple()
-    scale = len(t.digits[len(t.digits[:t.exponent]):])
-    value = str(value).encode()
-    return value, scale
-
-cdef inline bind_decimal(CassStatement* statement, int index, object value):
-    cdef CassError error
-    value, scale = get_cass_decimal(value)
-    error = cass_statement_bind_decimal(statement, index, <const cass_byte_t*> value, len(value), scale)
-    raise_if_error(error)
-
-cdef inline bind_decimal_by_name(CassStatement* statement, bytes name, object value):
-    value, scale = get_cass_decimal(value)
-    error = cass_statement_bind_decimal_by_name(statement, name, <const cass_byte_t*> value, len(value), scale)
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_DOUBLE
-cdef get_double(object value):
-    try:
-        value = float(value)
-    except ValueError:
-        raise ValueError(f'Value "{value}" is not float')
-    return <cass_double_t>value
-
-cdef inline bind_double(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_double(statement, index, get_double(value))
-    raise_if_error(error)
-
-cdef inline bind_double_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_double_by_name(statement, name, get_double(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_ASCII
-cdef get_ascii(object value):
-    if isinstance(value, str) and value.isascii():
-        return value.encode()
-    else:
-        raise ValueError(f'Value "{value}" is not ascii string')
-
-cdef inline bind_ascii_string(CassStatement* statement, int index, str value):
-    cdef CassError error
-    error = cass_statement_bind_string(statement, index, get_ascii(value))
-    raise_if_error(error)
-
-cdef inline bind_ascii_string_by_name(CassStatement* statement, bytes name, str value):
-    cdef CassError error
-    error = cass_statement_bind_string_by_name(statement, name, get_ascii(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_TEXT
-cdef get_text(object value):
-    if isinstance(value, str):
-        return value.encode()
-    elif isinstance(value, bytes):
+cdef inline as_bytes(object value, str encoding='utf-8'):
+    if isinstance(value, bytes):
         return value
+    return value.encode(encoding) if isinstance(value, str) else str(value).encode(encoding)
+
+
+cdef inline as_blob(object value):
+    if isinstance(value, bytes):
+        return value
+    raise ValueError(f'Value "{value}" is not bytes.')
+
+
+cdef inline cass_bool_t as_bool(object value) except *:
+    if value in (True, False, 0, 1):
+        return cass_true if value else cass_false
+    raise ValueError(f'Value "{value}" is not boolean.')
+
+
+cdef inline (cass_byte_t*, cass_int32_t) as_cass_decimal(object value) except *:
+    value = str(value) if not isinstance(value, str) else value
+    scale = value.split('.')
+    if not scale[0].isdigit():
+        raise ValueError(f'Bad value for decimal type: "{value}"')
+    if len(scale) == 2:
+        if not scale[1].isdigit():
+            raise ValueError(f'Bad value for decimal type: "{value}"')
+        scale = len(scale[1])
     else:
-        return str(value).encode()
+        scale = 0
 
-cdef inline bind_string(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_string(statement, index, get_text(value))
-    raise_if_error(error)
+    return value.encode(), scale
 
-cdef inline bind_string_by_name(CassStatement* statement, bytes name, str value):
-    cdef CassError error
-    error = cass_statement_bind_string_by_name(statement, name, get_text(value))
-    raise_if_error(error)
 
-# CASS_VALUE_TYPE_BLOB
-cdef inline bind_bytes(CassStatement* statement, int index, bytes value):
-    cdef CassError error
-    error = cass_statement_bind_bytes(statement, index, <const cass_byte_t*>value, len(value))
-    raise_if_error(error)
-
-cdef inline bind_bytes_by_name(CassStatement* statement, bytes name, bytes value):
-    cdef CassError error
-    error = cass_statement_bind_bytes_by_name(statement, name, <const cass_byte_t*> value, len(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_UUID
-cdef CassUuid get_cass_uuid(object value):
-    cdef bytes bytes_value
+cdef inline CassUuid as_cass_uuid(object value) except *:
     cdef CassUuid cass_uuid
     cdef CassError error
-    if isinstance(value, UUID):
-        bytes_value = str(value).encode()
-    elif isinstance(value, str):
-        bytes_value = str(UUID(value)).encode()
-    else:
-        raise ValueError(f'Bad value for UUID type: {value}')
-    error = cass_uuid_from_string(bytes_value, &cass_uuid)
-    raise_if_error(error)
+    error = cass_uuid_from_string(as_bytes(value), &cass_uuid)
+    if error:
+        raise ValueError(f'Bad UUID value: "{value}"')
     return cass_uuid
 
-cdef inline bind_uuid(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_uuid(statement, index, get_cass_uuid(value))
-    raise_if_error(error)
 
-cdef inline bind_uuid_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_uuid_by_name(statement, name, get_cass_uuid(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_INET
-cdef CassInet get_cass_inet(object value):
+cdef inline CassInet as_cass_inet(object value) except *:
     cdef CassInet cass_inet
-    cdef bytes bytes_value
     cdef CassError error
-
-    if isinstance(value, (IPv4Address, IPv6Address)):
-        bytes_value = str(value).encode()
-    else:
-        bytes_value = value.encode()
-    error = cass_inet_from_string(<const char*>bytes_value, &cass_inet)
-    raise_if_error(error)
+    error = cass_inet_from_string(as_bytes(value), &cass_inet)
+    if error:
+        raise ValueError(f'Bad IP address value: "{value}"')
     return cass_inet
 
-cdef inline bind_inet(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_inet(statement, index, get_cass_inet(value))
-    raise_if_error(error)
 
-cdef inline bind_inet_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_inet_by_name(statement, name, get_cass_inet(value))
-    raise_if_error(error)
+cdef inline int _days_from_civil(int y, unsigned m, unsigned d) except * nogil:
+    '''
+    http://howardhinnant.github.io/date_algorithms.html#days_from_civil
+    Returns number of days since civil 1970-01-01.  Negative values indicate
+       days prior to 1970-01-01.
+    Preconditions:  y-m-d represents a date in the civil (Gregorian) calendar
+                    m is in [1, 12]
+                    d is in [1, last_day_of_month(y, m)]
+                    y is "approximately" in
+                      [numeric_limits<Int>::min()/366, numeric_limits<Int>::max()/366]
+    '''
+    y -= m <= 2
+    cdef int era = <int>((y if y >= 0 else y - 399) / 400)
+    cdef unsigned yoe = y - era * 400
+    cdef unsigned doy = <unsigned>(((153 * (m - 3 if m > 2 else m + 9))  + 2) / 5 + d - 1)
+    cdef unsigned doe = <unsigned>(yoe * 365 + yoe/4 - yoe/100 + doy)
+    return era * 146097 + doe - 719468
 
-# CASS_VALUE_TYPE_DATE
-cdef get_cass_date(object value):
-    cdef CassError error
+
+cdef inline time_t _timegm(int year, unsigned month, unsigned day, unsigned hour, unsigned minute, unsigned second) except * nogil:
+    cdef int days_since_epoch = _days_from_civil(year, month, day)
+    return 60 * (60 * (24L * days_since_epoch + hour) + minute) + second
+
+
+cdef inline cass_uint32_t as_cass_date(object value) except *:
     cdef cass_uint32_t cass_date
-    cdef cass_int64_t epoch_secs
+    cdef time_t epoch_secs
 
-    if isinstance(value, date):
-        epoch_secs = int(datetime.fromtimestamp(
-            int(value.strftime('%s')))
-                         .replace(tzinfo=timezone.utc).timestamp())
-    elif isinstance(value, datetime):
-        epoch_secs = int(value.replace(tzinfo=timezone.utc).timestamp())
-    elif isinstance(value, str):
-        epoch_secs = int(datetime.strptime(value, "%Y-%m-%d")
-                         .replace(tzinfo=timezone.utc).timestamp())
+    if isinstance(value, (str, date, datetime)):
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        epoch_secs = _timegm(value.year, value.month, value.day, 0, 0, 0)
     else:
-        epoch_secs = int(value)
+        epoch_secs = value
 
     cass_date = cass_date_from_epoch(epoch_secs)
     return cass_date
 
-cdef inline bind_date(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_uint32(statement, index, get_cass_date(value))
-    raise_if_error(error)
 
-cdef inline bind_date_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_uint32_by_name(statement, name, get_cass_date(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_TIME
-cdef get_cass_time(object value):
+cdef inline cass_int64_t as_cass_time(object value) except *:
     cdef CassError error
     cdef cass_int64_t time_of_day
-    cdef cass_int64_t epoch_secs
 
-    if isinstance(value, time):
-        epoch_secs = int(datetime.now().replace(hour=value.hour,
-                                                minute=value.minute,
-                                                second=value.second,
-                                                microsecond=value.microsecond,
-                                                tzinfo=timezone.utc).timestamp())
-    elif isinstance(value, datetime):
-        epoch_secs = int(value.replace(tzinfo=timezone.utc).timestamp())
-    elif isinstance(value, str):
+    if isinstance(value, str):
         value = time.fromisoformat(value)
-        epoch_secs = int(datetime.now().replace(hour=value.hour,
-                                                minute=value.minute,
-                                                second=value.second,
-                                                microsecond=value.microsecond,
-                                                tzinfo=timezone.utc).timestamp())
+    if isinstance(value, (time, datetime)):
+        time_of_day = (value.hour * 60 * 60 + value.minute * 60 + value.second) * 1_000_000_000
+        if value.tzinfo:
+            time_of_day -= value.utcoffset().total_seconds() * 1_000_000_000
+        time_of_day += value.microsecond * 1_000
     else:
-        epoch_secs = int(value)
-    time_of_day = cass_time_from_epoch(epoch_secs)
+        time_of_day = value * 1_000_000_000
+
     return time_of_day
 
-cdef inline bind_time(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64(statement, index, get_cass_time(value))
-    raise_if_error(error)
 
-cdef inline bind_time_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64_by_name(statement, name, get_cass_time(value))
-    raise_if_error(error)
+cdef inline cass_int64_t as_cass_timestamp(object value) except *:
+    cdef double timestamp
 
-# CASS_VALUE_TYPE_TIMESTAMP
-cdef get_cass_timestamp(object value):
-    cdef CassError error
-    cdef cass_int64_t timestamp
-
-    if isinstance(value, datetime):
-        timestamp = int(value.replace(tzinfo=timezone.utc).timestamp()*1000)
-    elif isinstance(value, str):
-        value = datetime.fromisoformat(value)
-        timestamp = int(value.replace(hour=value.hour,
-                                      minute=value.minute,
-                                      second=value.second,
-                                      microsecond=value.microsecond,
-                                      tzinfo=timezone.utc).timestamp()*1000)
+    if isinstance(value, (str, datetime)):
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        timestamp = _timegm(value.year, value.month, value.day, value.hour, value.minute, value.second)
+        if value.tzinfo is not None:
+            timestamp -= value.utcoffset().total_seconds()
+        timestamp += value.microsecond / 1_000_000
     else:
-        timestamp = int(value*1000)
-    return timestamp
+        timestamp = value
+    return <cass_int64_t>(timestamp * 1000)
 
-cdef inline bind_timestamp(CassStatement* statement, int index, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64(statement, index, get_cass_timestamp(value))
-    raise_if_error(error)
 
-cdef inline bind_timestamp_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    error = cass_statement_bind_int64_by_name(statement, name, get_cass_timestamp(value))
-    raise_if_error(error)
-
-# CASS_VALUE_TYPE_DURATION
-cdef tuple get_cass_duration(object value):
-    cdef cass_int64_t NANOS_IN_A_SEC = 1000 * 1000 * 1000
-    cdef cass_int64_t NANOS_IN_A_US = 1000
-    cdef cass_int32_t month = 0
-    cdef cass_int32_t day = 0
+cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object value) except *:
+    cdef cass_int32_t months = 0
+    cdef cass_int32_t days = 0
     cdef cass_int64_t nanos = 0
 
-    if isinstance(value, timedelta):
+    if isinstance(value, tuple) and len(value) == 3:
+        months, days, nanos = value
+    elif isinstance(value, str):
+        months, days, nanos = _parse_duration_str(value)
+    elif isinstance(value, timedelta):
         days = value.days
-        nanos = value.seconds * NANOS_IN_A_SEC + value.microseconds * NANOS_IN_A_US
+        nanos = value.seconds * 1000 * 1000 * 1000 + value.microseconds * 1000
     else:
-        raise ValueError("Only instance of datetime.timedelta supported")
-    return month, days, nanos
+        raise ValueError(f'Unknown duration format for value: "{value}"')
 
-cdef inline bind_duration(CassStatement* statement, int index, object value):
-    cdef CassError error
-    month, days, nanos = get_cass_duration(value)
-    error = cass_statement_bind_duration(statement, index, month, days, nanos)
-    raise_if_error(error)
+    return months, days, nanos
 
-cdef inline bind_duration_by_name(CassStatement* statement, bytes name, object value):
-    cdef CassError error
-    month, days, nanos = get_cass_duration(value)
-    error = cass_statement_bind_duration_by_name(statement, name, month, days, nanos)
-    raise_if_error(error)
 
-# Collections
-cdef bind_collection_by_value_type(CassCollection* collection, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
-    cdef CassCollection* nested_collection
-    cdef CassError error
+# CASS_VALUE_TYPE_MAP, CASS_VALUE_TYPE_SET, CASS_VALUE_TYPE_LIST
+cdef inline void bind_collection_by_value_type(CassCollection* collection, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
+    cdef CassError error = CASS_OK
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
-        raise ValueError(f"Unknown type for collection value {value}")
+        raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for collection value "{value}"'.encode())
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        error = cass_collection_append_bool(collection, get_bool(value))
-        raise_if_error(error)
+        error = cass_collection_append_bool(collection, as_bool(value))
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
-        error = cass_collection_append_int8(collection, get_int8(value))
-        raise_if_error(error)
+        error = cass_collection_append_int8(collection, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
-        error = cass_collection_append_int16(collection, get_int16(value))
-        raise_if_error(error)
+        error = cass_collection_append_int16(collection, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_INT:
-        error = cass_collection_append_int32(collection, get_int32(value))
-        raise_if_error(error)
+        error = cass_collection_append_int32(collection, int(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
                              CASS_VALUE_TYPE_COUNTER):
-        error = cass_collection_append_int64(collection, get_int64(value))
-        raise_if_error(error)
+        error = cass_collection_append_int64(collection, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
-        error = cass_collection_append_float(collection, get_float(value))
-        raise_if_error(error)
+        error = cass_collection_append_float(collection, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_collection_append_double(collection, get_double(value))
-        raise_if_error(error)
+        error = cass_collection_append_double(collection, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_collection_append_string(collection, get_ascii(value))
-        raise_if_error(error)
+        error = cass_collection_append_string(collection, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_collection_append_string(collection, get_text(value))
-        raise_if_error(error)
+        error = cass_collection_append_string(collection, as_bytes(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
-        error = cass_collection_append_bytes(collection, <const cass_byte_t*>value, len(value))
-        raise_if_error(error)
+        error = cass_collection_append_bytes(collection, as_blob(value), len(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = get_cass_decimal(value)
-        error = cass_collection_append_decimal(collection, <const cass_byte_t*> value, len(value), scale)
-        raise_if_error(error)
+        value, scale = as_cass_decimal(value)
+        error = cass_collection_append_decimal(collection, value, len(value), scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
-        error = cass_collection_append_uuid(collection, get_cass_uuid(value))
-        raise_if_error(error)
+        error = cass_collection_append_uuid(collection, as_cass_uuid(value))
     elif cass_value_type == CASS_VALUE_TYPE_INET:
-        error = cass_collection_append_inet(collection, get_cass_inet(value))
-        raise_if_error(error)
+        error = cass_collection_append_inet(collection, as_cass_inet(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
-        error = error = cass_collection_append_int64(collection, get_cass_timestamp(value))
-        raise_if_error(error)
+        error = cass_collection_append_int64(collection, as_cass_timestamp(value))
     elif cass_value_type == CASS_VALUE_TYPE_DATE:
-        error = cass_collection_append_uint32(collection, get_cass_date(value))
-        raise_if_error(error)
+        error = cass_collection_append_uint32(collection, as_cass_date(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIME:
-        error = error = cass_collection_append_int64(collection, get_cass_time(value))
-        raise_if_error(error)
+        error = cass_collection_append_int64(collection, as_cass_time(value))
     elif cass_value_type == CASS_VALUE_TYPE_DURATION:
-        month, days, nanos = get_cass_duration(value)
+        month, days, nanos = as_cass_duration(value)
         error = cass_collection_append_duration(collection, month, days, nanos)
-        raise_if_error(error)
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
         nested_collection = get_collection(value, cass_data_type)
-        if nested_collection == NULL:
-            raise ValueError(f'Unable to bind collection with value {value}')
         error = cass_collection_append_collection(collection, nested_collection)
         cass_collection_free(nested_collection)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
         cass_tuple = get_tuple(value, cass_data_type)
-        if cass_tuple == NULL:
-            raise ValueError(f'Unable to bind tuple with value {value}')
         error = cass_collection_append_tuple(collection, cass_tuple)
         cass_tuple_free(cass_tuple)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
         user_type = get_udt(value, cass_data_type)
-        if user_type == NULL:
-            raise ValueError(f'Unable to bind UDT with value {value}')
         error = cass_collection_append_user_type(collection, user_type)
         cass_user_type_free(user_type)
-        raise_if_error(error)
-    else:
-        raise ValueError(f"Value {value} not supported")
 
-cdef CassCollection* get_collection(object value, const CassDataType* cass_data_type):
+    if error:
+        raise_if_error(error)
+
+
+cdef inline CassCollection* get_collection(object value, const CassDataType* cass_data_type) except *:
     cdef CassCollection* collection = NULL
     cdef CassError error
     cdef const CassDataType* sub_data_type
     cdef CassValueType sub_value_type
 
-    collection_type = cass_data_type_type(cass_data_type)
     collection = cass_collection_new_from_data_type(cass_data_type, len(value))
 
+    if collection == NULL:
+        raise ValueError(f'Unable to bind collection with value {value}')
+
+    collection_type = cass_data_type_type(cass_data_type)
+
     if collection_type == CASS_VALUE_TYPE_MAP:
-        if not isinstance(value, dict):
-            raise ValueError('Value type "map" must be dict')
-        for k, v in value.items():
-            if v is None:
-                continue
+        if isinstance(value, dict):
+            value = value.items()
+        for k, v in value:
             sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
             sub_value_type = cass_data_type_type(sub_data_type)
             bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type)
@@ -506,290 +275,311 @@ cdef CassCollection* get_collection(object value, const CassDataType* cass_data_
     else:
         sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
         sub_value_type = cass_data_type_type(sub_data_type)
-        for i, el in enumerate(value):
-            bind_collection_by_value_type(collection, el, sub_data_type, sub_value_type)
+        for i, v in enumerate(value):
+            bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
 
-    # TODO: cass_collection_free(collection)
     return collection
 
 
-# CASS_VALUE_TYPE_MAP, CASS_VALUE_TYPE_SET, CASS_VALUE_TYPE_LIST
-cdef bind_collection(CassStatement* statement, int index, object value, const CassDataType* cass_data_type):
+cdef inline CassError bind_collection(CassStatement* statement, int index, object value, const CassDataType* cass_data_type) except *:
     cdef CassCollection* collection
     cdef CassError error
     collection = get_collection(value, cass_data_type)
-    if collection == NULL:
-        raise ValueError(f'Unable to bind collection with value {value}')
     error = cass_statement_bind_collection(statement, index, collection)
     cass_collection_free(collection)
-    raise_if_error(error)
+    return error
 
-cdef inline bind_collection_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type):
+cdef inline  CassError bind_collection_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type) except *:
     cdef CassCollection* collection
     cdef CassError error
     collection = get_collection(value, cass_data_type)
-    if collection == NULL:
-        raise ValueError(f'Unable to bind collection with value {value}')
     error = cass_statement_bind_collection_by_name(statement, name, collection)
     cass_collection_free(collection)
-    raise_if_error(error)
+    return error
 
 # CASS_VALUE_TYPE_TUPLE
-cdef inline bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
-    cdef CassCollection* collection
-    cdef CassError error
+cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
+    cdef CassError error = CASS_OK
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
-        raise ValueError(f"Unknown type for tuple index {index}")
+        raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for Tuple index {index} value "{value}"'.encode())
     elif value is None:
         error = cass_tuple_set_null(cass_tuple, index)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        error = cass_tuple_set_bool(cass_tuple, index, get_bool(value))
-        raise_if_error(error)
+        error = cass_tuple_set_bool(cass_tuple, index, as_bool(value))
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
-        error = cass_tuple_set_int8(cass_tuple, index, get_int8(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int8(cass_tuple, index, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
-        error = cass_tuple_set_int16(cass_tuple, index, get_int16(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int16(cass_tuple, index, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_INT:
-        error = cass_tuple_set_int32(cass_tuple, index, get_int32(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int32(cass_tuple, index, int(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
                              CASS_VALUE_TYPE_COUNTER):
-        error = cass_tuple_set_int64(cass_tuple, index, get_int64(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int64(cass_tuple, index, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
-        error = cass_tuple_set_float(cass_tuple, index, get_float(value))
-        raise_if_error(error)
+        error = cass_tuple_set_float(cass_tuple, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_tuple_set_double(cass_tuple, index, get_double(value))
-        raise_if_error(error)
+        error = cass_tuple_set_double(cass_tuple, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_tuple_set_string(cass_tuple, index, get_ascii(value))
-        raise_if_error(error)
+        error = cass_tuple_set_string(cass_tuple, index, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_tuple_set_string(cass_tuple, index, get_text(value))
-        raise_if_error(error)
+        error = cass_tuple_set_string(cass_tuple, index, as_bytes(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
-        error = cass_tuple_set_bytes(cass_tuple, index, <const cass_byte_t*>value, len(value))
-        raise_if_error(error)
+        error = cass_tuple_set_bytes(cass_tuple, index, as_blob(value), len(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = get_cass_decimal(value)
-        error = cass_tuple_set_decimal(cass_tuple, index, <const cass_byte_t*> value, len(value), scale)
-        raise_if_error(error)
+        value, scale = as_cass_decimal(value)
+        error = cass_tuple_set_decimal(cass_tuple, index, value, len(value), scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
-        error = cass_tuple_set_uuid(cass_tuple, index, get_cass_uuid(value))
-        raise_if_error(error)
+        error = cass_tuple_set_uuid(cass_tuple, index, as_cass_uuid(value))
     elif cass_value_type == CASS_VALUE_TYPE_INET:
-        error = cass_tuple_set_inet(cass_tuple, index, get_cass_inet(value))
-        raise_if_error(error)
+        error = cass_tuple_set_inet(cass_tuple, index, as_cass_inet(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
-        error = error = cass_tuple_set_int64(cass_tuple, index, get_cass_timestamp(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int64(cass_tuple, index, as_cass_timestamp(value))
     elif cass_value_type == CASS_VALUE_TYPE_DATE:
-        error = cass_tuple_set_uint32(cass_tuple, index, get_cass_date(value))
-        raise_if_error(error)
+        error = cass_tuple_set_uint32(cass_tuple, index, as_cass_date(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIME:
-        error = error = cass_tuple_set_int64(cass_tuple, index, get_cass_time(value))
-        raise_if_error(error)
+        error = cass_tuple_set_int64(cass_tuple, index, as_cass_time(value))
     elif cass_value_type == CASS_VALUE_TYPE_DURATION:
-        month, days, nanos = get_cass_duration(value)
+        month, days, nanos = as_cass_duration(value)
         error = cass_tuple_set_duration(cass_tuple, index, month, days, nanos)
-        raise_if_error(error)
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
         collection = get_collection(value, cass_data_type)
-        if collection == NULL:
-            raise ValueError(f'Unable to bind collection with value {value}')
         error = cass_tuple_set_collection(cass_tuple, index, collection)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
         nested_tuple = get_tuple(value, cass_data_type)
-        if nested_tuple == NULL:
-            raise ValueError(f'Unable to bind tuple with value {value}')
         error = cass_tuple_set_tuple(cass_tuple, index, nested_tuple)
-        cass_tuple_free(nested_tuple)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
         user_type = get_udt(value, cass_data_type)
-        if user_type == NULL:
-            raise ValueError(f'Unable to bind UDT with value {value}')
         error = cass_tuple_set_user_type(cass_tuple, index, user_type)
-        cass_user_type_free(user_type)
-        raise_if_error(error)
-    else:
-        raise ValueError(f"Value {value} not supported")
 
-cdef CassTuple* get_tuple(object value, const CassDataType* cass_data_type):
+    if error:
+        raise_if_error(error)
+
+
+cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_type) except *:
     cdef CassTuple * cass_tuple = NULL
     cdef CassError error
     cdef size_t type_count
+    cdef size_t tuple_len = len(value)
 
     type_count = cass_data_type_sub_type_count(cass_data_type)
-    if <size_t>len(value) > type_count:
-        raise ValueError(f'Wrong tuple size (must be {type_count}) for value {value}')
+    if tuple_len > type_count:
+        raise ValueError(
+            f'Wrong tuple size (must be {type_count}) for value {value}')
 
-    cass_tuple = cass_tuple_new(len(value))
+    cass_tuple = cass_tuple_new(tuple_len)
 
-    for i, el in enumerate(value):
-        sub_data_type = cass_data_type_sub_data_type(cass_data_type, <size_t>i)
+    for i, v in enumerate(value):
+        sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
+        if sub_data_type == NULL:
+            raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind Tuple index {i}'.encode())
         sub_value_type = cass_data_type_type(sub_data_type)
-        bind_tuple_by_value_type(cass_tuple, i, el, sub_data_type, sub_value_type)
+        bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type)
+
     return cass_tuple
+
 
 cdef inline bind_tuple(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type):
     cdef CassError error
     cass_tuple = get_tuple(value, cass_data_type)
-    if cass_tuple == NULL:
-        raise ValueError(f'Unable to bind tuple with value {value}')
     error = cass_statement_bind_tuple(statement, index, cass_tuple)
     cass_tuple_free(cass_tuple)
-    raise_if_error(error)
+    return error
 
 cdef inline bind_tuple_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type):
     cdef CassError error
     cass_tuple = get_tuple(value, cass_data_type)
-    if cass_tuple == NULL:
-        raise ValueError(f'Unable to bind tuple with value {value}')
-
     error = cass_statement_bind_tuple_by_name(statement, name, cass_tuple)
     cass_tuple_free(cass_tuple)
-    raise_if_error(error)
+    return error
 
 # CASS_VALUE_TYPE_UDT
-cdef bind_udt_by_value_type(CassUserType* user_type, bytes name, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
-    cdef CassCollection* collection
-    cdef CassError error
+cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
+    cdef CassError error = CASS_OK
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
-        raise ValueError(f"Unknown type for column {name}")
+        raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {name} value "{value}"'.encode())
     elif value is None:
         error = cass_user_type_set_null_by_name(user_type, name)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
-        error = cass_user_type_set_bool_by_name(user_type, name, get_bool(value))
-        raise_if_error(error)
+        error = cass_user_type_set_bool_by_name(user_type, name, as_bool(value))
     elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
-        error = cass_user_type_set_int8_by_name(user_type, name, get_int8(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int8_by_name(user_type, name, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
-        error = cass_user_type_set_int16_by_name(user_type, name, get_int16(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int16_by_name(user_type, name, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_INT:
-        error = cass_user_type_set_int32_by_name(user_type, name, get_int32(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int32_by_name(user_type, name, int(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
                              CASS_VALUE_TYPE_COUNTER):
-        error = cass_user_type_set_int64_by_name(user_type, name, get_int64(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int64_by_name(user_type, name, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
-        error = cass_user_type_set_float_by_name(user_type, name, get_float(value))
-        raise_if_error(error)
+        error = cass_user_type_set_float_by_name(user_type, name, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
-        error = cass_user_type_set_double_by_name(user_type, name, get_double(value))
-        raise_if_error(error)
+        error = cass_user_type_set_double_by_name(user_type, name, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = get_cass_decimal(value)
-        error = cass_user_type_set_decimal_by_name(user_type, name, <const cass_byte_t*>value, len(value), scale)
-        raise_if_error(error)
+        value, scale = as_cass_decimal(value)
+        error = cass_user_type_set_decimal_by_name(user_type, name, value, len(value), scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_user_type_set_string_by_name(user_type, name, get_ascii(value))
-        raise_if_error(error)
+        error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_user_type_set_string_by_name(user_type, name, get_text(value))
-        raise_if_error(error)
+        error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
-        error = cass_user_type_set_bytes_by_name(user_type, name, <const cass_byte_t*>value, len(value))
-        raise_if_error(error)
+        error = cass_user_type_set_bytes_by_name(user_type, name, as_blob(value), len(value))
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
-        error = cass_user_type_set_uuid_by_name(user_type, name, get_cass_uuid(value))
-        raise_if_error(error)
+        error = cass_user_type_set_uuid_by_name(user_type, name, as_cass_uuid(value))
     elif cass_value_type == CASS_VALUE_TYPE_INET:
-        error = cass_user_type_set_inet_by_name(user_type, name, <CassInet>get_cass_inet(value))
-        raise_if_error(error)
+        error = cass_user_type_set_inet_by_name(user_type, name, as_cass_inet(value))
     elif cass_value_type == CASS_VALUE_TYPE_DATE:
-        error = cass_user_type_set_uint32_by_name(user_type, name, get_cass_date(value))
-        raise_if_error(error)
+        error = cass_user_type_set_uint32_by_name(user_type, name, as_cass_date(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIME:
-        error = cass_user_type_set_int64_by_name(user_type, name, get_cass_time(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int64_by_name(user_type, name, as_cass_time(value))
     elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
-        error = cass_user_type_set_int64_by_name(user_type, name, get_cass_timestamp(value))
-        raise_if_error(error)
+        error = cass_user_type_set_int64_by_name(user_type, name, as_cass_timestamp(value))
     elif cass_value_type == CASS_VALUE_TYPE_DURATION:
-        month, days, nanos = get_cass_duration(value)
+        month, days, nanos = as_cass_duration(value)
         error = cass_user_type_set_duration_by_name(user_type, name, month, days, nanos)
+    elif cass_value_type in (CASS_VALUE_TYPE_MAP,
+                             CASS_VALUE_TYPE_SET,
+                             CASS_VALUE_TYPE_LIST):
+        collection = get_collection(value, cass_data_type)
+        error = cass_user_type_set_collection_by_name(user_type, name, collection)
+        cass_collection_free(collection)
+    elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
+        cass_tuple = get_tuple(value, cass_data_type)
+        error = cass_user_type_set_tuple_by_name(user_type, name, cass_tuple)
+        cass_tuple_free(cass_tuple)
+    elif cass_value_type == CASS_VALUE_TYPE_UDT:
+        nested_user_type = get_udt(value, cass_data_type)
+        error = cass_user_type_set_user_type_by_name(user_type, name, nested_user_type)
+        cass_user_type_free(nested_user_type)
+
+    if error:
         raise_if_error(error)
+
+
+cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
+    cdef CassCollection* collection
+    cdef CassError error = CASS_OK
+
+    if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
+        raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {index} value "{value}"'.encode())
+    elif value is None:
+        error = cass_user_type_set_null(user_type, index)
+    elif cass_value_type == CASS_VALUE_TYPE_BOOLEAN:
+        error = cass_user_type_set_bool(user_type, index, as_bool(value))
+    elif cass_value_type == CASS_VALUE_TYPE_TINY_INT:
+        error = cass_user_type_set_int8(user_type, index, int(value))
+    elif cass_value_type == CASS_VALUE_TYPE_SMALL_INT:
+        error = cass_user_type_set_int16(user_type, index, int(value))
+    elif cass_value_type == CASS_VALUE_TYPE_INT:
+        error = cass_user_type_set_int32(user_type, index, int(value))
+    elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
+                             CASS_VALUE_TYPE_COUNTER):
+        error = cass_user_type_set_int64(user_type, index, value)
+    elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
+        error = cass_user_type_set_float(user_type, index, float(value))
+    elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
+        error = cass_user_type_set_double(user_type, index, float(value))
+    elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
+        value, scale = as_cass_decimal(value)
+        error = cass_user_type_set_decimal(user_type, index, value, len(value), scale)
+    elif cass_value_type == CASS_VALUE_TYPE_ASCII:
+        error = cass_user_type_set_string(user_type, index, as_bytes(value, 'ascii'))
+    elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
+                             CASS_VALUE_TYPE_VARCHAR):
+        error = cass_user_type_set_string(user_type, index, as_bytes(value))
+    elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
+                             CASS_VALUE_TYPE_VARINT,
+                             CASS_VALUE_TYPE_CUSTOM):
+        error = cass_user_type_set_bytes(user_type, index, as_blob(value), len(value))
+    elif cass_value_type in (CASS_VALUE_TYPE_UUID,
+                             CASS_VALUE_TYPE_TIMEUUID):
+        error = cass_user_type_set_uuid(user_type, index, as_cass_uuid(value))
+    elif cass_value_type == CASS_VALUE_TYPE_INET:
+        error = cass_user_type_set_inet(user_type, index, as_cass_inet(value))
+    elif cass_value_type == CASS_VALUE_TYPE_DATE:
+        error = cass_user_type_set_uint32(user_type, index, as_cass_date(value))
+    elif cass_value_type == CASS_VALUE_TYPE_TIME:
+        error = cass_user_type_set_int64(user_type, index, as_cass_time(value))
+    elif cass_value_type == CASS_VALUE_TYPE_TIMESTAMP:
+        error = cass_user_type_set_int64(user_type, index, as_cass_timestamp(value))
+    elif cass_value_type == CASS_VALUE_TYPE_DURATION:
+        month, days, nanos = as_cass_duration(value)
+        error = cass_user_type_set_duration(user_type, index, month, days, nanos)
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
         collection = get_collection(value, cass_data_type)
         if collection == NULL:
             raise ValueError(f'Unable to bind collection with value {value}')
-        error = cass_user_type_set_collection_by_name(user_type, name, collection)
+        error = cass_user_type_set_collection(user_type, index, collection)
         cass_collection_free(collection)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
         cass_tuple = get_tuple(value, cass_data_type)
         if cass_tuple == NULL:
-            raise ValueError(f'Unable to bind tuple with value {value}')
-        error = cass_user_type_set_tuple_by_name(user_type, name, cass_tuple)
+            raise ValueError(f'Unable to bind tuple with value "{value}"')
+        error = cass_user_type_set_tuple(user_type, index, cass_tuple)
         cass_tuple_free(cass_tuple)
-        raise_if_error(error)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
         nested_user_type = get_udt(value, cass_data_type)
-        if nested_user_type == NULL:
-            raise ValueError(f'Unable to bind UDT with value {value}')
-        error = cass_user_type_set_user_type_by_name(user_type, name, nested_user_type)
+        error = cass_user_type_set_user_type(user_type, index, nested_user_type)
         cass_user_type_free(nested_user_type)
-        raise_if_error(error)
-    else:
-        raise ValueError(f"Type {cass_value_type} not supported")
 
-cdef CassUserType* get_udt(object value, const CassDataType* cass_data_type):
+    if error:
+        raise_if_error(error)
+
+
+cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_type) except *:
     cdef CassUserType* user_type = NULL
+
     user_type = cass_user_type_new_from_data_type(cass_data_type)
 
-    for k, v in value.items():
-        sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, k.encode())
-        sub_value_type = cass_data_type_type(sub_data_type)
-        bind_udt_by_value_type(user_type, k.encode(), v, sub_data_type, sub_value_type)
+    if user_type == NULL:
+        raise ValueError(f'Unable to bind UDT with value {value}')
+
+    if isinstance(value, dict):
+        for k, v in value.items():
+            sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, k.encode())
+            if sub_data_type == NULL:
+                raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
+            sub_value_type = cass_data_type_type(sub_data_type)
+            bind_udt_value_by_name(user_type, k.encode(), v, sub_data_type, sub_value_type)
+    else:
+        for i, v in enumerate(value):
+            sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
+            if sub_data_type == NULL:
+                raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind UDT value "{v}" with index {i}'.encode())
+            sub_value_type = cass_data_type_type(sub_data_type)
+            bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type)
+
     return user_type
 
-cdef inline bind_udt(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type):
-    cdef CassUserType * user_type
+
+cdef inline CassError bind_udt(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type)  except *:
     cdef CassError error
+    cdef CassUserType* user_type = NULL
 
     user_type = get_udt(value, cass_data_type)
-
-    if user_type == NULL:
-        raise ValueError(f'Unable to bind UDT with value {value}')
-
     error = cass_statement_bind_user_type(statement, index, user_type)
     cass_user_type_free(user_type)
-    raise_if_error(error)
+    return error
 
 
-cdef inline bind_udt_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type):
-    cdef CassUserType * user_type
+cdef inline CassError bind_udt_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type) except *:
     cdef CassError error
+    cdef CassUserType* user_type = NULL
 
     user_type = get_udt(value, cass_data_type)
-
-    if user_type == NULL:
-        raise ValueError(f'Unable to bind UDT with value {value}')
-
     error = cass_statement_bind_user_type_by_name(statement, name, user_type)
     cass_user_type_free(user_type)
-    raise_if_error(error)
+    return error

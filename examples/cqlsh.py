@@ -17,6 +17,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)1.1s %(asctime)s] %(message)s")
 
+select_pattern = re.compile(
+    r"^select (?P<fields>[\*|\w|\,|\s]+)+(?P<from>from)+\ ?((?P<table>\S+)?\ ?(?P<where>where)?)?"
+)
+
 
 class Colors:
     RED = "\033[0;0;31m"
@@ -82,6 +86,7 @@ class AcsyllaCQLSH:
         self.session = None
         self.keyspace = self.session_args["keyspace"]
         self.print = Printer()
+        self._autoc_table = None
 
     async def init(self):
         self.cluster = acsylla.create_cluster(**self.cluster_args)
@@ -229,12 +234,25 @@ class AcsyllaCQLSH:
         ]
         options = [i.upper() for i in keywords if i.startswith(text.upper())]
         line = readline.get_line_buffer()
-        cmd = line.split()[-2:]
-        if len(cmd) == 2:
-            if cmd[0].lower() == "from" or (cmd[1].lower() == "from" and line.endswith(" ")):
-                options = [
-                    i.lower() for i in list(self.session.meta.tables_names(self.keyspace)) if i.startswith(text.lower())
-                ]
+        line_list = [k.strip().lower() for k in line.split()]
+        line_str = " ".join(line_list)
+        meta = self.session.get_metadata()
+        if {"select", "from", "where"}.issubset(set(line_list)):
+            table_re = re.compile(r"^select.+from\s+(?P<table>\S+)?")
+            table = table_re.match(line_str)
+            if table:
+                options = [k.name for k in meta.get_table_meta(self.keyspace, table.group(1)).columns]
+        elif {"select", "from"}.issubset(set(line_list)):
+            table_re = re.compile(r"^select.+from\s+(?P<table>\S+)?")
+            table = table_re.match(line_str)
+            if table and "from" in line_list[-2:] and not line.endswith(" "):
+                options = [k for k in meta.get_tables(self.keyspace) if k.startswith(table.group(1))]
+            elif "from" in line_list[-1:] and line.endswith(" "):
+                options = [k for k in meta.get_tables(self.keyspace)]
+            else:
+                options = ["WHERE"]
+        elif {"select"}.issubset(set(line_list)):
+            options = ["FROM"]
         if state < len(options):
             return options[state]
         else:
@@ -341,12 +359,19 @@ class AcsyllaCQLSH:
         await self.init()
 
         while True:
+            input_str = ""
             try:
-                input_str = input(self.get_input_prefix())
+                while True:
+                    if input_str:
+                        input_str += input().replace("\n", " ").strip().lower()
+                    else:
+                        input_str += input(self.get_input_prefix()).replace("\n", " ").strip().lower()
+                    if input_str.startswith("/") or input_str.endswith(";"):
+                        break
             except (KeyboardInterrupt, EOFError):
                 print("Bye!")
                 break
-            input_str = input_str.replace("\n", " ").strip().lower()
+
             if input_str == "/m" or input_str.startswith("show metrics"):
                 self.print.dict(asdict(self.session.metrics()))
                 self.print.dict(asdict(self.session.speculative_execution_metrics()))
@@ -362,6 +387,7 @@ class AcsyllaCQLSH:
                 continue
             else:
                 query = input_str
+
             if not query:
                 continue
             elif query.startswith("desc"):

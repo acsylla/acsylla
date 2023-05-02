@@ -607,6 +607,7 @@ def create_statement(
     consistency: Optional[Consistency] = None,
     serial_consistency: Optional[Consistency] = None,
     execution_profile: Optional[str] = None,
+    native_types: Optional[bool] = None,
 ) -> Statement:
     """
     Creates a new statement.
@@ -625,6 +626,8 @@ def create_statement(
     creation.
 
     `execution_profile` Assign the execution profile to the statement
+
+    `native_types` Returns values as native types. Default: False
     """
     return _cython.cyacsylla.create_statement(
         statement,
@@ -635,6 +638,7 @@ def create_statement(
         consistency=consistency,
         serial_consistency=serial_consistency,
         execution_profile=execution_profile,
+        native_types=native_types,
     )
 
 

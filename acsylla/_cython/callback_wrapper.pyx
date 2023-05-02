@@ -21,7 +21,7 @@ cdef class CallbackWrapper:
 
         error = cass_future_set_callback(
             cass_future,
-            cb_cass_future,
+            <CassFutureCallback>cb_cass_future,
             <void*> cb_wrapper
         ) 
         if error != CASS_OK:

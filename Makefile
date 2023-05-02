@@ -6,7 +6,7 @@ current_dir = $(shell pwd)
 _default: compile
 
 clean:
-	rm -fr acsylla/_cython/*.c acsylla/_cython/*.cpp acsylla/_cython/*.so build dist
+	rm -fr acsylla/_cython/cyacsylla.cpp acsylla/_cython/*.so build dist
 	find . -name '__pycache__' | xargs rm -rf
 	find . -type f -name "*.pyc" -delete
 

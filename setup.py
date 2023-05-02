@@ -22,7 +22,7 @@ extension = Extension(
     sources=["acsylla/_cython/cyacsylla.cpp"],
     include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
     extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
-    extra_compile_args=["-std=c++11"],
+    extra_compile_args=["-std=c++14"],
     libraries=["crypto", "ssl", "uv", "z"],
 )
 
@@ -43,7 +43,7 @@ class acsylla_build_ext(build_ext):
 
 
 dev_requires = [
-    "Cython==0.29.32",
+    "Cython==0.29.33",
     "pytest==6.2.5",
     "pytest-mock==3.6.1",
     "pytest-asyncio==0.16.0",

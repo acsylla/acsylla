@@ -56,6 +56,8 @@ def create_cluster(
     tracing_consistency: Optional[Union[str, Consistency]] = Consistency.ONE,
     load_balance_round_robin: Optional[bool] = False,
     load_balance_dc_aware: Optional[str] = None,
+    load_balance_rack_aware_dc: Optional[str] = None,
+    load_balance_rack_aware_rack: Optional[str] = None,
     token_aware_routing: Optional[bool] = True,
     token_aware_routing_shuffle_replicas: Optional[bool] = True,
     latency_aware_routing: Optional[bool] = False,
@@ -268,6 +270,10 @@ def create_cluster(
             connected contact point, and no remote hosts are considered in query
             plans. If relying on this mechanism, be sure to use only contact points
             from the local DC.
+
+        `load_balance_rack_aware_dc`: DC for rack aware load balancing
+
+        `load_balance_rack_aware_rack`: Rack for rack aware load balancing
 
         `token_aware_routing`: Configures the cluster to use token-aware request
             routing or not. This routing policy composes the base routing policy,
@@ -563,6 +569,8 @@ def create_cluster(
         tracing_consistency=tracing_consistency,
         load_balance_round_robin=load_balance_round_robin,
         load_balance_dc_aware=load_balance_dc_aware,
+        load_balance_rack_aware_dc=load_balance_rack_aware_dc,
+        load_balance_rack_aware_rack=load_balance_rack_aware_rack,
         token_aware_routing=token_aware_routing,
         token_aware_routing_shuffle_replicas=token_aware_routing_shuffle_replicas,
         latency_aware_routing=latency_aware_routing,

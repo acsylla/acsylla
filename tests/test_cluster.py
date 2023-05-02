@@ -59,6 +59,9 @@ class Testcreate_cluster:
     async def test_cluster_blacklist_hosts(self, host):
         create_cluster([host], blacklist_hosts="127.0.0.1, 127.0.0.4")
 
+    async def test_load_balance_rack_aware(self, host):
+        create_cluster([host], load_balance_rack_aware_dc="DC1", load_balance_rack_aware_rack="Rack1")
+
     async def test_cluster_create_execution_profile(self, host):
         latency_aware_routing = LatencyAwareRoutingSettings()
         speculative_execution_policy = SpeculativeExecutionPolicy(constant_delay_ms=100, max_speculative_executions=10)

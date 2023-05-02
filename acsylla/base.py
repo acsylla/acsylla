@@ -346,6 +346,18 @@ class Cluster(metaclass=ABCMeta):
         """
 
     @abstractmethod
+    def set_load_balance_rack_aware(self, dc: str, rack: str) -> None:
+        """Configures the cluster to use Rack-aware load balancing.
+        For each query, all live nodes in a primary 'local' rack are tried first,
+        followed by nodes from local DC and then nodes from other DCs.
+        With empty local_rack and local_dc,  default local_dc and local_rack
+        is chosen from the first connected contact point,
+        and no remote hosts are considered in query plans.
+        If relying on this mechanism, be sure to use only contact
+        points from the local rack.
+        """
+
+    @abstractmethod
     def set_token_aware_routing(self, enabled: bool) -> None:
         """Configures the cluster to use token-aware request routing or not.
         Important: Token-aware routing depends on keyspace metadata. For this

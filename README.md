@@ -297,6 +297,26 @@ List of named arguments to configure cluster with  `acsylla.create_cluster` help
     plans. If relying on this mechanism, be sure to use only contact points
     from the local DC.
 
+- ***load_balance_rack_aware_dc:*** Configures the cluster to use Rack-aware load 
+    balancing.
+    For each query, all live nodes in a primary 'local' rack are tried first,
+    followed by nodes from local DC and then nodes from other DCs.
+    With empty local_rack and local_dc,  default local_dc and local_rack
+    is chosen from the first connected contact point,
+    and no remote hosts are considered in query plans.
+    If relying on this mechanism, be sure to use only contact
+    points from the local rack.
+
+- ***load_balance_rack_aware_rack:*** Configures the cluster to use Rack-aware load 
+    balancing.
+    For each query, all live nodes in a primary 'local' rack are tried first,
+    followed by nodes from local DC and then nodes from other DCs.
+    With empty local_rack and local_dc,  default local_dc and local_rack
+    is chosen from the first connected contact point,
+    and no remote hosts are considered in query plans.
+    If relying on this mechanism, be sure to use only contact
+    points from the local rack.
+
 - ***token_aware_routing:*** Configures the cluster to use token-aware request
     routing or not. This routing policy composes the base routing policy,
     routing requests first to replicas on nodes considered ‘local’ by the

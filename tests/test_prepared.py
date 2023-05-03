@@ -44,3 +44,18 @@ class TestPreparedStatement:
         statement = prepared.bind(execution_profile="")
         statement.set_execution_profile("")
         assert statement is not None
+
+    async def test_async_generator(self, session):
+        statement_str = "INSERT INTO test (id, value) values( ?, ?)"
+        prepared = await session.create_prepared(statement_str)
+        for i in range(100):
+            await prepared.bind([i, i]).execute()
+            # await prepared.bind((i,i)).execute()
+            await prepared.bind({"id": i, "value": i}).execute()
+
+        statement_str = "SELECT id, value FROM test"
+        prepared = await session.create_prepared(statement_str)
+        values_list = range(100)
+        async for row in prepared.bind():
+            assert row[1] in values_list
+            assert row["value"] in values_list

@@ -48,7 +48,7 @@ cdef class Logger:
         if not self._instances:
             raise RuntimeError('Use Logger.instance() for initializing Logger')
         self.log = self._log_fn
-        cass_log_set_callback(cb_log_message, <void*>self)
+        cass_log_set_callback(<CassLogCallback>cb_log_message, <void*>self)
 
     def __init__(self, log_level='warn', logging_callback=None):
         self.set_log_level(log_level)

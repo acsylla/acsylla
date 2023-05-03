@@ -99,3 +99,9 @@ cdef class Row:
             raise ColumnNotFound(column_name)
 
         return get_cass_value(cass_value, self.result.native_types)
+
+    def __getitem__(self, name):
+        if isinstance(name, int):
+            return self.column_value_by_index(name)
+        else:
+            return self.column_value(name)

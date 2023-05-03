@@ -382,6 +382,7 @@ cdef extern from "cassandra.h" nogil:
   void cass_cluster_set_credentials(CassCluster* cluster, const char* username, const char* password)
   void cass_cluster_set_load_balance_round_robin(CassCluster * cluster)
   CassError cass_cluster_set_load_balance_dc_aware(CassCluster * cluster, const char * local_dc, unsigned used_hosts_per_remote_dc, cass_bool_t allow_remote_dcs_for_local_cl)
+  CassError cass_cluster_set_load_balance_rack_aware(CassCluster* cluster, const char* local_dc, const char* local_rack)
   void cass_cluster_set_token_aware_routing(CassCluster * cluster, cass_bool_t enabled)
   CassError cass_cluster_set_local_port_range(CassCluster * cluster, int lo, int hi)
   void cass_cluster_set_token_aware_routing_shuffle_replicas(CassCluster * cluster, cass_bool_t enabled)

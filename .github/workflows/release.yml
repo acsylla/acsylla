@@ -114,12 +114,6 @@ jobs:
       - name: Display content
         run: ls -R
         working-directory: wheelhouse/
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          packages_dir: wheelhouse/
-          password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
-          repository_url: https://upload.pypi.org/legacy/
       - name: Publish release to github
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')

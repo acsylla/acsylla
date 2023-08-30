@@ -89,7 +89,7 @@ cdef class Session:
         finally:
             cass_future_free(cass_future)
 
-    async def execute(self, Statement statement, native_types=False):
+    async def execute(self, Statement statement, native_types=None):
         """ Execute an statement and returns the result.
 
         Is responsability of the caller to know what to do with
@@ -108,6 +108,9 @@ cdef class Session:
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
+
+        if native_types is None:
+            native_types = statement.native_types or False
 
         cass_future = cass_session_execute(self.cass_session, statement.cass_statement)
         cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
@@ -130,7 +133,7 @@ cdef class Session:
 
         return result
 
-    async def create_prepared(self, str statement, object timeout=None, object consistency=None, object serial_consistency=None, execution_profile=None):
+    async def create_prepared(self, str statement, object timeout=None, object consistency=None, object serial_consistency=None, execution_profile=None, native_types=None):
         """ Prepares an statement."""
         cdef CassFuture* cass_future
         cdef CassError cass_error
@@ -157,7 +160,7 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
                 raise_if_error(cass_error, error_message)
-            prepared = PreparedStatement.new_(cass_prepared, timeout, consistency, serial_consistency, execution_profile)
+            prepared = PreparedStatement.new_(self, cass_prepared, timeout, consistency, serial_consistency, execution_profile, native_types)
         finally:
             cass_future_free(cass_future)
 

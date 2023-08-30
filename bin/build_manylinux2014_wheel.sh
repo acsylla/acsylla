@@ -50,6 +50,8 @@ make
 make install
 cd ..
 
+git config --global --add safe.directory /io
+
 make install-driver
 
 ${PYTHON} -m pip install --upgrade pip

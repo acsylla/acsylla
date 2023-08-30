@@ -1,8 +1,14 @@
+cdef extern from "utils.cpp":
+    int days_from_civil(int y, unsigned m, unsigned d) nogil
+
 from cpython.datetime cimport date
 from cpython.datetime cimport datetime
 from cpython.datetime cimport time
 from cpython.datetime cimport timedelta
 from libc.time cimport time_t
+
+import_datetime()
+
 
 import re
 
@@ -94,27 +100,8 @@ cdef inline CassInet as_cass_inet(object value) except *:
     return cass_inet
 
 
-cdef inline int _days_from_civil(int y, unsigned m, unsigned d) except * nogil:
-    '''
-    http://howardhinnant.github.io/date_algorithms.html#days_from_civil
-    Returns number of days since civil 1970-01-01.  Negative values indicate
-       days prior to 1970-01-01.
-    Preconditions:  y-m-d represents a date in the civil (Gregorian) calendar
-                    m is in [1, 12]
-                    d is in [1, last_day_of_month(y, m)]
-                    y is "approximately" in
-                      [numeric_limits<Int>::min()/366, numeric_limits<Int>::max()/366]
-    '''
-    y -= m <= 2
-    cdef int era = <int>((y if y >= 0 else y - 399) / 400)
-    cdef unsigned yoe = y - era * 400
-    cdef unsigned doy = <unsigned>(((153 * (m - 3 if m > 2 else m + 9))  + 2) / 5 + d - 1)
-    cdef unsigned doe = <unsigned>(yoe * 365 + yoe/4 - yoe/100 + doy)
-    return era * 146097 + doe - 719468
-
-
 cdef inline time_t _timegm(int year, unsigned month, unsigned day, unsigned hour, unsigned minute, unsigned second) except * nogil:
-    cdef int days_since_epoch = _days_from_civil(year, month, day)
+    cdef int days_since_epoch = days_from_civil(year, month, day)
     return 60 * (60 * (24L * days_since_epoch + hour) + minute) + second
 
 
@@ -156,10 +143,11 @@ cdef inline cass_int64_t as_cass_timestamp(object value) except *:
     if isinstance(value, (str, datetime)):
         if isinstance(value, str):
             value = datetime.fromisoformat(value)
+
         timestamp = _timegm(value.year, value.month, value.day, value.hour, value.minute, value.second)
         if value.tzinfo is not None:
             timestamp -= value.utcoffset().total_seconds()
-        timestamp += value.microsecond / 1_000_000
+        timestamp += (value.microsecond * 0.000001)
     else:
         timestamp = value
     return <cass_int64_t>(timestamp * 1000)

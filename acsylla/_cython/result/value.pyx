@@ -1,7 +1,15 @@
-from cpython.datetime cimport datetime
-from cpython.datetime cimport time
+cdef extern from "utils.cpp":
+    void civil_from_days(int z, int* year, unsigned* month, unsigned* day) nogil
+
+from cpython.datetime cimport date_new
+from cpython.datetime cimport datetime_new
+from cpython.datetime cimport import_datetime
+from cpython.datetime cimport time_new
+from libc.math cimport floor
 
 from decimal import Decimal
+
+import_datetime()
 
 
 cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_types):
@@ -77,6 +85,7 @@ cdef inline object _int8(const CassValue* cass_value):
         raise_if_error(error)
     return output
 
+
 cdef inline object _int16(const CassValue* cass_value):
     """ Returns the int value of a column.
 
@@ -89,6 +98,7 @@ cdef inline object _int16(const CassValue* cass_value):
     else:
         raise_if_error(error)
     return output
+
 
 cdef inline object _int32(const CassValue* cass_value):
     """ Returns the int value of a column.
@@ -208,6 +218,7 @@ cdef inline object _bool(const CassValue* cass_value):
     else:
         return False
 
+
 cdef inline object _string(const CassValue* cass_value):
     """ Returns the string value of a column.
 
@@ -228,6 +239,7 @@ cdef inline object _string(const CassValue* cass_value):
     # the result. When the result is free up all the space will be free up.
     string = output[:length]
     return string.decode()
+
 
 cdef inline object _bytes(const CassValue* cass_value):
     """ Returns the bytes value of a column.
@@ -250,6 +262,7 @@ cdef inline object _bytes(const CassValue* cass_value):
     bytes_ = output[:length]
     return bytes_
 
+
 cdef inline object _inet(const CassValue* cass_value):
     """ Returns the inet value of a column.
 
@@ -265,17 +278,24 @@ cdef inline object _inet(const CassValue* cass_value):
     cass_inet_string(output, <char*>&address)
     return address.decode()
 
+
 cdef inline object _date(const CassValue* cass_value, int8_t native_types):
     cdef cass_uint32_t output
     cdef CassError error
+    cdef int y
+    cdef unsigned int m
+    cdef unsigned int d
+
     error = cass_value_get_uint32(cass_value, <cass_uint32_t *> &output)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
+    civil_from_days(output-2147483648U, <int*>&y, <unsigned*>&m, <unsigned*>&d)
     if native_types:
-        return cass_date_time_to_epoch(output, 0)
-    return datetime.utcfromtimestamp(cass_date_time_to_epoch(output, 0)).date()
+        return f'{y:04d}-{m:02d}-{d:02d}'
+    return date_new(y, m, d)
+
 
 cdef inline object _time(const CassValue* cass_value, int8_t native_types):
     cdef cass_int64_t nanos
@@ -286,25 +306,41 @@ cdef inline object _time(const CassValue* cass_value, int8_t native_types):
         return None
     else:
         raise_if_error(error)
-    if native_types:
-        return nanos / 1_000_000_000
     second, nanosecond = divmod(nanos, 1_000_000_000)
     minute, second = divmod(second, 60)
     hour = int(minute/60)
-    return time(hour=hour, minute=minute-hour*60, second=second, microsecond=int(nanosecond/1_000))
+    minute = minute-hour*60
+    microsecond = int(nanosecond/1_000)
+    if native_types:
+        return f'{hour:02d}:{minute:02d}:{second:02d}.{nanosecond:09d}'
+    return time_new(hour, minute, second, microsecond, None)
+
 
 cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
     cdef cass_int64_t output
     cdef CassError error
+    cdef int y
+    cdef unsigned int m
+    cdef unsigned int d
 
     error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
+
+    second, millisecond = divmod(output, 1_000)
+    if millisecond < 100:
+        millisecond = 0
+    days_from_epoch = int(floor(output / 1000 / 60 / 60 / 24))
+    civil_from_days(days_from_epoch, <int*>&y, <unsigned*>&m, <unsigned*>&d)
+    hour = second // 3600 % 24
+    minute = second % 3600 // 60
+    second = second % 3600 % 60
     if native_types:
-        return output / 1000.0
-    return datetime.utcfromtimestamp(output / 1000.0)
+        return f'{y:04d}-{m:02d}-{d:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z'
+
+    return datetime_new(y, m, d, hour, minute, second, millisecond*1000, None)
 
 
 cdef inline object _duration(const CassValue* cass_value, int8_t native_types):

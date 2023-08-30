@@ -7,6 +7,8 @@ from ipaddress import IPv4Address
 from ipaddress import IPv6Address
 from uuid import UUID
 
+import asyncio
+
 
 cdef class Statement:
 
@@ -15,6 +17,26 @@ cdef class Statement:
 
     def __dealloc__(self):
         cass_statement_free(self.cass_statement)
+
+    async def __aiter__(self):
+        if self.prepared == 0:
+            raise RuntimeError("Method only availabe for statements created from prepared")
+
+        result = await self.session.execute(self, native_types=self.native_types)
+        while True:
+            if result.has_more_pages():
+                self.set_page_state(result.page_state())
+                future_result = asyncio.create_task(
+                    self.session.execute(self, native_types=self.native_types))
+                await asyncio.sleep(0)
+            else:
+                future_result = None
+            for row in result:
+                yield row
+            if future_result is not None:
+                result = await future_result
+            else:
+                break
 
     @staticmethod
     cdef Statement new_from_string(
@@ -25,7 +47,9 @@ cdef class Statement:
         object timeout,
         object consistency,
         object serial_consistency,
-        str execution_profile):
+        str execution_profile,
+        object native_types,
+    ):
 
         cdef Statement statement
         cdef bytes encoded_statement
@@ -39,6 +63,7 @@ cdef class Statement:
             len(encoded_statement),
             parameters
         )
+        statement.native_types
         statement.set_page_size(page_size)
         statement.set_page_state(page_state)
         statement.set_timeout(timeout)
@@ -49,6 +74,7 @@ cdef class Statement:
 
     @staticmethod
     cdef Statement new_from_prepared(
+            Session session,
             CassStatement* cass_statement,
             const CassPrepared* cass_prepared,
             object page_size,
@@ -56,14 +82,18 @@ cdef class Statement:
             object timeout,
             object consistency,
             object serial_consistency,
-            str execution_profile):
+            str execution_profile,
+            object native_types,
+        ):
 
         cdef Statement statement
 
         statement = Statement()
+        statement.session = session
         statement.cass_statement = cass_statement
         statement.cass_prepared = cass_prepared
         statement.prepared = 1
+        statement.native_types = native_types
         statement.set_page_size(page_size)
         statement.set_page_state(page_state)
         statement.set_timeout(timeout)
@@ -71,6 +101,11 @@ cdef class Statement:
         statement.set_serial_consistency(serial_consistency)
         statement.set_execution_profile(execution_profile)
         return statement
+
+    async def execute(self, native_types=None):
+        if self.prepared == 0:
+            raise RuntimeError("Method only availabe for statements created from prepared")
+        return await self.session.execute(self, native_types=native_types)
 
     def add_key_index(self, int index):
         error = cass_statement_add_key_index(self.cass_statement, index)
@@ -364,7 +399,8 @@ def create_statement(
     object timeout=None,
     object consistency=None,
     object serial_consistency=None,
-    str execution_profile=None):
+    str execution_profile=None,
+    object native_types=False):
     cdef Statement statement
     statement = Statement.new_from_string(
         statement_str,
@@ -374,6 +410,7 @@ def create_statement(
         timeout,
         consistency,
         serial_consistency,
-        execution_profile
+        execution_profile,
+        native_types,
     )
     return statement

@@ -12,6 +12,7 @@ from decimal import Decimal
 from enum import Enum
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
+from typing import AsyncIterable
 from typing import Callable
 from typing import Dict
 from typing import Iterable
@@ -342,6 +343,18 @@ class Cluster(metaclass=ABCMeta):
              to use only contact points from the local DC.
 
         `dc` The primary data center to try first
+        """
+
+    @abstractmethod
+    def set_load_balance_rack_aware(self, dc: str, rack: str) -> None:
+        """Configures the cluster to use Rack-aware load balancing.
+        For each query, all live nodes in a primary 'local' rack are tried first,
+        followed by nodes from local DC and then nodes from other DCs.
+        With empty local_rack and local_dc,  default local_dc and local_rack
+        is chosen from the first connected contact point,
+        and no remote hosts are considered in query plans.
+        If relying on this mechanism, be sure to use only contact
+        points from the local rack.
         """
 
     @abstractmethod
@@ -1097,6 +1110,10 @@ class Statement(metaclass=ABCMeta):
     def set_execute_as(self, name: str) -> None:
         """Sets the name of the user to execute the statement as."""
 
+    @abstractmethod
+    async def execute(self, native_types=False) -> "Result":
+        """Execute an statement and returns the result."""
+
 
 class PreparedStatement(metaclass=ABCMeta):
     """Provides a PreparedStatement instance class. Use the
@@ -1105,11 +1122,24 @@ class PreparedStatement(metaclass=ABCMeta):
     @abstractmethod
     def bind(
         self,
+        parameters: Optional[Union[list, tuple, dict]] = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
+        timeout=None,
+        consistency=None,
+        serial_consistency=None,
         execution_profile: Optional[str] = None,
-    ) -> Statement:
-        """Returns a new statment using the prepared."""
+    ) -> Union[Statement, AsyncIterable]:
+        """Returns a new statment using the prepared.
+
+        `parameters` Bind parameters values to the statement
+        `page_size` Sets the statement's page size.
+        `page_state` Sets the statement's paging state.
+        `timeout` Set request timeout
+        `consistency` Set Consistency
+        `serial_consistency` set Serial consistency
+        `execution_profile` Set execution_profile
+        """
 
     @abstractmethod
     def set_execution_profile(self, statement: Statement, name: str) -> None:

@@ -49,7 +49,7 @@ cdef class HostListener:
 
     cdef init(self, CassCluster* cass_cluster, callback):
         self.host_listener_callback = callback
-        cass_cluster_set_host_listener_callback(<CassCluster*>cass_cluster, self._callback, <void*>self)
+        cass_cluster_set_host_listener_callback(<CassCluster*>cass_cluster, <CassHostListenerCallback>self._callback, <void*>self)
 
     def set_host_listener_callback(self, callback):
         self.host_listener_callback = callback

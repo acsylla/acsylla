@@ -56,6 +56,8 @@ cdef class Cluster:
         object password=None,
         object load_balance_round_robin=False,
         str load_balance_dc_aware=None,
+        str load_balance_rack_aware_dc=None,
+        str load_balance_rack_aware_rack=None,
         object token_aware_routing=None,
         object token_aware_routing_shuffle_replicas=None,
         object latency_aware_routing=None,
@@ -122,6 +124,7 @@ cdef class Cluster:
         self.set_tracing_consistency(tracing_consistency)
         self.set_load_balance_round_robin(load_balance_round_robin)
         self.set_load_balance_dc_aware(load_balance_dc_aware)
+        self.set_load_balance_rack_aware(load_balance_rack_aware_dc, load_balance_rack_aware_rack)
         self.set_token_aware_routing(token_aware_routing)
         self.set_token_aware_routing_shuffle_replicas(token_aware_routing_shuffle_replicas)
         self.set_latency_aware_routing(latency_aware_routing)
@@ -319,6 +322,11 @@ cdef class Cluster:
     def set_load_balance_dc_aware(self, dc):
         if dc is not None:
             error = cass_cluster_set_load_balance_dc_aware(self.cass_cluster, dc.encode(), 0, cass_false)
+            raise_if_error(error)
+
+    def set_load_balance_rack_aware(self, dc, rack):
+        if dc is not None and rack is not None:
+            error = cass_cluster_set_load_balance_rack_aware(self.cass_cluster, dc.encode(), rack.encode())
             raise_if_error(error)
 
     def set_token_aware_routing(self, enabled):

@@ -90,6 +90,8 @@ command for installing it:
 pip install acsylla
 ```
 
+#### ⚠️ We removed support for Python 3.7, but you still build this driver for that version. 
+
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 

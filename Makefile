@@ -1,5 +1,5 @@
-PYTHON ?= python
-PIP ?= pip
+PYTHON ?= python3
+PIP ?= pip3
 CYTHON ?= cython
 current_dir = $(shell pwd)
 
@@ -33,7 +33,7 @@ install-driver:
 		make
 
 install-dev: compile
-	$(PIP) install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev]"
 
 install: compile
 	$(PIP) install -e .

@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ macos-latest, ubuntu-latest ]
-        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -26,10 +26,8 @@ jobs:
           brew install cmake libuv openssl
           make install-driver
           python -m pip install --upgrade pip
-          export LDFLAGS="-L/usr/local/opt/openssl/lib"
-          export CPPFLAGS="-I/usr/local/opt/openssl/include"
-          export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
-          export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
+          export LDFLAGS="-L/opt/homebrew/lib"
+          export LIBUV_ROOT_DIR="/opt/homebrew"
           pip install wheel
           make compile
           python setup.py bdist_wheel

@@ -40,6 +40,7 @@ jobs:
           export LIBUV_ROOT_DIR="/opt/homebrew"
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools
+          python -m pip install --upgrade importlib_metadata<5
           make install-driver
           make compile
           make install-dev
@@ -52,6 +53,7 @@ jobs:
           export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools
+          python -m pip install --upgrade importlib_metadata<5
           make install-driver
           make compile
           make install-dev

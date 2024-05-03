@@ -50,6 +50,8 @@ jobs:
           export CPPFLAGS="-I/usr/local/opt/openssl/include"
           export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
           export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
           make install-driver
           make compile
           make install-dev

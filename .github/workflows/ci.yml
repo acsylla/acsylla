@@ -41,7 +41,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools
           python -m pip install --upgrade "importlib_metadata<5"
-          python -m pip install --upgrade "Cython==0.29.33"
           make install-driver
           make compile
           make install-dev
@@ -55,7 +54,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools
           python -m pip install --upgrade "importlib_metadata<5"
-          python -m pip install --upgrade "Cython==0.29.33"
           make install-driver
           make compile
           make install-dev

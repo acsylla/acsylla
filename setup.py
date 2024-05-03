@@ -43,7 +43,7 @@ class acsylla_build_ext(build_ext):
 
 
 dev_requires = [
-    "Cython==0.29.33",
+    "Cython",
     "pytest==6.2.5",
     "pytest-mock==3.6.1",
     "pytest-asyncio==0.16.0",
@@ -54,7 +54,7 @@ dev_requires = [
     "isort==5.9.3",
     "flake8==4.0.1",
     "mypy==0.910",
-    "setuptools"
+    "setuptools",
 ]
 
 

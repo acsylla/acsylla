@@ -90,8 +90,6 @@ command for installing it:
 pip install acsylla
 ```
 
-#### ⚠️ We removed support for Python 3.7, but you still build this driver for that version. 
-
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 
@@ -1271,8 +1269,8 @@ for installing any dependency that you would need for compiling the driver:
 > **_NOTE:_**
     The driver depends on `libuv` and `openssl`. To install on Mac OS X, do `brew install libuv`
     and `brew install openssl` respectively. Additionally, you may need to export openssl lib
-    locations: `export LDFLAGS="-L/usr/local/opt/openssl/lib"`
-    and `export CPPFLAGS="-I/usr/local/opt/openssl/include"`.
+    locations: `export LDFLAGS="-L/opt/homebrew/lib"`
+    and `export CPPFLAGS="-I/opt/homebrew/include"`.
 
 
 ```bash

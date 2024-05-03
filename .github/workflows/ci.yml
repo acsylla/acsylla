@@ -38,14 +38,25 @@ jobs:
           brew install cmake libuv openssl
           export LDFLAGS="-L/opt/homebrew/lib"
           export LIBUV_ROOT_DIR="/opt/homebrew"
-      - name: Compile Cassandra Driver
-        run: |
-          make install-driver
-      - name: Compile and install dependencies
-        run: |
           python -m pip install --upgrade pip
+          make install-driver
           make compile
           make install-dev
+      - name: Compile Cassandra Driver
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          export LDFLAGS="-L/usr/local/opt/openssl/lib"
+          export CPPFLAGS="-I/usr/local/opt/openssl/include"
+          export SSL_LIBRARY_PATH="/usr/local/opt/openssl/lib"
+          export UV_LIBRARY_PATH="/usr/local/opt/libuv/lib"
+          make install-driver
+          make compile
+          make install-dev
+      - name: Compile and install dependencies
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          make certs
+          docker-compose up -d
       - name: Lint with flake8
         run: |
           make lint

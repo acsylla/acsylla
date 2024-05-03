@@ -61,7 +61,7 @@ git config --global --add safe.directory /io
 make install-driver
 
 ${PYTHON} -m pip install --upgrade pip
-${PIP} install auditwheel cython
+${PIP} install auditwheel cython setuptools wheel
 PYTHON=${PYTHON} PIP=${PIP} CYTHON=${CYTHON} make compile
 ${PYTHON} setup.py bdist_wheel
 ${AUDITWHEEL} repair dist/acsylla-*.whl -w dist

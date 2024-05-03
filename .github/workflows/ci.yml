@@ -39,6 +39,7 @@ jobs:
           export LDFLAGS="-L/opt/homebrew/lib"
           export LIBUV_ROOT_DIR="/opt/homebrew"
           python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
           make install-driver
           make compile
           make install-dev

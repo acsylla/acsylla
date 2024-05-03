@@ -43,9 +43,9 @@ format:
 	black .
 
 lint:
-	isort --check-only  .
-	black --exclude vendor --check .
-	flake8 --config setup.cfg
+	isort --check-only ./acsylla
+	black --exclude vendor --check ./acsylla
+	flake8 --config setup.cfg ./acsylla
 
 mypy:
 	mypy -p acsylla -p tests.test_typing

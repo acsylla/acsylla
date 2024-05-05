@@ -92,10 +92,9 @@ jobs:
           cp dist/acsylla-*.whl test_wheel
           pip install virtualenv
           python -m virtualenv env
+          pip3 install -r requirements-test.txt
           source env/bin/activate
           rm -f .install-cython
-          make install-driver
-          make install-dev
           sudo apt-get remove libuv1 libuv1-dev
           rm -r acsylla
           pip install test_wheel/acsylla-*.whl --upgrade

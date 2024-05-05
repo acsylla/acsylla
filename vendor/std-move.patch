@@ -1,0 +1,11 @@
+--- vendor/cpp-driver/src/connection_pool.cpp.orig      2024-05-05 23:59:11
++++ vendor/cpp-driver/src/connection_pool.cpp   2024-05-05 23:59:20
+@@ -98,7 +98,7 @@
+       if (connections_by_shard_[connection->shard_id()].size() < num_connections_per_shard_) {
+         add_connection(PooledConnection::Ptr(new PooledConnection(this, connection)));
+       } else {
+-        host_->add_unpooled_connection(std::move(connection));
++        host_->add_unpooled_connection(connection);
+       }
+     }
+   }

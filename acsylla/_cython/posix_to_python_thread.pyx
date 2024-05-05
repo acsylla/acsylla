@@ -14,12 +14,11 @@ from libc.string cimport strcpy
 from posix cimport unistd
 
 
-cdef void _socket_write(int fd) nogil:
-    unistd.write(fd, b"1", 1)
+cdef int _socket_write(int fd) nogil:
+    return unistd.write(fd, b"1", 1)
 
-
-cdef void _socket_close(int fd) nogil:
-    unistd.close(fd)
+cdef int _socket_close(int fd) nogil:
+    return unistd.close(fd)
 
 
 cdef void cb_cass_future(CassFuture* cass_future, void* data):

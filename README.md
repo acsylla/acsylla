@@ -93,18 +93,18 @@ pip install acsylla
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 
-Example for build wheel for Python 3.11 ***x86_64*** from master branch
+Example for build wheel for Python 3.12 ***x86_64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run -v `pwd`:/io -e PYTHON_VERSION=3.11 quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
+docker run -v `pwd`:/io -e PYTHON_VERSION=3.12  quay.io/pypa/manylinux_2_28_x86_64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
-Example for build wheel for Python 3.11 ***aarch64*** from master branch
+Example for build wheel for Python 3.12 ***aarch64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.11 quay.io/pypa/manylinux2014_aarch64 /io/bin/build_manylinux2014_wheel.sh
+docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.12  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
 ## Cluster

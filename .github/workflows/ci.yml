@@ -72,14 +72,14 @@ jobs:
         run: |
           mkdir /tmp/acsylla
           cp -r . /tmp/acsylla
-          docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
+          docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux_2_28_x86_64 /io/bin/build_manylinux_2_28_wheel.sh
           mkdir dist
           cp /tmp/acsylla/dist/acsylla-*.whl dist/
       - name: Test dependencies for manylinux2010-wheel
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libuv1 libuv1-dev default-jre
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
           make certs
           docker-compose up -d
           # wait till casssandra server is up, to be improved
@@ -94,8 +94,6 @@ jobs:
           python -m virtualenv env
           pip3 install -r requirements-test.txt
           source env/bin/activate
-          rm -f .install-cython
-          sudo apt-get remove libuv1 libuv1-dev
           rm -r acsylla
           pip install test_wheel/acsylla-*.whl --upgrade
           make test

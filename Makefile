@@ -26,7 +26,7 @@ compile: clean cythonize setup-build
 
 install-driver:
 	git submodule update --init --recursive
-	patch -N -p0 < vendor/std-move.patch || echo Already applied
+# 	patch -N -p0 < vendor/std-move.patch || echo Already applied
 	patch -N -p0 < vendor/prevent-stdout-spam.patch || echo Already applied
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \

@@ -23,7 +23,7 @@ extension = Extension(
     include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
     extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
     extra_compile_args=["-std=c++14"],
-    libraries=["crypto", "ssl", "uv", "z"],
+    libraries=["ssl", "crypto", "uv", "z"],
 )
 
 

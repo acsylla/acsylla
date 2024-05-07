@@ -1,4 +1,4 @@
-name: CI
+name: CI MacOS aarch64
 
 on:
   # Trigger the workflow on push or pull request,

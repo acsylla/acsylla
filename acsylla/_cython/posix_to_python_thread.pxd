@@ -21,8 +21,8 @@ ctypedef struct LogMessageCallback:
 ctypedef queue[void *] cpp_event_queue
 ctypedef queue[LogMessageCallback] cpp_log_queue
 
-cdef int _socket_write(int fd) nogil
-cdef int _socket_close(int fd) nogil
+cdef int _socket_write(int fd) noexcept nogil
+cdef int _socket_close(int fd) noexcept nogil
 
 cdef void cb_cass_future(CassFuture* cass_future, void* data)
 cdef void cb_log_message(const CassLogMessage* message, void* data)

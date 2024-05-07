@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.2.0
+========
+- Add support python3.12 
+- Update code to support latest Cython 3.0.10
+- Remove python3.7 from CI 
+
 0.1.8b1
 ========
 - Add host listener callback 

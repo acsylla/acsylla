@@ -9,8 +9,7 @@ source /$PYTHON_VERSION/bin/activate
 
 cd /io
 
-dnf install cmake -y
-dnf install openssl-devel libuv-devel -y
+dnf install openssl-devel -y
 
 LIBUV_VERSION=1.48.0
 
@@ -18,12 +17,14 @@ curl -O https://dist.libuv.org/dist/v$LIBUV_VERSION/libuv-v$LIBUV_VERSION.tar.gz
 tar -xzvf libuv-v$LIBUV_VERSION.tar.gz
 cd libuv-v$LIBUV_VERSION
 sh autogen.sh
-./configure --enable-shared=no
+./configure
 make
 make install
 cd ..
 
 git config --global --add safe.directory /io
+
+export LIBUV_ROOT_DIR="/usr/local"
 
 make install-driver
 

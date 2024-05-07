@@ -14,10 +14,10 @@ from libc.string cimport strcpy
 from posix cimport unistd
 
 
-cdef int _socket_write(int fd) nogil:
+cdef int _socket_write(int fd) noexcept nogil:
     return unistd.write(fd, b"1", 1)
 
-cdef int _socket_close(int fd) nogil:
+cdef int _socket_close(int fd) noexcept nogil:
     return unistd.close(fd)
 
 

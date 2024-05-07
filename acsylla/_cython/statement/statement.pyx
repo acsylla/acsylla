@@ -47,7 +47,7 @@ cdef class Statement:
         object timeout,
         object consistency,
         object serial_consistency,
-        str execution_profile,
+        object execution_profile,
         object native_types,
     ):
 
@@ -64,12 +64,18 @@ cdef class Statement:
             parameters
         )
         statement.native_types
-        statement.set_page_size(page_size)
-        statement.set_page_state(page_state)
-        statement.set_timeout(timeout)
-        statement.set_consistency(consistency)
-        statement.set_serial_consistency(serial_consistency)
-        statement.set_execution_profile(execution_profile)
+        if page_size is not None:
+            statement.set_page_size(page_size)
+        if page_state is not None:
+            statement.set_page_state(page_state)
+        if timeout is not None:
+            statement.set_timeout(timeout)
+        if consistency is not None:
+            statement.set_consistency(consistency)
+        if serial_consistency is not None:
+            statement.set_serial_consistency(serial_consistency)
+        if execution_profile is not None:
+            statement.set_execution_profile(execution_profile)
         return statement
 
     @staticmethod
@@ -82,7 +88,7 @@ cdef class Statement:
             object timeout,
             object consistency,
             object serial_consistency,
-            str execution_profile,
+            object execution_profile,
             object native_types,
         ):
 
@@ -94,12 +100,18 @@ cdef class Statement:
         statement.cass_prepared = cass_prepared
         statement.prepared = 1
         statement.native_types = native_types
-        statement.set_page_size(page_size)
-        statement.set_page_state(page_state)
-        statement.set_timeout(timeout)
-        statement.set_consistency(consistency)
-        statement.set_serial_consistency(serial_consistency)
-        statement.set_execution_profile(execution_profile)
+        if page_size is not None:
+            statement.set_page_size(page_size)
+        if page_state is not None:
+            statement.set_page_state(page_state)
+        if timeout is not None:
+            statement.set_timeout(timeout)
+        if consistency is not None:
+            statement.set_consistency(consistency)
+        if serial_consistency is not None:
+            statement.set_serial_consistency(serial_consistency)
+        if execution_profile is not None:
+            statement.set_execution_profile(execution_profile)
         return statement
 
     async def execute(self, native_types=None):
@@ -115,9 +127,9 @@ cdef class Statement:
         error = cass_statement_reset_parameters(self.cass_statement, count)
         raise_if_error(error)
 
-    def set_page_size(self, page_size: int):
+    def set_page_size(self, page_size: object):
         if page_size is not None:
-            error = cass_statement_set_paging_size(self.cass_statement, page_size)
+            error = cass_statement_set_paging_size(self.cass_statement, int(page_size))
             raise_if_error(error)
 
     def set_page_state(self, bytes page_state):
@@ -144,9 +156,10 @@ cdef class Statement:
             cass_consistency = consistency.value
             error = cass_statement_set_serial_consistency(self.cass_statement, cass_consistency)
             raise_if_error(error)
-    def set_timestamp(self, timestamp: int):
+
+    def set_timestamp(self, timestamp: object):
         if timestamp is not None:
-            error = cass_statement_set_timestamp(self.cass_statement, timestamp)
+            error = cass_statement_set_timestamp(self.cass_statement, int(timestamp))
             raise_if_error(error)
 
     def set_is_idempotent(self, is_idempotent: bool):
@@ -154,7 +167,7 @@ cdef class Statement:
             error = cass_statement_set_is_idempotent(self.cass_statement, is_idempotent)
             raise_if_error(error)
 
-    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+    def set_retry_policy(self, retry_policy: object, retry_policy_logging: bool = False):
         cdef CassRetryPolicy* cass_policy
         cdef CassRetryPolicy* cass_log_policy
         if retry_policy is not None:
@@ -180,12 +193,12 @@ cdef class Statement:
             raise_if_error(error)
             self.tracing_enabled = enabled
 
-    def set_host(self, host: str, port: int = 9042):
+    def set_host(self, host: object, port: int = 9042):
         if host is not None:
             error = cass_statement_set_host(self.cass_statement, host.encode(), port)
             raise_if_error(error)
 
-    def set_execution_profile(self, name: str) -> None:
+    def set_execution_profile(self, name: object) -> None:
         if name is not None:
             error = cass_statement_set_execution_profile(self.cass_statement, name.encode())
             raise_if_error(error)

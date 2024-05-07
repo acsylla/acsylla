@@ -15,7 +15,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, ARM64]
+        os: [ubuntu-latest]
         python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
 
     runs-on: ${{ matrix.os }}
@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir /tmp/acsylla
           cp -r . /tmp/acsylla
-          docker run --platform linux/aarch64 -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux_2_28_aarch64 /io/bin/build_manylinux_2_28_wheel.sh
+          docker run --platform linux/arm64 -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux_2_28_aarch64 /io/bin/build_manylinux_2_28_wheel.sh
           mkdir dist
           cp /tmp/acsylla/dist/acsylla-*.whl dist/
       - name: Test dependencies for manylinux_2_28_aarch64-wheel
@@ -48,4 +48,4 @@ jobs:
       - name: Test generated manylinux_2_28_aarch64-wheel
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          docker run --platform linux/aarch64 -v `pwd`:/io -e "PYTHON_VERSION=${{matrix.python-version}}" -it quay.io/pypa/manylinux_2_28_aarch64  /io/bin/test.sh
+          docker run --platform linux/arm64 -v `pwd`:/io -e "PYTHON_VERSION=${{matrix.python-version}}" -it quay.io/pypa/manylinux_2_28_aarch64  /io/bin/test.sh

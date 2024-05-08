@@ -78,9 +78,9 @@ jobs:
           prerelease: >-
             ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b')
               || contains(github.ref_name, 'rc') || contains(github.ref_name, 'dev') }}
-      #- name: Publish distribution to PyPI
-      #  uses: pypa/gh-action-pypi-publish@master
-      #  with:
-      #    packages_dir: wheelhouse/
-      #    password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
-      #    repository_url: https://upload.pypi.org/legacy/
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          packages_dir: wheelhouse/
+          password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
+          repository_url: https://upload.pypi.org/legacy/

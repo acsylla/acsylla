@@ -38,6 +38,7 @@ jobs:
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
+          cd /tmp/acsylla
           make certs
           docker-compose up -d
           # wait till casssandra server is up, to be improved

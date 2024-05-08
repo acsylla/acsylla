@@ -32,6 +32,8 @@ jobs:
         run: |
           brew install cmake libuv openssl
           export LDFLAGS="-L/opt/homebrew/lib"
+          export SSL_LIBRARY_PATH="/opt/homebrew/opt/openssl/lib"
+          export UV_LIBRARY_PATH="/opt/homebrew/opt/libuv/lib"
           export LIBUV_ROOT_DIR="/opt/homebrew"
           export LIBUV_INCLUDE_DIR="/opt/homebrew/include"
           make install-driver

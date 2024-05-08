@@ -1,15 +1,16 @@
-name: PyPi release
+name: PyPi release MacOS
 on:
   push:
     tags:
       - v*
+
 jobs:
   build:
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest ]
+        os: [macos-latest]
         python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
 
     runs-on: ${{ matrix.os }}
@@ -62,36 +63,6 @@ jobs:
           rm -r acsylla
           pip install test_wheel/acsylla-*.whl --upgrade
           make test
-      - name: Generate manylinux_2_28_x86_64-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          mkdir /tmp/acsylla
-          cp -r . /tmp/acsylla
-          docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/manylinux2014_x86_64 /io/bin/build_manylinux2014_wheel.sh
-          mkdir dist
-          cp /tmp/acsylla/dist/acsylla-*.whl dist/
-      - name: Test dependencies for manylinux_2_28_x86_64-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
-          make certs
-          docker-compose up -d
-          # wait till casssandra server is up, to be improved
-          # by checking the readiness of the serivce
-          sleep 90
-      - name: Test generated manylinux2010-wheel
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          mkdir test_wheel
-          cp dist/acsylla-*.whl test_wheel
-          pip install virtualenv
-          python -m virtualenv env
-          source env/bin/activate
-          pip install -r requirements-test.txt
-          rm -r acsylla
-          pip install test_wheel/acsylla-*.whl --upgrade
-          make test
       - name: Get the version
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
@@ -101,7 +72,7 @@ jobs:
           path: test_wheel/acsylla-*.whl
   upload:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3
@@ -111,14 +82,14 @@ jobs:
       - name: Display content
         run: ls -R
         working-directory: wheelhouse/
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          packages_dir: wheelhouse/
-          password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
-          repository_url: https://upload.pypi.org/legacy/
+      #- name: Publish distribution to PyPI
+      #  uses: pypa/gh-action-pypi-publish@master
+      #  with:
+      #    packages_dir: wheelhouse/
+      #    password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
+      #    repository_url: https://upload.pypi.org/legacy/
       - name: Publish release to github
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |

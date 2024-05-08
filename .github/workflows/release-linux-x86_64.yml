@@ -1,17 +1,12 @@
-name: CI Linux x86_64
-
+name: PyPi release Linux x86_64
 on:
-  # Trigger the workflow on push or pull request,
-  # but only for the master branch
   push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-
+    tags:
+      - v*
 jobs:
   build:
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -57,3 +52,37 @@ jobs:
           rm -r acsylla
           pip install test_wheel/acsylla-*.whl --upgrade
           make test
+      - name: Get the version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.get_version.outputs.VERSION }}
+          path: test_wheel/acsylla-*.whl
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ needs.build.outputs.version }}
+          path: wheelhouse/
+      - name: Display content
+        run: ls -R
+        working-directory: wheelhouse/
+      #- name: Publish distribution to PyPI
+      #  uses: pypa/gh-action-pypi-publish@master
+      #  with:
+      #    packages_dir: wheelhouse/
+      #    password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
+      #    repository_url: https://upload.pypi.org/legacy/
+      - name: Publish release to github
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            wheelhouse/*
+          prerelease: >-
+            ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b')
+              || contains(github.ref_name, 'rc') || contains(github.ref_name, 'dev') }}

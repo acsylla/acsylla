@@ -15,7 +15,7 @@ cdef class Statement:
                                    object timeout,
                                    object consistency,
                                    object serial_consistency,
-                                   str execution_profile,
+                                   object execution_profile,
                                    object native_types,
                                 )
 
@@ -28,7 +28,7 @@ cdef class Statement:
                                      object timeout,
                                      object consistency,
                                      object serial_consistency,
-                                     str execution_profile,
+                                     object execution_profile,
                                      object native_types,
                                 )
 

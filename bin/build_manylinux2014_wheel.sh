@@ -30,6 +30,12 @@ then
     PIP=/opt/python/cp311-cp311/bin/pip
     CYTHON=/opt/python/cp311-cp311/bin/cython
     AUDITWHEEL=/opt/python/cp311-cp311/bin/auditwheel
+elif [ $PYTHON_VERSION == "3.12" ]
+then
+    PYTHON=/opt/python/cp312-cp312/bin/python
+    PIP=/opt/python/cp312-cp312/bin/pip
+    CYTHON=/opt/python/cp312-cp312/bin/cython
+    AUDITWHEEL=/opt/python/cp312-cp312/bin/auditwheel
 else
     exit 1
 fi
@@ -55,7 +61,7 @@ git config --global --add safe.directory /io
 make install-driver
 
 ${PYTHON} -m pip install --upgrade pip
-${PIP} install auditwheel cython
+${PIP} install auditwheel cython setuptools wheel
 PYTHON=${PYTHON} PIP=${PIP} CYTHON=${CYTHON} make compile
 ${PYTHON} setup.py bdist_wheel
 ${AUDITWHEEL} repair dist/acsylla-*.whl -w dist

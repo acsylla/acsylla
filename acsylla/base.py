@@ -1,5 +1,6 @@
 """Abstract base classes, use them for documentation or for adding
 types in your functions."""
+
 from abc import ABCMeta
 from abc import abstractmethod
 from acsylla._cython import cyacsylla

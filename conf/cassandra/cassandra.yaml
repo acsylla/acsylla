@@ -94,8 +94,7 @@ internode_compression: dc
 inter_dc_tcp_nodelay: false
 tracetype_query_ttl: 86400
 tracetype_repair_ttl: 604800
-enable_user_defined_functions: true
-enable_scripted_user_defined_functions: true
+user_defined_functions_enabled: true
 windows_timer_interval: 1
 transparent_data_encryption_options:
     enabled: false
@@ -131,3 +130,4 @@ enable_materialized_views: true
 enable_sasi_indexes: false
 enable_transient_replication: false
 enable_drop_compact_storage: false
+

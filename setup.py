@@ -23,7 +23,7 @@ extension = Extension(
     include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
     extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
     extra_compile_args=["-std=c++14"],
-    libraries=["crypto", "ssl", "uv", "z"],
+    libraries=["ssl", "crypto", "uv", "z"],
 )
 
 
@@ -43,7 +43,7 @@ class acsylla_build_ext(build_ext):
 
 
 dev_requires = [
-    "Cython==0.29.33",
+    "Cython",
     "pytest==6.2.5",
     "pytest-mock==3.6.1",
     "pytest-asyncio==0.16.0",
@@ -54,6 +54,7 @@ dev_requires = [
     "isort==5.9.3",
     "flake8==4.0.1",
     "mypy==0.910",
+    "setuptools",
 ]
 
 

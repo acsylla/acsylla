@@ -33,9 +33,9 @@ cdef class Batch:
             error =  cass_batch_set_serial_consistency(self.cass_batch, consistency.value)
             raise_if_error(error)
 
-    def set_timestamp(self, timestamp: int):
+    def set_timestamp(self, timestamp: object):
         if timestamp is not None:
-            error =  cass_batch_set_timestamp(self.cass_batch, timestamp)
+            error =  cass_batch_set_timestamp(self.cass_batch, int(timestamp))
             raise_if_error(error)
 
     def set_request_timeout(self, timeout_ms: int):
@@ -50,7 +50,7 @@ cdef class Batch:
             error = cass_batch_set_is_idempotent(self.cass_batch, is_idempotent)
             raise_if_error(error)
 
-    def set_retry_policy(self, retry_policy: str, retry_policy_logging: bool = False):
+    def set_retry_policy(self, retry_policy: object, retry_policy_logging: bool = False):
         cdef CassError error
         cdef CassRetryPolicy* cass_policy
         cdef CassRetryPolicy* cass_log_policy
@@ -83,7 +83,7 @@ cdef class Batch:
         error = cass_batch_add_statement(self.cass_batch, statement.cass_statement)
         raise_if_error(error)
 
-    def set_execution_profile(self, name: str) -> None:
+    def set_execution_profile(self, name: object) -> None:
         cdef CassError error
         if name is not None:
             error = cass_batch_set_execution_profile(self.cass_batch, name.encode())

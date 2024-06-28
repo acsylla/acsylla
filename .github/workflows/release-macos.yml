@@ -1,0 +1,101 @@
+name: PyPi release MacOS
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+    strategy:
+      matrix:
+        os: [macos-latest]
+        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Generate macos-wheel
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install cmake libuv openssl
+          export LDFLAGS="-L/opt/homebrew/lib"
+          export SSL_LIBRARY_PATH="/opt/homebrew/opt/openssl/lib"
+          export UV_LIBRARY_PATH="/opt/homebrew/opt/libuv/lib"
+          export LIBUV_ROOT_DIR="/opt/homebrew"
+          export LIBUV_INCLUDE_DIR="/opt/homebrew/include"
+          make install-driver
+          python -m pip install --upgrade pip
+          pip install wheel setuptools
+          make compile
+          python setup.py bdist_wheel
+      - name: Test dependencies for macos-wheel
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install cassandra
+          make certs
+          cp -R ./certs /opt/homebrew/etc/cassandra/certs
+          ls -la /opt/homebrew/etc/cassandra/certs
+          sed -i '' -e 's/\/certs/\/opt\/homebrew\/etc\/cassandra\/certs/g' ./conf/cassandra/cassandra.yaml
+          cp ./conf/cassandra/cassandra.yaml /opt/homebrew/etc/cassandra/cassandra.yaml
+          cat /opt/homebrew/etc/cassandra/cassandra.yaml
+          brew services start cassandra
+          # wait till casssandra server is up, to be improved
+          # by checking the readiness of the serivce
+          echo sleep 120 for wait till casssandra server is up
+          sleep 120
+          cat /opt/homebrew/var/log/cassandra/system.log
+      - name: Test generated macos-wheel
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          mkdir test_wheel
+          cp dist/acsylla-*.whl test_wheel
+          pip install virtualenv
+          python -m virtualenv env
+          source env/bin/activate
+          pip install -r requirements-test.txt
+          rm -r acsylla
+          pip install test_wheel/acsylla-*.whl --upgrade
+          make test
+      - name: Get the version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.get_version.outputs.VERSION }}
+          path: test_wheel/acsylla-*.whl
+  upload:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ needs.build.outputs.version }}
+          path: wheelhouse/
+      - name: Display content
+        run: ls -R
+        working-directory: wheelhouse/
+      - name: Publish release to github
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            wheelhouse/*
+          prerelease: >-
+            ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b')
+              || contains(github.ref_name, 'rc') || contains(github.ref_name, 'dev') }}
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          packages_dir: wheelhouse/
+          password: ${{ secrets.PYPY_RELEASE_UPLOAD }}
+          repository_url: https://upload.pypi.org/legacy/

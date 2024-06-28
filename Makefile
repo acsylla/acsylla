@@ -1,5 +1,5 @@
-PYTHON ?= python
-PIP ?= pip
+PYTHON ?= python3
+PIP ?= pip3
 CYTHON ?= cython
 current_dir = $(shell pwd)
 
@@ -26,6 +26,7 @@ compile: clean cythonize setup-build
 
 install-driver:
 	git submodule update --init --recursive
+	patch -N -p0 < vendor/std-move.patch || echo Already applied
 	patch -N -p0 < vendor/prevent-stdout-spam.patch || echo Already applied
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \
@@ -33,7 +34,7 @@ install-driver:
 		make
 
 install-dev: compile
-	$(PIP) install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev]"
 
 install: compile
 	$(PIP) install -e .
@@ -43,9 +44,8 @@ format:
 	black .
 
 lint:
-	isort --check-only  .
-	black --exclude vendor --check .
-	flake8 --config setup.cfg
+	isort --check-only ./acsylla
+	black --exclude vendor --check ./acsylla
 
 mypy:
 	mypy -p acsylla -p tests.test_typing

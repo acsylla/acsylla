@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.2.1
+========
+- Add support python3.13 
+- Updating libuv version to 1.49.2
+
 0.2.0
 ========
 - Add support python3.12 

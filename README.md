@@ -1,5 +1,6 @@
-[![CI](https://github.com/acsylla/acsylla/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci.yml)
-[![CI](https://github.com/acsylla/acsylla/actions/workflows/release.yml/badge.svg?branch=v0.1.7a0)](https://github.com/acsylla/acsylla/actions/workflows/release.yml)
+[![CI](https://github.com/acsylla/acsylla/actions/workflows/ci-linux-x86_64.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci-linux-x86_64.yml)
+[![CI](https://github.com/acsylla/acsylla/actions/workflows/ci-linux-aarch64.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci-linux-aarch64.yml)
+[![CI](https://github.com/acsylla/acsylla/actions/workflows/ci-macos.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci-macos.yml)
 [![PyPI](https://img.shields.io/pypi/v/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Number of PyPI downloads](https://img.shields.io/pypi/dm/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Documentation Status](https://readthedocs.org/projects/acsylla/badge/?version=latest)](https://acsylla.readthedocs.io/en/latest/)
@@ -861,6 +862,20 @@ The following snippet shows the minimal stuff that would be needed for creating 
 object for the keyspace ``acsylla`` and then peform a query for reading a set of rows. 
 For more info see [base.py](./acsylla/base.py) and [factories.py](./acsylla/factories.py)
 Acsylla supports all native datatypes including `Collections` and `UDT`
+
+```python
+import asyncio
+import acsylla
+
+async def main():
+    cluster = acsylla.create_cluster(['localhost'])
+    session = await cluster.create_session(keyspace="acsylla")    
+    prepared = await session.create_prepared("SELECT id, value FROM test")    
+    async for row in prepared.bind(page_size=10):
+        ...
+
+asyncio.run(main())
+ ```
 
 ```python
 import asyncio

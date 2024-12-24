@@ -11,7 +11,7 @@ cd /io
 
 dnf install openssl-devel -y
 
-LIBUV_VERSION=1.48.0
+LIBUV_VERSION=1.49.2
 
 curl -O https://dist.libuv.org/dist/v$LIBUV_VERSION/libuv-v$LIBUV_VERSION.tar.gz
 tar -xzvf libuv-v$LIBUV_VERSION.tar.gz

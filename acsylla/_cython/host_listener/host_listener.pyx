@@ -1,7 +1,5 @@
 import socket
 
-from posix cimport unistd
-
 
 cdef class HostListener:
     def __cinit__(self):
@@ -11,19 +9,16 @@ cdef class HostListener:
         loop = asyncio.get_running_loop()
         loop.add_reader(self._read_socket, self._handle_message)
 
-    cdef void _write(self, int fd) nogil:
-        unistd.write(fd, b"1", 1)
-
     @staticmethod
-    cdef void _callback(CassHostListenerEvent event, CassInet inet, void* data):
+    cdef void _callback(CassHostListenerEvent event, const CassInet address, void* data):
         self = <HostListener>data
         cdef HostListenerMessage message
         message.event = event
-        message.inet = inet
+        message.address = address
         self._mutex.lock()
         self._queue.push(message)
         self._mutex.unlock()
-        self._write(self._write_fd)
+        _socket_write(self._write_fd)
 
     def _handle_message(self):
         cdef bytes _ = self._read_socket.recv(1)
@@ -34,8 +29,11 @@ cdef class HostListener:
         self._mutex.unlock()
         if self.host_listener_callback is not None:
             from acsylla import HostListenerEvent
-            cass_inet_string(message.inet, address)
-            self.host_listener_callback(HostListenerEvent(message.event), address.decode())
+            cass_inet_string(message.address, address)
+            if asyncio.iscoroutinefunction(self.host_listener_callback):
+                asyncio.create_task(self.host_listener_callback(HostListenerEvent(message.event), address.decode()))
+            else:
+                self.host_listener_callback(HostListenerEvent(message.event), address.decode())
 
     def free(self):
         try:
@@ -49,7 +47,8 @@ cdef class HostListener:
 
     cdef init(self, CassCluster* cass_cluster, callback):
         self.host_listener_callback = callback
-        cass_cluster_set_host_listener_callback(<CassCluster*>cass_cluster, <CassHostListenerCallback>self._callback, <void*>self)
+        error = cass_cluster_set_host_listener_callback(<CassCluster*>cass_cluster, <CassHostListenerCallback>self._callback, <void*>self)
+        raise_if_error(error)
 
     def set_host_listener_callback(self, callback):
         self.host_listener_callback = callback

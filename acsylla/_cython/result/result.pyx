@@ -1,10 +1,19 @@
+from libc.stdlib cimport free
+from libc.stdlib cimport malloc
+
+
 cdef class Result:
 
     def __cinit__(self):
         self.cass_result = NULL
+        self.iterator_refs.resize(0)
 
     def __dealloc__(self):
         cass_result_free(self.cass_result)
+        for i in range(self.iterator_refs.size()):
+            cass_iterator = self.iterator_refs[i]
+            if cass_iterator != NULL:
+                cass_iterator_free(cass_iterator)
 
     @staticmethod
     cdef Result new_(const CassResult* cass_result, int8_t native_types):
@@ -62,7 +71,7 @@ cdef class Result:
         count = cass_result_column_count(self.cass_result)
         return count
 
-    def columns_names(self):
+    def columns(self):
         """ Returns the columns names"""
         cdef size_t length = 0
         cdef char* name = NULL
@@ -71,8 +80,10 @@ cdef class Result:
         for i in range(self.column_count()):
             error = cass_result_column_name(self.cass_result, i, <const char**> &name, <size_t*> &length)
             raise_if_error(error)
-            columns.append(name[:length].decode())
-        return columns
+            yield name[:length].decode()
+
+    def columns_names(self):
+        return list(self.columns())
 
     def first(self):
         """ Return the first result, if there is no row
@@ -93,15 +104,12 @@ cdef class Result:
         If there is no rows iterator returns no rows.
         """
         cdef CassIterator* cass_iterator
-        cdef const CassRow* cass_row
 
-        try:
-            cass_iterator = cass_iterator_from_result(self.cass_result)
-            while cass_iterator_next(cass_iterator) == cass_true:
-                cass_row = cass_iterator_get_row(cass_iterator)
-                yield Row.new_(cass_row, self)
-        finally:
-            cass_iterator_free(cass_iterator)
+        cass_iterator = cass_iterator_from_result(self.cass_result)
+        # Keep cass_iterator ref
+        self.iterator_refs.push_back(cass_iterator)
+        while cass_iterator_next(cass_iterator) == cass_true:
+            yield Row.new_(cass_iterator_get_row(cass_iterator), self)
 
     def __iter__(self):
         return self.all()

@@ -1,6 +1,6 @@
 ctypedef struct HostListenerMessage:
     CassHostListenerEvent event
-    CassInet inet
+    CassInet address
 
 ctypedef queue[HostListenerMessage] _host_listener_queue
 
@@ -14,6 +14,5 @@ cdef class HostListener:
         object host_listener_callback
 
     @staticmethod
-    cdef void _callback(CassHostListenerEvent event, CassInet inet, void* data)
+    cdef void _callback(CassHostListenerEvent event, const CassInet address, void* data)
     cdef init(self, CassCluster* cass_cluster, object callback)
-    cdef void _write(self, int fd) nogil

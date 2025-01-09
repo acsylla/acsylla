@@ -3,7 +3,6 @@
 [![CI](https://github.com/acsylla/acsylla/actions/workflows/ci-macos.yml/badge.svg?branch=master)](https://github.com/acsylla/acsylla/actions/workflows/ci-macos.yml)
 [![PyPI](https://img.shields.io/pypi/v/acsylla.svg)](https://pypi.org/project/acsylla/)
 [![Number of PyPI downloads](https://img.shields.io/pypi/dm/acsylla.svg)](https://pypi.org/project/acsylla/)
-[![Documentation Status](https://readthedocs.org/projects/acsylla/badge/?version=latest)](https://acsylla.readthedocs.io/en/latest/)
 
 # Acsylla <img align="right" width="200px" src="https://raw.githubusercontent.com/acsylla/acsylla/master/logo/cassandra-scylladb.svg" />
 A composition of ***async*** + ***cassandra*** + ***scylla*** words.
@@ -80,12 +79,11 @@ Cassandra's native protocol. The current version works with:
 
 * Scylla and Scylla Enterprise
 * Apache Cassandra® versions 2.1, 2.2 and 3.0+
-* Python 3.7, 3.8, 3.9, 3.10 and 3.11 for Linux and MacOS 
+* Python 3.8, 3.9, 3.10, 3.11, 3.12 and 3.13 for Linux and MacOS  
 
 ## Install
 
-There is an Beta realease compabitble with Python 3.7, 3.8, 3.9, 3.10 and 3.11 for Linux and MacOS environments uploaded as a Pypi package. Use the following
-command for installing it:
+Use the following command for installing it:
 
 ```bash
 pip install acsylla
@@ -94,18 +92,58 @@ pip install acsylla
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 
-Example for build wheel for Python 3.12 ***x86_64*** from master branch
+Example for build wheel for Python 3.13 ***x86_64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run -v `pwd`:/io -e PYTHON_VERSION=3.12  quay.io/pypa/manylinux_2_28_x86_64  /io/bin/build_manylinux_2_28_wheel.sh
+docker run -v `pwd`:/io -e PYTHON_VERSION=3.13  quay.io/pypa/manylinux_2_28_x86_64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
-Example for build wheel for Python 3.12 ***aarch64*** from master branch
+Example for build wheel for Python 3.13 ***aarch64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.12  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
+docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.13  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
+```
+
+## Basic usage
+```python
+import acsylla
+import asyncio
+
+
+async def main():
+    cluster = acsylla.create_cluster(["localhost"])
+    session = await cluster.create_session()
+    await session.query(
+        """
+        CREATE KEYSPACE IF NOT EXISTS acsylla WITH REPLICATION = { 
+            'class': 'SimpleStrategy', 'replication_factor': 1
+        }
+        """
+    )
+    await session.use_keyspace("acsylla")
+    await session.query(
+        """
+        CREATE TABLE IF NOT EXISTS test (
+            id tinyint PRIMARY KEY,
+            value int
+        );
+        """
+    )
+    insert = await session.prepared_query("INSERT INTO test (id, value) VALUES (?, ?)")
+    await asyncio.gather(*[insert([i, i]) for i in range(100)])
+    select = await session.prepared_query("SELECT * FROM test WHERE id IN :id")
+    async for row in select([(1, 4, 7, 90)]):
+        print(row.as_tuple())
+
+    non_prepared = session.query("SELECT * FROM test WHERE id=:id")
+    async for row in non_prepared([7], value_types=[acsylla.ValueType.TINY_INT]):
+        print(dict(row))
+        print(row.id)
+        print(row.value)
+
+asyncio.run(main())
 ```
 
 ## Cluster
@@ -870,9 +908,15 @@ import acsylla
 async def main():
     cluster = acsylla.create_cluster(['localhost'])
     session = await cluster.create_session(keyspace="acsylla")    
+    statement = acsylla.create_statement("SELECT id, value FROM test")
+    async for row in statement:
+        ...
+
     prepared = await session.create_prepared("SELECT id, value FROM test")    
     async for row in prepared.bind(page_size=10):
         ...
+    
+
 
 asyncio.run(main())
  ```

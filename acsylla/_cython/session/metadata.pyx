@@ -53,6 +53,10 @@ cdef object _fields_from_keyspace_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef const CassValue* field_value
 
     fields = {}
+
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
+
     try:
         cass_iterator = cass_iterator_fields_from_keyspace_meta(keyspace_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
@@ -70,6 +74,9 @@ cdef object _keyspace_meta(const CassKeyspaceMeta* keyspace_meta):
 
     cdef size_t length = 0
     cdef char* keyspace_name = NULL
+
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
 
     cass_keyspace_meta_name(keyspace_meta, <const char**> &keyspace_name, <size_t *>&length)
 
@@ -94,13 +101,18 @@ cdef object _fields_from_table_meta(const CassTableMeta* table_meta):
     cdef const char* field_name
     cdef const CassValue* field_value
 
+    if table_meta == NULL:
+        raise Exception('Table meta is NULL')
+
     fields = {}
     try:
         cass_iterator = cass_iterator_fields_from_table_meta(table_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
-            cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
+            error = cass_iterator_get_meta_field_name(cass_iterator, <const char**>&field_name, <size_t*>&length)
+            raise_if_error(error)
             field_value = cass_iterator_get_meta_field_value(cass_iterator)
-            fields[field_name[:length].decode()] = get_cass_value(field_value, False)
+            if field_value != NULL:
+                fields[field_name[:length].decode()] = get_cass_value(field_value, False)
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -111,24 +123,31 @@ cdef object _tables_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef CassIterator* cass_iterator
     cdef const CassTableMeta* table_meta
 
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
+
     from acsylla import TableMeta
     tables = []
     try:
         cass_iterator = cass_iterator_tables_from_keyspace_meta(keyspace_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             table_meta = cass_iterator_get_table_meta(cass_iterator)
-            fields = _fields_from_table_meta(table_meta)
-            is_virtual = True if cass_table_meta_is_virtual(table_meta) else False
-            indexes = _indexes_meta_from_table_meta(table_meta, fields['keyspace_name'])
-            exclude_indexes = [f'{i.name}_index' for i in indexes]
-            materialized_views = [k for k in _materialized_views_from_table_meta(table_meta) if k.name not in exclude_indexes]
-            tables.append(TableMeta(
-                name=fields['table_name'],
-                is_virtual=is_virtual,
-                columns=_columns_meta(table_meta),
-                indexes=indexes,
-                materialized_views=materialized_views,
-                **fields))
+            if table_meta == NULL:
+                raise Exception('Table meta is NULL')
+
+            if table_meta != NULL:
+                fields = _fields_from_table_meta(table_meta)
+                is_virtual = True if cass_table_meta_is_virtual(table_meta) else False
+                indexes = _indexes_meta_from_table_meta(table_meta, fields['keyspace_name'])
+                exclude_indexes = [f'{i.name}_index' for i in indexes]
+                materialized_views = [k for k in _materialized_views_from_table_meta(table_meta) if k.name not in exclude_indexes]
+                tables.append(TableMeta(
+                    name=fields['table_name'],
+                    is_virtual=is_virtual,
+                    columns=_columns_meta(table_meta),
+                    indexes=indexes,
+                    materialized_views=materialized_views,
+                    **fields))
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -140,6 +159,9 @@ cdef object _fields_from_column_meta(const CassColumnMeta* column_meta):
     cdef size_t length = 0
     cdef const char* field_name
     cdef const CassValue* field_value
+
+    if column_meta == NULL:
+        raise Exception('Column meta is NULL')
 
     fields = {}
     try:
@@ -164,19 +186,23 @@ cdef object _columns_meta(const CassTableMeta* table_meta):
     cdef const CassDataType* data_type
     cdef CassValueType value_type
 
+    if table_meta == NULL:
+        raise Exception('Table meta is NULL')
+
     from acsylla import ColumnMeta
     columns = []
     try:
         cass_iterator = cass_iterator_columns_from_table_meta(table_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             column_meta = cass_iterator_get_column_meta(cass_iterator)
-            cass_column_meta_name(column_meta, <const char**> &column_name, <size_t *> &length)
-            data_type = cass_column_meta_data_type(column_meta)
-            fields = _fields_from_column_meta(column_meta)
-            columns.append(ColumnMeta(
-                name=fields['column_name'],
-                **fields
-            ))
+            if column_meta != NULL:
+                cass_column_meta_name(column_meta, <const char**> &column_name, <size_t *> &length)
+                data_type = cass_column_meta_data_type(column_meta)
+                fields = _fields_from_column_meta(column_meta)
+                columns.append(ColumnMeta(
+                    name=fields['column_name'],
+                    **fields
+                ))
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -187,6 +213,9 @@ cdef object _materialized_views_from_table_meta(const CassTableMeta* table_meta)
     cdef CassIterator* cass_iterator
     cdef const CassMaterializedViewMeta* materialized_view_meta
 
+    if table_meta == NULL:
+        raise Exception('Table meta is NULL')
+
     from acsylla import MaterializedViewMeta
 
     materialized_views = []
@@ -194,14 +223,15 @@ cdef object _materialized_views_from_table_meta(const CassTableMeta* table_meta)
         cass_iterator = cass_iterator_materialized_views_from_table_meta(table_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             materialized_view_meta = cass_iterator_get_materialized_view_meta(cass_iterator)
-            fields = _fields_from_materialized_view_meta(materialized_view_meta)
-            columns = _columns_from_materialized_view_meta(materialized_view_meta)
-            materialized_views.append(MaterializedViewMeta(
-                keyspace=fields['keyspace_name'],
-                name=fields['view_name'],
-                columns=columns,
-                **fields
-            ))
+            if materialized_view_meta != NULL:
+                fields = _fields_from_materialized_view_meta(materialized_view_meta)
+                columns = _columns_from_materialized_view_meta(materialized_view_meta)
+                materialized_views.append(MaterializedViewMeta(
+                    keyspace=fields['keyspace_name'],
+                    name=fields['view_name'],
+                    columns=columns,
+                    **fields
+                ))
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -213,6 +243,9 @@ cdef object _fields_from_index_meta(const CassIndexMeta* index_meta):
     cdef size_t length = 0
     cdef const char* field_name
     cdef const CassValue* field_value
+
+    if index_meta == NULL:
+        raise Exception('Index meta is NULL')
 
     fields = {}
     try:
@@ -242,6 +275,9 @@ cdef object _indexes_meta_from_table_meta(const CassTableMeta* table_meta, objec
 
     cdef CassValueType cass_type
 
+    if table_meta == NULL:
+        raise Exception('Table meta is NULL')
+
     from acsylla import IndexMeta
     indexes = []
     try:
@@ -249,19 +285,20 @@ cdef object _indexes_meta_from_table_meta(const CassTableMeta* table_meta, objec
         cass_iterator = cass_iterator_indexes_from_table_meta(table_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             index_meta = cass_iterator_get_index_meta(cass_iterator)
-            cass_index_meta_name(index_meta, <const char**> &name, <size_t *> &length)
-            cass_index_meta_target(index_meta, <const char**> &target, <size_t *> &length_t)
-            options = cass_index_meta_options(index_meta)
-            indexes.append(
-                IndexMeta(
-                    keyspace=keyspace_name,
-                    table=table_name[:table_name_length].decode(),
-                    name=name[:length].decode(),
-                    target=target[:length_t].decode(),
-                    kind=index_type_map[cass_index_meta_type(index_meta)],
-                    options=get_cass_value(options, False)
+            if index_meta != NULL:
+                cass_index_meta_name(index_meta, <const char**> &name, <size_t *> &length)
+                cass_index_meta_target(index_meta, <const char**> &target, <size_t *> &length_t)
+                options = cass_index_meta_options(index_meta)
+                indexes.append(
+                    IndexMeta(
+                        keyspace=keyspace_name,
+                        table=table_name[:table_name_length].decode(),
+                        name=name[:length].decode(),
+                        target=target[:length_t].decode(),
+                        kind=index_type_map[cass_index_meta_type(index_meta)],
+                        options=get_cass_value(options, False)
+                    )
                 )
-            )
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -273,6 +310,9 @@ cdef object _fields_from_materialized_view_meta(const CassMaterializedViewMeta* 
     cdef size_t length = 0
     cdef const char* field_name
     cdef const CassValue* field_value
+
+    if materialized_view_meta == NULL:
+        raise Exception('Materialized view meta is NULL')
 
     fields = {}
     try:
@@ -290,17 +330,21 @@ cdef object _columns_from_materialized_view_meta(const CassMaterializedViewMeta*
     cdef CassIterator* cass_iterator
     cdef const CassColumnMeta* column_meta
 
+    if materialized_view_meta == NULL:
+        raise Exception('Materialized view meta is NULL')
+
     from acsylla import ColumnMeta
     columns = []
     try:
         cass_iterator = cass_iterator_columns_from_materialized_view_meta(materialized_view_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             column_meta = cass_iterator_get_column_meta(cass_iterator)
-            fields = _fields_from_column_meta(column_meta)
-            columns.append(ColumnMeta(
-                name=fields['column_name'],
-                **fields
-            ))
+            if column_meta != NULL:
+                fields = _fields_from_column_meta(column_meta)
+                columns.append(ColumnMeta(
+                    name=fields['column_name'],
+                    **fields
+                ))
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -311,6 +355,9 @@ cdef object _materialized_views_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef CassIterator* cass_iterator
     cdef const CassMaterializedViewMeta* materialized_view_meta
 
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
+
     from acsylla import MaterializedViewMeta
 
     materialized_views = []
@@ -318,14 +365,15 @@ cdef object _materialized_views_meta(const CassKeyspaceMeta* keyspace_meta):
         cass_iterator = cass_iterator_materialized_views_from_keyspace_meta(keyspace_meta)
         while cass_iterator_next(cass_iterator) == cass_true:
             materialized_view_meta = cass_iterator_get_materialized_view_meta(cass_iterator)
-            fields = _fields_from_materialized_view_meta(materialized_view_meta)
-            columns = _columns_from_materialized_view_meta(materialized_view_meta)
-            materialized_views.append(MaterializedViewMeta(
-                keyspace=fields['keyspace_name'],
-                name=fields['view_name'],
-                columns=columns,
-                **fields
-            ))
+            if materialized_view_meta != NULL:
+                fields = _fields_from_materialized_view_meta(materialized_view_meta)
+                columns = _columns_from_materialized_view_meta(materialized_view_meta)
+                materialized_views.append(MaterializedViewMeta(
+                    keyspace=fields['keyspace_name'],
+                    name=fields['view_name'],
+                    columns=columns,
+                    **fields
+                ))
     finally:
         cass_iterator_free(cass_iterator)
 
@@ -368,6 +416,9 @@ cdef object _user_types_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef char* udt_name = NULL
 
     cdef CassError error
+
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
 
     from acsylla import UserTypeFieldMeta
     from acsylla import UserTypeMeta
@@ -416,6 +467,9 @@ cdef object _fields_from_function_meta(const CassFunctionMeta* function_meta):
     cdef const char* field_name
     cdef const CassValue* field_value
 
+    if function_meta == NULL:
+        raise Exception('Function meta is NULL')
+
     fields = {}
     try:
         cass_iterator = cass_iterator_fields_from_function_meta(function_meta)
@@ -432,6 +486,9 @@ cdef object _fields_from_function_meta(const CassFunctionMeta* function_meta):
 cdef object _functions_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef CassIterator* cass_iterator
     cdef const CassFunctionMeta* function_meta
+
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
 
     from acsylla import FunctionMeta
 
@@ -457,6 +514,9 @@ cdef object _fields_from_aggregate_meta(const CassAggregateMeta* aggregate_meta)
     cdef const char* field_name
     cdef const CassValue* field_value
 
+    if aggregate_meta == NULL:
+        raise Exception('Aggregate meta is NULL')
+
     fields = {}
     try:
         cass_iterator = cass_iterator_fields_from_aggregate_meta(aggregate_meta)
@@ -473,6 +533,9 @@ cdef object _fields_from_aggregate_meta(const CassAggregateMeta* aggregate_meta)
 cdef object _aggregates_meta(const CassKeyspaceMeta* keyspace_meta):
     cdef CassIterator* cass_iterator
     cdef const CassAggregateMeta* aggregate_meta
+
+    if keyspace_meta == NULL:
+        raise Exception('Keyspace meta is NULL')
 
     from acsylla import AggregateMeta
 
@@ -505,8 +568,8 @@ cdef class Metadata:
             cass_schema_meta_free(self.cass_schema_meta)
 
     cdef const CassSchemaMeta* _get_schema_meta(self) except *:
-        if self.cass_schema_meta:
-            cass_schema_meta_free(self.cass_schema_meta)
+        if self.cass_schema_meta != NULL:
+            return self.cass_schema_meta
         self.cass_schema_meta = cass_session_get_schema_meta(self.cass_session)
         if self.cass_schema_meta == NULL:
             raise SchemaNotAvailable("Could not retrieve schema metadata from cluster!")

@@ -38,13 +38,18 @@ cdef class PreparedStatement:
             native_types or self.native_types,
         )
         if parameters is not None:
-            if isinstance(parameters, (list, tuple)):
-                statement.bind_list(parameters)
+            if isinstance(parameters, list):
+                statement.bind_list(parameters, None)
+            elif isinstance(parameters, tuple):
+                statement.bind_tuple(parameters, None)
             elif isinstance(parameters, dict):
-                statement.bind_dict(parameters)
+                statement.bind_dict(parameters, None)
             else:
-                raise ValueError('`parameters` must be `list`, `tuple` or `dict`')
+                raise ValueError(f'`parameters` must be `list`, `tuple` or `dict` but not {type(parameters)}')
         return statement
 
     def set_execution_profile(self, name):
         self.execution_profile = name
+
+    def __call__(self, object parameters=None, object page_size=None, object page_state=None, timeout=None, consistency=None, serial_consistency=None, execution_profile=None, native_types=None):
+        return self.bind(parameters, page_size, page_state, timeout, consistency, serial_consistency, execution_profile, native_types)

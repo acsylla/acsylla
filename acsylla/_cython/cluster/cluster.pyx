@@ -456,7 +456,6 @@ cdef class Cluster:
             raise_if_error(error)
 
     def set_host_listener_callback(self, callback):
-        return None
         if self.host_listener:
             self.host_listener.set_host_listener_callback(callback)
             return

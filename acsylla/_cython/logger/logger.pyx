@@ -73,6 +73,9 @@ cdef class Logger:
 
     def _log_fn(self, msg):
         if self.logging_callback is not None:
-            self.logging_callback(msg)
+            if asyncio.iscoroutinefunction(self.logging_callback):
+                asyncio.create_task(self.logging_callback(msg))
+            else:
+                self.logging_callback(msg)
         else:
             self.logger_fn[msg.log_level](msg.message)

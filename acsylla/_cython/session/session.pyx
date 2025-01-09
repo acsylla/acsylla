@@ -54,6 +54,9 @@ cdef class Session:
     def get_metadata(self):
         return Metadata.new_(self.cass_session)
 
+    def use_keyspace(self, object keyspace):
+        return self.set_keyspace(keyspace)
+
     async def set_keyspace(self, object keyspace):
         query = f"USE {keyspace}".encode()
         statement = Statement()
@@ -62,6 +65,34 @@ cdef class Session:
         if result is not None:
             self.keyspace = keyspace
         return result
+
+    def query(self,
+        str statement_str,
+        object parameters=None,
+        object value_types=None,
+        object page_size=None,
+        object page_state=None,
+        object timeout=None,
+        object consistency=None,
+        object serial_consistency=None,
+        str execution_profile=None,
+        object native_types=False
+    ):
+        cdef Statement statement
+        statement = Statement.new_from_string(
+            statement_str,
+            parameters,
+            value_types,
+            page_size,
+            page_state,
+            timeout,
+            consistency,
+            serial_consistency,
+            execution_profile,
+            native_types,
+        )
+        statement.session = self
+        return statement
 
     async def close(self):
         cdef CassFuture* cass_future
@@ -132,6 +163,9 @@ cdef class Session:
             cass_future_free(cass_future)
 
         return result
+
+    def prepared_query(self, str statement, object timeout=None, object consistency=None, object serial_consistency=None, execution_profile=None, native_types=None):
+        return self.create_prepared(statement, timeout, consistency, serial_consistency, execution_profile, native_types)
 
     async def create_prepared(self, str statement, object timeout=None, object consistency=None, object serial_consistency=None, execution_profile=None, native_types=None):
         """ Prepares an statement."""

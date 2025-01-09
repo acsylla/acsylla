@@ -3,6 +3,7 @@ cdef extern from "utils.cpp":
 
 from cpython.datetime cimport date_new
 from cpython.datetime cimport datetime_new
+from cpython.datetime cimport get_utc
 from cpython.datetime cimport import_datetime
 from cpython.datetime cimport time_new
 from libc.math cimport floor
@@ -22,7 +23,7 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_typ
     cass_type = cass_value_type(cass_value)
 
     if cass_type == CASS_VALUE_TYPE_UNKNOWN:
-        raise RuntimeError("Value type returned can not be interpreted")
+        return None
     elif cass_type == CASS_VALUE_TYPE_TINY_INT:
         return _int8(cass_value)
     elif cass_type == CASS_VALUE_TYPE_SMALL_INT:

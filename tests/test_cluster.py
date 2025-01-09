@@ -3,6 +3,7 @@ from acsylla import create_cluster
 from acsylla import LatencyAwareRoutingSettings
 from acsylla import SpeculativeExecutionPolicy
 
+import asyncio
 import functools
 import pytest
 
@@ -85,25 +86,25 @@ class Testcreate_cluster:
             speculative_execution_policy=speculative_execution_policy,
         )
 
-    # async def test_cluster_host_listener_callback(self, host):
-    #     events = []
-    #
-    #     def host_listener_callback(event, host, events=None):
-    #         events.append((event.name, host))
-    #
-    #     callback = functools.partial(host_listener_callback, events=events)
-    #     cluster = create_cluster([host], host_listener_callback=callback)
-    #     await cluster.create_session()
-    #     assert events[0] in [("ADD", "127.0.0.1"), ("UP", "127.0.0.1")]
-    #
-    # async def test_cluster_set_host_listener_callback(self, host):
-    #     events = []
-    #
-    #     def host_listener_callback(event, host, events=None):
-    #         events.append((event.name, host))
-    #
-    #     callback = functools.partial(host_listener_callback, events=events)
-    #     cluster = create_cluster([host], host_listener_callback=callback)
-    #     cluster.set_host_listener_callback(None)
-    #     await cluster.create_session()
-    #     assert events == []
+    async def test_cluster_host_listener_callback(self, host):
+        events = []
+
+        def host_listener_callback(event, host, events=None):
+            events.append((event.name, host))
+
+        callback = functools.partial(host_listener_callback, events=events)
+        cluster = create_cluster([host], host_listener_callback=callback)
+        await cluster.create_session()
+        assert events[0] in [("ADD", "127.0.0.1"), ("UP", "127.0.0.1")]
+
+    async def test_cluster_set_host_listener_callback(self, host):
+        events = []
+
+        def host_listener_callback(event, host, events=None):
+            events.append((event.name, host))
+
+        callback = functools.partial(host_listener_callback, events=events)
+        cluster = create_cluster([host], host_listener_callback=callback)
+        cluster.set_host_listener_callback(None)
+        await cluster.create_session()
+        assert events == []

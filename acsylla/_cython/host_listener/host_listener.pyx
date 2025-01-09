@@ -3,7 +3,6 @@ import socket
 
 cdef class HostListener:
     def __cinit__(self):
-        self._queue = _host_listener_queue()
         self._read_socket, self._write_socket = socket.socketpair()
         self._write_fd = self._write_socket.fileno()
         loop = asyncio.get_running_loop()

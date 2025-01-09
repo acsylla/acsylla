@@ -1,12 +1,7 @@
-from libc.stdlib cimport free
-from libc.stdlib cimport malloc
-
-
 cdef class Result:
 
     def __cinit__(self):
         self.cass_result = NULL
-        self.iterator_refs.resize(0)
 
     def __dealloc__(self):
         cass_result_free(self.cass_result)
@@ -14,6 +9,7 @@ cdef class Result:
             cass_iterator = self.iterator_refs[i]
             if cass_iterator != NULL:
                 cass_iterator_free(cass_iterator)
+        self.iterator_refs.resize(0)
 
     @staticmethod
     cdef Result new_(const CassResult* cass_result, int8_t native_types):

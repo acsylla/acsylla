@@ -2,7 +2,6 @@ ctypedef struct HostListenerMessage:
     CassHostListenerEvent event
     CassInet address
 
-ctypedef queue[HostListenerMessage] _host_listener_queue
 
 cdef class HostListener:
     cdef:
@@ -10,8 +9,8 @@ cdef class HostListener:
         int _write_fd
         object _read_socket
         object _write_socket
-        _host_listener_queue _queue
         object host_listener_callback
+        queue[HostListenerMessage] _queue
 
     @staticmethod
     cdef void _callback(CassHostListenerEvent event, const CassInet address, void* data)

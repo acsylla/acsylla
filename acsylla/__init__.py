@@ -31,6 +31,7 @@ from .base import Statement
 from .base import TableMeta
 from .base import UserTypeFieldMeta
 from .base import UserTypeMeta
+from .base import ValueType
 from .factories import create_batch_counter
 from .factories import create_batch_logged
 from .factories import create_batch_unlogged
@@ -71,6 +72,7 @@ __all__ = (
     "HostListenerEvent",
     "AggregateMeta",
     "LogMessage",
+    "ValueType",
     "create_cluster",
     "create_statement",
     "create_batch_logged",

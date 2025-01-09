@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.0.0
+========
+- Add alias `Session.use_keyspace` for `Session.set_keyspace`
+- Add alias `Session.prepared_query` for `Session.create_prepared`
+- Add method `Session.query` for creating `Statement`
+- Make `PreparedStatement` and `Statement` callable and async iterable
+- Allow `Row` to be accessed by attributes
+- Fix `host_listener_callback`
+- Add `value_types` for non-prepared `Statement` and `ValueType` to support binding non-native Python data types (e.g., `tiny_int`, etc.)
+  - Note: Binding collections (map, set, list, tuple) and UDT types is not yet implemented for non-prepared statements
+  
 0.2.1
 ========
 - Add support python3.13 

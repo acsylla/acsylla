@@ -2,39 +2,52 @@ from acsylla import create_cluster
 from acsylla import create_statement
 
 import asyncio
+import logging
 import pytest
 
 pytestmark = pytest.mark.asyncio
 
+logger = logging.getLogger(__name__)
+
 
 class TestMeta:
-    async def test_metadata(self, session, keyspace):
+    async def test_metadata_keyspace(self, session, keyspace):
         meta = session.get_metadata()
         assert keyspace in meta.get_keyspaces()
         assert keyspace == meta.get_keyspace_meta(keyspace).name
 
+    async def test_metadata_user_types(self, session, keyspace):
+        meta = session.get_metadata()
         assert "udt_type" in meta.get_user_types(keyspace)
         assert "udt_type" in [k.name for k in meta.get_user_types_meta(keyspace)]
         assert "udt_type" == meta.get_user_type_meta(keyspace, "udt_type").name
 
+    async def test_metadata_tables(self, session, keyspace):
+        meta = session.get_metadata()
         assert "test" in meta.get_tables(keyspace)
         assert "test" in [k.name for k in meta.get_tables_meta(keyspace)]
         assert "test" == meta.get_table_meta(keyspace, "test").name
 
+    async def test_metadata_indexes(self, session, keyspace):
+        meta = session.get_metadata()
         assert "test_index" in meta.get_indexes(keyspace)
         assert "test_index" in [k.name for k in meta.get_indexes_meta(keyspace)]
         assert "test_index" == meta.get_index_meta(keyspace, "test_index").name
 
-        # Sometimes we need to wait for the materialized view to be created.
-        await asyncio.sleep(3)
+    async def test_metadata_materialized_views(self, session, keyspace):
+        meta = session.get_metadata()
         assert "test_materialized_view" in meta.get_materialized_views(keyspace)
         assert "test_materialized_view" in [k.name for k in meta.get_materialized_views_meta(keyspace)]
         assert "test_materialized_view" == meta.get_materialized_view_meta(keyspace, "test_materialized_view").name
 
+    async def test_metadata_functions(self, session, keyspace):
+        meta = session.get_metadata()
         assert ["avgfinal", "avgstate"] == meta.get_functions(keyspace)
         assert ["avgfinal", "avgstate"] == [k.name for k in meta.get_functions_meta(keyspace)]
         assert "avgfinal" == meta.get_function_meta(keyspace, "avgfinal").name
 
+    async def test_metadata_aggregates(self, session, keyspace):
+        meta = session.get_metadata()
         assert "average" in meta.get_aggregates(keyspace)
         assert "average" in [k.name for k in meta.get_aggregates_meta(keyspace)]
         assert "average" == meta.get_aggregate_meta(keyspace, "average").name

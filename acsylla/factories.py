@@ -12,9 +12,13 @@ from .base import SpeculativeExecutionPolicy
 from .base import SSLVerifyFlags
 from .base import Statement
 from .version import __version__
+from typing import Any
 from typing import Callable
+from typing import Coroutine
+from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 from uuid import UUID
 
@@ -31,7 +35,7 @@ def create_cluster(
     request_timeout: Optional[Union[int, float]] = 12.0,
     resolve_timeout: Optional[Union[int, float]] = 2.0,
     log_level: Optional[str] = "warn",
-    logging_callback: Optional[Callable] = None,
+    logging_callback: Optional[Callable[..., Coroutine[Any, Any, Any]]] = None,
     ssl_enabled: Optional[bool] = False,
     ssl_cert: Optional[str] = None,
     ssl_private_key: Optional[str] = None,
@@ -80,7 +84,7 @@ def create_cluster(
     max_reusable_write_objects: Optional[int] = None,  # Default: Max unsigned integer value
     prepare_on_all_hosts: Optional[bool] = True,
     no_compact: Optional[bool] = False,
-    host_listener_callback: Optional[Callable] = None,  # Not implemented yet
+    host_listener_callback: Optional[Callable[..., Coroutine[Any, Any, Any]]] = None,
     application_name: Optional[str] = "acsylla",
     application_version: Optional[str] = __version__,
     client_id: Optional[Union[str, UUID]] = None,
@@ -608,7 +612,7 @@ def create_cluster(
 
 def create_statement(
     statement: str,
-    parameters: int = 0,
+    parameters: Union[int, List, Tuple, Dict] = None,
     page_size: Optional[int] = None,
     page_state: Optional[bytes] = None,
     timeout: Optional[float] = None,

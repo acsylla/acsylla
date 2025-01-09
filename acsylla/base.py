@@ -14,18 +14,24 @@ from enum import Enum
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
 from typing import AsyncIterable
+from typing import Awaitable
 from typing import Callable
 from typing import Dict
 from typing import Iterable
+from typing import Iterator
 from typing import List
 from typing import Mapping
 from typing import Optional
 from typing import Sequence
 from typing import Set
+from typing import Tuple
+from typing import TypeVar
 from typing import Union
 from uuid import UUID
 
 import json
+
+ValueType = TypeVar("ValueType")
 
 SupportedType = Union[
     None,
@@ -825,6 +831,10 @@ class Session(metaclass=ABCMeta):
     `Cluster.create_session` coroutine for creating a new instance"""
 
     @abstractmethod
+    async def use_keyspace(self, keyspace: str) -> "Result":
+        """Alias for set_keyspace Sets the keyspace for session"""
+
+    @abstractmethod
     async def set_keyspace(self, keyspace: str) -> "Result":
         """Sets the keyspace for session"""
 
@@ -844,6 +854,40 @@ class Session(metaclass=ABCMeta):
         raising the proper excetion if this is the case.
         """
 
+    def query(
+        self,
+        statement: str,
+        parameters: Union[int, List, Tuple, Dict] = None,
+        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        page_size: Optional[int] = None,
+        page_state: Optional[bytes] = None,
+        timeout: Optional[float] = None,
+        consistency: Optional["Consistency"] = None,
+        serial_consistency: Optional["Consistency"] = None,
+        execution_profile: Optional[str] = None,
+        native_types: Optional[bool] = None,
+    ) -> Union["Statement", AsyncIterable, Awaitable["Result"]]:
+        """
+        Creates a new statement.
+
+        Provide a raw `statement` and the number of `parameters` if there are, othewise will default to
+        0.
+
+        Pagination can be handled by providing a `page_size` for telling the maximum size of records
+        fetched. The `page_state` will act as a cursor by returning the next results of a previous
+        execution.
+
+        If `timeout` is provided, this will override the request timeout provided during the cluster
+        creation. Value expected is in seconds.
+
+        If `consistency` is provided, this will override the consistency value provided during the cluster
+        creation.
+
+        `execution_profile` Assign the execution profile to the statement
+
+        `native_types` Returns values as native types. Default: False
+        """
+
     @abstractmethod
     async def execute(self, statement: "Statement") -> "Result":
         """Executes an statement and returns the result."""
@@ -851,6 +895,16 @@ class Session(metaclass=ABCMeta):
     @abstractmethod
     async def create_prepared(self, statement: str, timeout: Optional[float] = None) -> "PreparedStatement":
         """Prepares an statement.
+
+        By providing a `timeout` all requests built by the prepared statement will use it,
+        otherwise timeout provided during the Cluster instantantation will be used. Value expected is seconds.
+        """
+
+    @abstractmethod
+    async def prepared_query(self, statement: str, timeout: Optional[float] = None) -> "PreparedStatement":
+        """Alias for create_prepared
+
+        Prepares an statement.
 
         By providing a `timeout` all requests built by the prepared statement will use it,
         otherwise timeout provided during the Cluster instantantation will be used. Value expected is seconds.
@@ -964,6 +1018,30 @@ class Metadata(metaclass=ABCMeta):
 class Statement(metaclass=ABCMeta):
     """Provides a Statement instance class. Use the the
     `create_statement` factory for creating a new instance"""
+
+    @abstractmethod
+    def __call__(
+        self,
+        parameters: Union[int, List, Tuple, Dict] = None,
+        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        page_size: Optional[int] = None,
+        page_state: Optional[bytes] = None,
+        timeout=None,
+        consistency=None,
+        serial_consistency=None,
+        execution_profile: Optional[str] = None,
+    ) -> Union["Statement", AsyncIterable, Awaitable["Result"]]:
+        """Bind parameters.
+
+        `parameters` Bind parameters values to the statement
+        `value_types` The value_types are used for binding correct type parameters in non-prepared statement usage.
+        `page_size` Sets the statement's page size.
+        `page_state` Sets the statement's paging state.
+        `timeout` Set request timeout
+        `consistency` Set Consistency
+        `serial_consistency` set Serial consistency
+        `execution_profile` Set execution_profile
+        """
 
     @abstractmethod
     def add_key_index(self, index: int) -> None:
@@ -1121,16 +1199,38 @@ class PreparedStatement(metaclass=ABCMeta):
     `session.create_prepared()` coroutine for creating a new instance"""
 
     @abstractmethod
-    def bind(
+    def __call__(
         self,
-        parameters: Optional[Union[list, tuple, dict]] = None,
+        parameters: Optional[Union[int, List, Tuple, Dict]] = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
         timeout=None,
         consistency=None,
         serial_consistency=None,
         execution_profile: Optional[str] = None,
-    ) -> Union[Statement, AsyncIterable]:
+    ) -> Union[Statement, AsyncIterable, Awaitable["Result"]]:
+        """Returns a new statment using the prepared.
+
+        `parameters` Bind parameters values to the statement
+        `page_size` Sets the statement's page size.
+        `page_state` Sets the statement's paging state.
+        `timeout` Set request timeout
+        `consistency` Set Consistency
+        `serial_consistency` set Serial consistency
+        `execution_profile` Set execution_profile
+        """
+
+    @abstractmethod
+    def bind(
+        self,
+        parameters: Optional[Union[int, List, Tuple, Dict]] = None,
+        page_size: Optional[int] = None,
+        page_state: Optional[bytes] = None,
+        timeout=None,
+        consistency=None,
+        serial_consistency=None,
+        execution_profile: Optional[str] = None,
+    ) -> Union[Statement, AsyncIterable, Awaitable["Result"]]:
         """Returns a new statment using the prepared.
 
         `parameters` Bind parameters values to the statement
@@ -1220,10 +1320,17 @@ class Batch(metaclass=ABCMeta):
         """
 
 
-class Result(metaclass=ABCMeta):
+T = TypeVar("T", bound="Row")
+
+
+class Result(Iterator[T], metaclass=ABCMeta):
     """Provides a result instance class. Use the
     `session.execute()` coroutine for getting the result
     from a query"""
+
+    @abstractmethod
+    def __len__(self):
+        ...
 
     @abstractmethod
     def count(self) -> int:
@@ -1417,6 +1524,36 @@ class Consistency(Enum):
     SERIAL = cyacsylla.Consistency.SERIAL
     LOCAL_SERIAL = cyacsylla.Consistency.LOCAL_SERIAL
     LOCAL_ONE = cyacsylla.Consistency.LOCAL_ONE
+
+
+class ValueType(Enum):
+    CUSTOM = cyacsylla.ValueType.CUSTOM
+    ASCII = cyacsylla.ValueType.ASCII
+    BIGINT = cyacsylla.ValueType.BIGINT
+    BLOB = cyacsylla.ValueType.BLOB
+    BOOLEAN = cyacsylla.ValueType.BOOLEAN
+    COUNTER = cyacsylla.ValueType.COUNTER
+    DECIMAL = cyacsylla.ValueType.DECIMAL
+    DOUBLE = cyacsylla.ValueType.DOUBLE
+    FLOAT = cyacsylla.ValueType.FLOAT
+    INT = cyacsylla.ValueType.INT
+    TEXT = cyacsylla.ValueType.TEXT
+    TIMESTAMP = cyacsylla.ValueType.TIMESTAMP
+    UUID = cyacsylla.ValueType.UUID
+    VARCHAR = cyacsylla.ValueType.VARCHAR
+    VARINT = cyacsylla.ValueType.VARINT
+    TIMEUUID = cyacsylla.ValueType.TIMEUUID
+    INET = cyacsylla.ValueType.INET
+    DATE = cyacsylla.ValueType.DATE
+    TIME = cyacsylla.ValueType.TIME
+    SMALL_INT = cyacsylla.ValueType.SMALL_INT
+    TINY_INT = cyacsylla.ValueType.TINY_INT
+    DURATION = cyacsylla.ValueType.DURATION
+    LIST = cyacsylla.ValueType.LIST
+    MAP = cyacsylla.ValueType.MAP
+    SET = cyacsylla.ValueType.SET
+    UDT = cyacsylla.ValueType.UDT
+    TUPLE = cyacsylla.ValueType.TUPLE
 
 
 class SSLVerifyFlags(Enum):

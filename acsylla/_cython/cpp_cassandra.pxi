@@ -1,3 +1,18 @@
+cdef extern from "<queue>" namespace "std" nogil:
+    cdef cppclass queue[T]:
+        queue()
+        bint empty()
+        T& front()
+        void pop()
+        void push(T&)
+        size_t size()
+
+cdef extern from "<mutex>" namespace "std" nogil:
+    cdef cppclass mutex:
+        mutex()
+        void lock()
+        void unlock()
+
 cdef extern from "Python.h":
     void Py_INCREF(object o)
     void Py_DECREF(object o)

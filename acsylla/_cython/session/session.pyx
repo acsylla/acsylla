@@ -3,6 +3,7 @@ import asyncio
 
 cdef class Session:
     def __cinit__(self, Cluster cluster, object keyspace):
+        self.cluster = cluster
         self.cass_cluster = cluster.cass_cluster
         self.cass_session = cass_session_new()
 
@@ -10,7 +11,6 @@ cdef class Session:
         cass_session_free(self.cass_session)
 
     def __init__(self, cass_cluster, keyspace=None):
-        self.loop = asyncio.get_running_loop()
         self.keyspace = keyspace
         self.closed = 0
         self.connected = 0
@@ -35,7 +35,7 @@ cdef class Session:
         else:
             cass_future = cass_session_connect(self.cass_session, self.cass_cluster)
 
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
 
         try:
             await cb_wrapper.__await__()
@@ -110,7 +110,7 @@ cdef class Session:
         self.closed = 1
 
         cass_future = cass_session_close(self.cass_session)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
 
         try:
             await cb_wrapper.__await__()
@@ -144,7 +144,7 @@ cdef class Session:
             native_types = statement.native_types or False
 
         cass_future = cass_session_execute(self.cass_session, statement.cass_statement)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
 
         try:
             await cb_wrapper.__await__()
@@ -185,7 +185,7 @@ cdef class Session:
         encoded_statement = statement.encode()
 
         cass_future = cass_session_prepare_n(self.cass_session, encoded_statement, len(encoded_statement))
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
 
         try:
             await cb_wrapper.__await__()
@@ -221,7 +221,7 @@ cdef class Session:
             raise RuntimeError("Session closed")
 
         cass_future = cass_session_execute_batch(self.cass_session, batch.cass_batch)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.loop)
+        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
 
         try:
             await cb_wrapper.__await__()

@@ -52,7 +52,6 @@ cdef class Cluster:
         cb_wrapper.cluster._queue.push(data)
         cb_wrapper.cluster._queue_mutex.unlock()
         cb_wrapper.cluster._socket_write(cb_wrapper.cluster._write_fd)
-        Py_DECREF(cb_wrapper)
 
     def _handle_events(self):
         """ Function called from the Asyncio Loop because some

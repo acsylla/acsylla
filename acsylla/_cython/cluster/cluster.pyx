@@ -1,22 +1,81 @@
-cdef class Cluster:
+import socket
 
-    def __cinit__(self):
-        # Starts the necessary machinary for bringing events
-        # from the CPP driver to a Python Thread.
-        # Is idempotent, can be called as many times as we want
-        # but would be initalize only once.
-        _initialize_posix_to_python_thread()
-        self.ssl = NULL
-        self.cass_cluster = NULL
-        self.logger = Logger.instance()
-        self.host_listener = None
+from posix cimport unistd
+
+
+cdef class Cluster:
+    def destroy(self):
+        if self.host_listener:
+            self.host_listener.destroy()
+            self.host_listener = None
+        if self.logger:
+            self.logger.destroy()
+            self.logger = None
+        if self.loop and self.loop.is_running() and self._read_socket:
+            self.loop.remove_reader(self._read_socket)
+            self.loop = None
+            self._read_socket.close()
+            self._read_socket = None
+        if self._write_socket:
+            self._write_socket.close()
+            self._write_socket = None
 
     def __dealloc__(self):
-        if self.host_listener:
-            self.host_listener.free()
         cass_cluster_free(self.cass_cluster)
         if self.ssl != NULL:
             cass_ssl_free(self.ssl)
+        self.destroy()
+
+    def __cinit__(self):
+        self._read_socket, self._write_socket = socket.socketpair()
+        self._write_fd = self._write_socket.fileno()
+        self.loop = asyncio.get_running_loop()
+        self.loop.add_reader(self._read_socket, self._handle_events)
+
+        self.ssl = NULL
+        self.cass_cluster = NULL
+        self.logger = Logger()
+        self.host_listener = None
+
+    cdef int _socket_write(self, int fd) noexcept nogil:
+        return unistd.write(fd, b"1", 1)
+
+    @staticmethod
+    cdef void cb_cass_future(CassFuture* cass_future, void* data):
+        """ Function called from the POSIX Thread, no Python objects
+        are touched. A CassFuture has finished, we add it to the queue
+        and tell the Asyncio Loop that there is data to be processed.
+        """
+        cb_wrapper = <CallbackWrapper> data
+        Py_INCREF(cb_wrapper)
+        cb_wrapper.cluster._queue_mutex.lock()
+        cb_wrapper.cluster._queue.push(data)
+        cb_wrapper.cluster._queue_mutex.unlock()
+        cb_wrapper.cluster._socket_write(cb_wrapper.cluster._write_fd)
+        Py_DECREF(cb_wrapper)
+
+    def _handle_events(self):
+        """ Function called from the Asyncio Loop because some
+        data was added into the queue, it gets from the queue
+        the data and calls the corresponding CallbackWrappers.
+        """
+        cdef bytes _ = self._read_socket.recv(1)
+        cdef void* data
+        cdef CallbackWrapper cb_wrapper
+
+        while True:
+            self._queue_mutex.lock()
+            if self._queue.empty():
+                self._queue_mutex.unlock()
+                break
+            else:
+                data = self._queue.front()
+                self._queue.pop()
+                self._queue_mutex.unlock()
+
+            cb_wrapper = <CallbackWrapper> data
+            cb_wrapper.set_result()
+            Py_DECREF(cb_wrapper)
 
     def __init__(
         self,

@@ -14,4 +14,6 @@ cdef class HostListener:
 
     @staticmethod
     cdef void _callback(CassHostListenerEvent event, const CassInet address, void* data)
+    cdef int _socket_write(self, int fd) noexcept nogil
+
     cdef init(self, CassCluster* cass_cluster, object callback)

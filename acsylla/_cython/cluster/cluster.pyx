@@ -1,7 +1,5 @@
 import socket
 
-from posix cimport unistd
-
 
 cdef class Cluster:
     def destroy(self):
@@ -22,36 +20,20 @@ cdef class Cluster:
 
     def __dealloc__(self):
         cass_cluster_free(self.cass_cluster)
+        del self.posix_to_python
         if self.ssl != NULL:
             cass_ssl_free(self.ssl)
         self.destroy()
 
     def __cinit__(self):
-        self._read_socket, self._write_socket = socket.socketpair()
-        self._write_fd = self._write_socket.fileno()
         self.loop = asyncio.get_running_loop()
+        self._read_socket, self._write_socket = socket.socketpair()
         self.loop.add_reader(self._read_socket, self._handle_events)
-
+        self.posix_to_python = new PosixToPython(self._write_socket.fileno())
         self.ssl = NULL
         self.cass_cluster = NULL
         self.logger = Logger()
         self.host_listener = None
-
-    cdef int _socket_write(self, int fd) noexcept nogil:
-        return unistd.write(fd, b"1", 1)
-
-    @staticmethod
-    cdef void cb_cass_future(CassFuture* cass_future, void* data):
-        """ Function called from the POSIX Thread, no Python objects
-        are touched. A CassFuture has finished, we add it to the queue
-        and tell the Asyncio Loop that there is data to be processed.
-        """
-        cb_wrapper = <CallbackWrapper> data
-        Py_INCREF(cb_wrapper)
-        cb_wrapper.cluster._queue_mutex.lock()
-        cb_wrapper.cluster._queue.push(data)
-        cb_wrapper.cluster._queue_mutex.unlock()
-        cb_wrapper.cluster._socket_write(cb_wrapper.cluster._write_fd)
 
     def _handle_events(self):
         """ Function called from the Asyncio Loop because some
@@ -63,18 +45,17 @@ cdef class Cluster:
         cdef CallbackWrapper cb_wrapper
 
         while True:
-            self._queue_mutex.lock()
-            if self._queue.empty():
-                self._queue_mutex.unlock()
+            self.posix_to_python._queue_mutex.lock()
+            if self.posix_to_python._queue.empty():
+                self.posix_to_python._queue_mutex.unlock()
                 break
             else:
-                data = self._queue.front()
-                self._queue.pop()
-                self._queue_mutex.unlock()
-
-            cb_wrapper = <CallbackWrapper> data
-            cb_wrapper.set_result()
-            Py_DECREF(cb_wrapper)
+                data = self.posix_to_python._queue.front()
+                self.posix_to_python._queue.pop()
+                self.posix_to_python._queue_mutex.unlock()
+                cb_wrapper = <CallbackWrapper> data
+                cb_wrapper.set_result()
+                Py_DECREF(cb_wrapper)
 
     def __init__(
         self,
@@ -135,8 +116,6 @@ cdef class Cluster:
         object hostname_resolution=None,
         object randomized_contact_points=None,
         object speculative_execution_policy=None,
-
-
         object max_reusable_write_objects=None,
         object prepare_on_all_hosts=None,
         object no_compact=None,
@@ -279,11 +258,12 @@ cdef class Cluster:
             cass_cluster_set_resolve_timeout(self.cass_cluster, timeout_ms)
 
     def set_log_level(self, level):
-        if level is not None:
+        if level is not None and self.logger is not None:
             self.logger.set_log_level(level)
 
     def set_logging_callback(self, callback):
-        self.logger.set_logging_callback(callback)
+        if self.logger is not None:
+            self.logger.set_logging_callback(callback)
 
     def set_ssl(self, enabled, cert=None, private_key=None, private_key_password='', trusted_cert=None, verify_flags=None):
         if enabled is True:

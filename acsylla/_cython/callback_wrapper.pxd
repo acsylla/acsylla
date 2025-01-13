@@ -2,7 +2,6 @@ cdef class CallbackWrapper:
     cdef:
         object future
         Cluster cluster
-
     cdef void set_result(self)
 
     @staticmethod

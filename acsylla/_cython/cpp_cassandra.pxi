@@ -13,9 +13,20 @@ cdef extern from "<mutex>" namespace "std" nogil:
         void lock()
         void unlock()
 
+cdef extern from "posix_to_python_thread.cpp" nogil:
+    void posix_to_python_callback(CassFuture* cass_future, void* data)
+    cdef cppclass PosixToPython:
+        PosixToPython(int write_fd)
+        int write_fd
+        mutex _queue_mutex
+        queue[void *] _queue
+    cdef cppclass CallbackContainer:
+        CallbackContainer(PosixToPython* handler, void* data)
+
 cdef extern from "Python.h":
     void Py_INCREF(object o)
     void Py_DECREF(object o)
+    Py_ssize_t Py_REFCNT(object o)
 
 cdef extern from "stdint.h":
   ctypedef   signed char  int8_t

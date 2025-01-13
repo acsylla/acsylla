@@ -100,12 +100,12 @@ cdef class Result:
         If there is no rows iterator returns no rows.
         """
         cdef CassIterator* cass_iterator
-
-        cass_iterator = cass_iterator_from_result(self.cass_result)
-        # Keep cass_iterator ref
-        self.iterator_refs.push_back(cass_iterator)
-        while cass_iterator_next(cass_iterator) == cass_true:
-            yield Row.new_(cass_iterator_get_row(cass_iterator), self)
+        try:
+            cass_iterator = cass_iterator_from_result(self.cass_result)
+            while cass_iterator_next(cass_iterator) == cass_true:
+                yield Row.new_(cass_iterator_get_row(cass_iterator), self)
+        finally:
+            self.iterator_refs.push_back(cass_iterator)
 
     def __iter__(self):
         return self.all()

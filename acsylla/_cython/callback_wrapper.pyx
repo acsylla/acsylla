@@ -15,16 +15,16 @@ cdef class CallbackWrapper:
         cdef CallbackWrapper cb_wrapper
 
         cb_wrapper = CallbackWrapper()
-        cb_wrapper.cluster = cluster
         cb_wrapper.future = cluster.loop.create_future()
-
         Py_INCREF(cb_wrapper)
 
+        cdef CallbackContainer* container
+        container = new CallbackContainer(<PosixToPython*>cluster.posix_to_python, <void*>cb_wrapper)
         error = cass_future_set_callback(
             cass_future,
-            <CassFutureCallback>cluster.cb_cass_future,
-            <void*> cb_wrapper
-        ) 
+            <CassFutureCallback>posix_to_python_callback,
+            <void*>container
+        )
         if error != CASS_OK:
             Py_DECREF(cb_wrapper)
             raise_if_error(error)

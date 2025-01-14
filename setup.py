@@ -84,7 +84,7 @@ setup(
     ext_modules=[extension],
     extras_require={"dev": dev_requires},
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

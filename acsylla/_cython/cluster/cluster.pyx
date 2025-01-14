@@ -23,7 +23,6 @@ cdef class Cluster:
         del self.posix_to_python
         if self.ssl != NULL:
             cass_ssl_free(self.ssl)
-        self.destroy()
 
     def __cinit__(self):
         self.loop = asyncio.get_running_loop()

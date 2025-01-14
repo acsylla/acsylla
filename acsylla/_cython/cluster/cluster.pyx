@@ -1,3 +1,4 @@
+import random
 import socket
 
 
@@ -235,6 +236,10 @@ cdef class Cluster:
 
     def set_local_port_range(self, min, max):
         if min is not None and max is not None:
+            if min==49152 and max==65535:
+                # If default settings
+                # Choice random min port for prevent "Connect error 'address already in use'"
+                min = random.randint(49152,57347)
             error = cass_cluster_set_local_port_range(self.cass_cluster, min, max)
             raise_if_error(error)
 

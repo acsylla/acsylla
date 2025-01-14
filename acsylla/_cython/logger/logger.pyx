@@ -46,9 +46,6 @@ cdef class Logger:
         loop.add_reader(self._read_socket, self._handle_message)
         cass_log_set_callback(<CassLogCallback>self.log_message_callback, <void*>self)
 
-    def __dealloc__(self):
-        self.destroy()
-
     def __init__(self, log_level='warn', logging_callback=None):
         self.set_log_level(log_level)
         self.logging_callback = logging_callback

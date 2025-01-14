@@ -10,9 +10,6 @@ cdef class HostListener:
         loop = asyncio.get_running_loop()
         loop.add_reader(self._read_socket, self._handle_message)
 
-    def __dealloc__(self):
-        self.destroy()
-
     cdef init(self, CassCluster* cass_cluster, callback):
         self.host_listener_callback = callback
         error = cass_cluster_set_host_listener_callback(<CassCluster*>cass_cluster, <CassHostListenerCallback>self._callback, <void*>self)

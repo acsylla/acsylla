@@ -50,7 +50,11 @@ cdef class Logger:
         self.set_log_level(log_level)
         self.logging_callback = logging_callback
 
+    def __dealloc__(self):
+        cass_log_set_callback(NULL, NULL)
+
     def destroy(self):
+        cass_log_set_callback(NULL, NULL)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:

@@ -1,3 +1,5 @@
+from libcpp.memory cimport shared_ptr
+
 cdef extern from "<queue>" namespace "std" nogil:
     cdef cppclass queue[T]:
         queue()
@@ -15,6 +17,7 @@ cdef extern from "<mutex>" namespace "std" nogil:
 
 cdef extern from "posix_to_python_thread.cpp" nogil:
     void posix_to_python_callback(CassFuture* cass_future, void* data)
+    void posix_to_python_logger_callback(const CassLogMessage* message, void* data)
     cdef cppclass PosixToPython:
         PosixToPython(int write_fd)
         int write_fd
@@ -22,6 +25,11 @@ cdef extern from "posix_to_python_thread.cpp" nogil:
         queue[void *] _queue
     cdef cppclass CallbackContainer:
         CallbackContainer(PosixToPython* handler, void* data)
+    cdef cppclass PosixToPythonLogger:
+        PosixToPythonLogger(int write_fd)
+        int write_fd
+        mutex _queue_mutex
+        queue[shared_ptr[CassLogMessage]] _queue
 
 cdef extern from "Python.h":
     void Py_INCREF(object o)

@@ -8,6 +8,7 @@ cdef class Cluster:
             self.host_listener.destroy()
             self.host_listener = None
         if self.logger:
+            cass_log_set_callback(NULL, NULL)
             self.logger.destroy()
             self.logger = None
         if self.loop and self.loop.is_running() and self._read_socket:

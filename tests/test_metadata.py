@@ -5,7 +5,7 @@ import asyncio
 import logging
 import pytest
 
-pytestmark = pytest.mark.asyncio
+pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 logger = logging.getLogger(__name__)
 

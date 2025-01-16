@@ -3,7 +3,7 @@ from acsylla import create_statement
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
+pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 
 class TestCQLTypes:

@@ -140,8 +140,15 @@ async def main():
     non_prepared = session.query("SELECT * FROM test WHERE id=:id")
     async for row in non_prepared([7], value_types=[acsylla.ValueType.TINY_INT]):
         print(dict(row))
+        print(row.as_dict())
+        print(row.as_list())
+        print(row.as_tuple())
         print(row.id)
         print(row.value)
+        print(row[0])
+        print(row[1])
+        print(row[:1])
+        print(row[1:])
 
 asyncio.run(main())
 ```

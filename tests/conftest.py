@@ -2,35 +2,27 @@ from . import cql_types
 from acsylla import create_cluster
 from acsylla import create_statement
 
-import asyncio
 import os
 import pytest
 
+pytestmark = pytest.mark.asyncio(loop_scope="class")
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="class", autouse=True)
 def keyspace():
     return "acsylla"
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="class", autouse=True)
 def host():
     return "127.0.0.1"
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="class", autouse=True)
 async def cluster(host):
     return create_cluster([host], connect_timeout=10.0, request_timeout=30.0, resolve_timeout=5.0, log_level="critical")
 
 
-@pytest.fixture(scope="class")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="class", autouse=True)
 async def session(cluster, keyspace):
     # Create the acsylla keyspace if it does not exist yet
     session_without_keyspace = await cluster.create_session()
@@ -202,7 +194,7 @@ async def session(cluster, keyspace):
         await session.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="class", autouse=True)
 def id_generation():
     def _():
         cnt = 1

@@ -10,7 +10,6 @@ import pytest
 import time
 import uuid
 
-pytestmark = pytest.mark.asyncio
 
 statement_str = """
     INSERT INTO test (
@@ -41,7 +40,7 @@ class TestStatement:
 
     OUT_OF_BAND_PARAMETER = 100
 
-    @pytest.fixture(params=["none_prepared", "prepared"])
+    @pytest.fixture(scope="class", params=["none_prepared", "prepared"], autouse=True)
     async def statement(self, request, session):
         if request.param == "none_prepared":
             statement_ = create_statement(statement_str, parameters=19)
@@ -216,7 +215,7 @@ class TestStatementOnlyPrepared:
     """Special tests for testing some methods that are only allowed for statements
     that were created by using prepared statements."""
 
-    @pytest.fixture
+    @pytest.fixture(scope='class', autouse=True)
     async def statement(self, session):
         prepared = await session.create_prepared(statement_str)
         statement_ = prepared.bind()

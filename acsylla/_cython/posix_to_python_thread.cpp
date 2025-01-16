@@ -39,7 +39,7 @@ void posix_to_python_callback(CassFuture* cass_future, void* data){
         std::lock_guard<std::mutex> lock(container->handler->_queue_mutex);
         container->handler->_queue.push(container->data);
     }
-    (void *)write(container->handler->write_fd, "1", 1);
+    write(container->handler->write_fd, "1", 1);
     delete container;
 }
 
@@ -76,5 +76,37 @@ void posix_to_python_logger_callback(const CassLogMessage* message, void* data){
         std::shared_ptr<CassLogMessage> message_copy = copy_log_message(message);
         handler->_queue.push(message_copy);
     }
-    (void *)write(handler->write_fd, "1", 1);
+    write(handler->write_fd, "1", 1);
+}
+
+
+typedef struct HostListenerMessage_ {
+    CassHostListenerEvent event;
+    char address[CASS_INET_STRING_LENGTH];
+} HostListenerMessage;
+
+class PosixToPythonHostListener {
+    public:
+        PosixToPythonHostListener(int write_fd);
+        ~PosixToPythonHostListener() = default;
+        int write_fd;
+        std::mutex _queue_mutex;
+        std::queue<std::shared_ptr<HostListenerMessage>> _queue;
+};
+
+PosixToPythonHostListener::PosixToPythonHostListener(int fd) {
+    write_fd = fd;
+}
+
+
+void posix_to_python_host_listener_callback(CassHostListenerEvent event, const CassInet address, void* data){
+    PosixToPythonHostListener* handler = (PosixToPythonHostListener*)data;
+    std::shared_ptr<HostListenerMessage> message = std::make_shared<HostListenerMessage>();
+    message->event = event;
+    cass_inet_string(address, message->address);
+    {
+        std::lock_guard<std::mutex> lock(handler->_queue_mutex);
+        handler->_queue.push(message);
+    }
+    write(handler->write_fd, "1", 1);
 }

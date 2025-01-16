@@ -1,4 +1,5 @@
 include "cpp_cassandra.pxi"
+include "posix_to_python_thread.pxi"
 include "callback_wrapper.pxd"
 include "cluster/cluster.pxd"
 include "logger/logger.pxd"

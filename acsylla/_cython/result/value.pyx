@@ -341,7 +341,7 @@ cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
     if native_types:
         return f'{y:04d}-{m:02d}-{d:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z'
 
-    return datetime_new(y, m, d, hour, minute, second, millisecond*1000, None)
+    return datetime_new(y, m, d, hour, minute, second, millisecond*1000, get_utc())
 
 
 cdef inline object _duration(const CassValue* cass_value, int8_t native_types):

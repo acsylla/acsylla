@@ -13,8 +13,8 @@ exclude = '''
     | \.hg
     | \.mypy_cache
     | \.tox
-    | \venv
     | \.venv
+    | venv
     | _build
     | buck-out
     | build
@@ -33,3 +33,7 @@ skip_covered = true
 [tool.coverage.run]
 branch = true
 source = ["acsylla"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "class"

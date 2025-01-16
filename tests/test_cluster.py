@@ -7,7 +7,7 @@ import asyncio
 import functools
 import pytest
 
-pytestmark = pytest.mark.asyncio
+pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 
 class Testcreate_cluster:

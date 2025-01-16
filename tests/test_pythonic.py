@@ -6,11 +6,11 @@ import logging
 import pytest
 import random
 
-pytestmark = pytest.mark.asyncio
+pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 
 class TestQueryTypesHint:
-    @pytest.fixture(params=sorted(set(cql_types.native_types)), scope="class")
+    @pytest.fixture(scope='class', autouse=True, params=sorted(set(cql_types.native_types)))
     async def data_type(self, request):
         return request.param
 
@@ -44,11 +44,11 @@ class TestQueryTypesHint:
 
 
 class TestPythonicSession:
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope='class', autouse=True)
     def select_query(self):
         return "SELECT id, value FROM test WHERE id=?"
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope='class', autouse=True)
     def insert_query(self):
         return "INSERT INTO test (id, value) values( ?, ?)"
 
@@ -136,11 +136,11 @@ class TestPythonicSession:
 
 
 class TestPythonicRow:
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope='class', autouse=True)
     def insert_query(self):
         return "INSERT INTO test (id, value_text) values( ?, ?)"
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope='class', autouse=True)
     def select_query(self):
         return "SELECT id, value_text FROM test WHERE id IN :ids"
 

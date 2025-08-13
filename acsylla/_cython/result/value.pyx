@@ -6,7 +6,6 @@ from cpython.datetime cimport datetime_new
 from cpython.datetime cimport get_utc
 from cpython.datetime cimport import_datetime
 from cpython.datetime cimport time_new
-from libc.math cimport floor
 
 from decimal import Decimal
 
@@ -318,30 +317,36 @@ cdef inline object _time(const CassValue* cass_value, int8_t native_types):
 
 
 cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
-    cdef cass_int64_t output
+    cdef cass_int64_t milliseconds_since_epoch
+    cdef double seconds_since_epoch
     cdef CassError error
     cdef int y
     cdef unsigned int m
     cdef unsigned int d
 
-    error = cass_value_get_int64(cass_value, <cass_int64_t *> &output)
+    error = cass_value_get_int64(cass_value, <cass_int64_t *> &milliseconds_since_epoch)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
 
-    second, millisecond = divmod(output, 1_000)
-    if millisecond < 100:
-        millisecond = 0
-    days_from_epoch = int(floor(output / 1000 / 60 / 60 / 24))
-    civil_from_days(days_from_epoch, <int*>&y, <unsigned*>&m, <unsigned*>&d)
-    hour = second // 3600 % 24
-    minute = second % 3600 // 60
-    second = second % 3600 % 60
+    seconds_since_epoch = <double>(milliseconds_since_epoch) / 1000.0
+    utc_datetime = datetime.fromtimestamp(seconds_since_epoch, get_utc())
+    # there might be some rounding imprecision
+    utc_datetime = utc_datetime.replace(microsecond=utc_datetime.microsecond // 1_000 * 1_000)
+
+    y = utc_datetime.year
+    m = utc_datetime.month
+    d = utc_datetime.day
+    hour = utc_datetime.hour
+    minute = utc_datetime.minute
+    second = utc_datetime.second
+    millisecond = utc_datetime.microsecond // 1_000
+
     if native_types:
         return f'{y:04d}-{m:02d}-{d:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z'
 
-    return datetime_new(y, m, d, hour, minute, second, millisecond*1000, get_utc())
+    return utc_datetime
 
 
 cdef inline object _duration(const CassValue* cass_value, int8_t native_types):

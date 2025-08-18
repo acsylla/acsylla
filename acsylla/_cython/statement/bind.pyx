@@ -3,8 +3,10 @@ cdef extern from "utils.cpp":
 
 from cpython.datetime cimport date
 from cpython.datetime cimport datetime
+from cpython.datetime cimport get_utc
 from cpython.datetime cimport time
 from cpython.datetime cimport timedelta
+from libc.math cimport floor
 from libc.time cimport time_t
 
 import_datetime()
@@ -138,19 +140,22 @@ cdef inline cass_int64_t as_cass_time(object value) except *:
 
 
 cdef inline cass_int64_t as_cass_timestamp(object value) except *:
-    cdef double timestamp
+    cdef datetime dt
 
-    if isinstance(value, (str, datetime)):
-        if isinstance(value, str):
-            value = datetime.fromisoformat(value)
-
-        timestamp = _timegm(value.year, value.month, value.day, value.hour, value.minute, value.second)
-        if value.tzinfo is not None:
-            timestamp -= value.utcoffset().total_seconds()
-        timestamp += (value.microsecond * 0.000001)
+    if isinstance(value, str):
+        dt = datetime.fromisoformat(value)
+    elif isinstance(value, datetime):
+        dt = value
     else:
-        timestamp = value
-    return <cass_int64_t>(timestamp * 1000)
+        return <cass_int64_t>(value * 1_000)
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=get_utc())
+
+    # cass timestamp type has millisecond resolution
+    dt = dt.replace(microsecond=dt.microsecond // 1_000 * 1_000)
+
+    return <cass_int64_t>(floor(dt.timestamp() * 1_000))
 
 
 cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object value) except *:

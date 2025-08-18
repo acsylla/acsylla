@@ -1,6 +1,10 @@
 Changelog
 =========
 
+1.0.1
+======
+- Fix milliseconds in timestamps [#97](https://github.com/acsylla/acsylla/pull/97)
+
 1.0.0
 ========
 - !!! (maybe breaking change) add tzinfo=UTC for returned datetime field

@@ -7,6 +7,7 @@ import pytest
 
 pytestmark = pytest.mark.asyncio(loop_scope="class")
 
+
 @pytest.fixture(scope="class", autouse=True)
 def keyspace():
     return "acsylla"

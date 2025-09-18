@@ -15,7 +15,9 @@ class TestTyping:
 
         cluster: Cluster = create_cluster([host])
         session: Session = await cluster.create_session(keyspace=keyspace)
-        statement: Statement = create_statement("INSERT INTO test (id, value) values(" + str(id_) + ", " + str(value) + ")")
+        statement: Statement = create_statement(
+            "INSERT INTO test (id, value) values(" + str(id_) + ", " + str(value) + ")"
+        )
         await session.execute(statement)
 
         # read the new inserted value

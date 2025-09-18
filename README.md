@@ -1356,7 +1356,7 @@ make install-dev
 And finally run the tests:
 
 ```bash
-make cert
+make certs
 docker-compose up -d
 make test
 ```

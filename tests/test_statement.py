@@ -10,7 +10,6 @@ import pytest
 import time
 import uuid
 
-
 statement_str = """
     INSERT INTO test (
             id,
@@ -215,7 +214,7 @@ class TestStatementOnlyPrepared:
     """Special tests for testing some methods that are only allowed for statements
     that were created by using prepared statements."""
 
-    @pytest.fixture(scope='class', autouse=True)
+    @pytest.fixture(scope="class", autouse=True)
     async def statement(self, session):
         prepared = await session.create_prepared(statement_str)
         statement_ = prepared.bind()

@@ -22,6 +22,8 @@ from typing import Tuple
 from typing import Union
 from uuid import UUID
 
+import logging
+
 
 def create_cluster(
     contact_points: Union[str, List[str]] = None,
@@ -691,4 +693,4 @@ def get_logger():
     """
     Returns the `Logger` instance
     """
-    return _cython.cyacsylla.Logger.instance()
+    return logging.getLogger("acsylla")

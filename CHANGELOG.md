@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.0.2
+======
+- Fix gh release actions 
+- Include v1.0.1 Fix milliseconds in timestamps [#97](https://github.com/acsylla/acsylla/pull/97)
+- Fix Using acsylla.get_logger() raises an AttributeError  [#97](https://github.com/acsylla/acsylla/pull/98)
+- Update LIBUV_VERSION to 1.51.0
+
 1.0.1
 ======
 - Fix milliseconds in timestamps [#97](https://github.com/acsylla/acsylla/pull/97)

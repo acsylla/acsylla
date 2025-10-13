@@ -32,7 +32,7 @@ commitlog_segment_size_in_mb: 32
 seed_provider:
     - class_name: org.apache.cassandra.locator.SimpleSeedProvider
       parameters:
-          - seeds: "0.0.0.0"
+          - seeds: "127.0.0.1"
 concurrent_reads: 32
 concurrent_writes: 32
 concurrent_counter_writes: 32
@@ -44,13 +44,13 @@ trickle_fsync: false
 trickle_fsync_interval_in_kb: 10240
 storage_port: 7000
 ssl_storage_port: 7001
-listen_address: 0.0.0.0
-broadcast_address: 0.0.0.0
+listen_address: 127.0.0.1
+broadcast_address: 127.0.0.1
 start_native_transport: true
 native_transport_port: 9042
 native_transport_allow_older_protocols: true
 rpc_address: 0.0.0.0
-broadcast_rpc_address: 0.0.0.0
+broadcast_rpc_address: 127.0.0.1
 rpc_keepalive: true
 incremental_backups: false
 snapshot_before_compaction: false
@@ -70,7 +70,7 @@ truncate_request_timeout_in_ms: 60000
 request_timeout_in_ms: 10000
 slow_query_log_timeout_in_ms: 500
 endpoint_snitch: SimpleSnitch
-dynamic_snitch_update_interval_in_ms: 100 
+dynamic_snitch_update_interval_in_ms: 100
 dynamic_snitch_reset_interval_in_ms: 600000
 dynamic_snitch_badness_threshold: 1.0
 server_encryption_options:

@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest]
-        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13" ]
+        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14" ]
 
     runs-on: ${{ matrix.os }}
 
@@ -54,8 +54,8 @@ jobs:
           brew services start cassandra
           # wait till casssandra server is up, to be improved
           # by checking the readiness of the serivce
-          echo sleep 240 for wait till casssandra server is up
-          sleep 240
+          echo sleep 120 for wait till casssandra server is up
+          sleep 120
           cat /opt/homebrew/var/log/cassandra/system.log
       - name: Test generated macos-wheel
         if: ${{ matrix.os == 'macos-latest' }}

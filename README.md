@@ -79,7 +79,7 @@ Cassandra's native protocol. The current version works with:
 
 * Scylla and Scylla Enterprise
 * Apache Cassandra® versions 2.1, 2.2 and 3.0+
-* Python 3.8, 3.9, 3.10, 3.11, 3.12 and 3.13 for Linux and MacOS  
+* Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13 and 3.14 for Linux and MacOS  
 
 ## Install
 
@@ -92,18 +92,18 @@ pip install acsylla
 ### Build your own package
 You can build your own package for any supported python version for ***x86_64*** and ***aarch64*** Linux.
 
-Example for build wheel for Python 3.13 ***x86_64*** from master branch
+Example for build wheel for Python 3.14 ***x86_64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run -v `pwd`:/io -e PYTHON_VERSION=3.13  quay.io/pypa/manylinux_2_28_x86_64  /io/bin/build_manylinux_2_28_wheel.sh
+docker run -v `pwd`:/io -e PYTHON_VERSION=3.14  quay.io/pypa/manylinux_2_28_x86_64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
-Example for build wheel for Python 3.13 ***aarch64*** from master branch
+Example for build wheel for Python 3.14 ***aarch64*** from master branch
 ```bash
 git clone https://github.com/acsylla/acsylla.git
 cd acsylla
-docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.13  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
+docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.14  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
 ## Basic usage

@@ -19,17 +19,17 @@ class TestResult:
             raise ValueError(type_)
         return statement_
 
-    @pytest.fixture(scope='class', autouse=True, params=["none_prepared", "prepared"])
+    @pytest.fixture(scope="class", autouse=True, params=["none_prepared", "prepared"])
     async def insert_statement(self, request, session):
         statement_str = "INSERT INTO test (id, value) values(?, ?)"
         return await self._build_statement(session, request.param, statement_str, 2)
 
-    @pytest.fixture(scope='class', autouse=True, params=["none_prepared", "prepared"])
+    @pytest.fixture(scope="class", autouse=True, params=["none_prepared", "prepared"])
     async def select_statement(self, request, session):
         statement_str = "SELECT id, value FROM test WHERE id = ?"
         return await self._build_statement(session, request.param, statement_str, 1)
 
-    @pytest.fixture(scope='class', autouse=True, params=["none_prepared", "prepared"])
+    @pytest.fixture(scope="class", autouse=True, params=["none_prepared", "prepared"])
     async def select_filter_statement(self, request, session):
         statement_str = "SELECT id, value FROM test WHERE id >= :min and id <= :max ALLOW FILTERING"
         return await self._build_statement(session, request.param, statement_str, 2)

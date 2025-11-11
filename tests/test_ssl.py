@@ -3,6 +3,7 @@ from acsylla import SSLVerifyFlags
 
 import acsylla.errors
 import pytest
+import sys
 
 pytestmark = pytest.mark.asyncio
 
@@ -57,6 +58,7 @@ class TestSSL:
         )
         await cluster.create_session()
 
+    @pytest.mark.skipif(sys.platform == "darwin", reason="SSL test skipped on macOS")
     async def test_ssl_flags_peer_identity_dns(self, host, certificates):
         ssl_cert, ssl_private_key, ssl_trusted_cert = certificates
         cluster = create_cluster(

@@ -7,11 +7,11 @@ from acsylla import create_statement
 import pytest
 import time
 
-#pytestmark = pytest.mark.asyncio
+# pytestmark = pytest.mark.asyncio
 
 
 class TestBatch:
-    @pytest.fixture(scope='class', autouse=True, params=["none_prepared", "prepared"])
+    @pytest.fixture(scope="class", autouse=True, params=["none_prepared", "prepared"])
     async def statement(self, request, session):
         statement_str = "INSERT INTO test (id, value) values " + "(?, ?)"
         if request.param == "none_prepared":
@@ -24,7 +24,7 @@ class TestBatch:
 
         return statement_
 
-    @pytest.fixture(scope='class', autouse=True, params=["logged", "unlogged", "counter"])
+    @pytest.fixture(scope="class", autouse=True, params=["logged", "unlogged", "counter"])
     async def batch(self, request, session):
         if request.param == "logged":
             return create_batch_logged()

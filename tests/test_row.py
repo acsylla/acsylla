@@ -1,10 +1,9 @@
 from acsylla import create_statement
-
-from datetime import timezone
 from datetime import date
 from datetime import datetime
 from datetime import time
 from datetime import timedelta
+from datetime import timezone
 from decimal import Decimal
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
@@ -15,6 +14,7 @@ import uuid
 UTC = timezone.utc
 
 pytestmark = pytest.mark.asyncio(loop_scope="class")
+
 
 class TestRow:
     async def test_bool(self, session, id_generation):

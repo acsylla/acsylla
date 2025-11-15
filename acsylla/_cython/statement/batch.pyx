@@ -71,7 +71,7 @@ cdef class Batch:
                 raise_if_error(error)
             cass_retry_policy_free(cass_policy)
 
-    def set_tracing(self, enabled: bool):
+    def set_tracing(self, enabled: cass_bool_t):
         cdef CassError error
         if enabled is not None:
             error = cass_batch_set_tracing(self.cass_batch, enabled)

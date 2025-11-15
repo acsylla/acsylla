@@ -207,9 +207,9 @@ cdef class Statement:
             error = cass_statement_set_timestamp(self.cass_statement, int(timestamp))
             raise_if_error(error)
 
-    def set_is_idempotent(self, is_idempotent: cass_bool_t):
+    def set_is_idempotent(self, is_idempotent: object):
         if is_idempotent is not None:
-            error = cass_statement_set_is_idempotent(self.cass_statement, is_idempotent)
+            error = cass_statement_set_is_idempotent(self.cass_statement, <cass_bool_t>is_idempotent)
             raise_if_error(error)
 
     def set_retry_policy(self, retry_policy: object, retry_policy_logging: bool = False):

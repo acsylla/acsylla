@@ -106,6 +106,20 @@ cd acsylla
 docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.14  quay.io/pypa/manylinux_2_28_aarch64  /io/bin/build_manylinux_2_28_wheel.sh
 ```
 
+Example for build musllinux wheel for Python 3.14 ***x86_64*** from master branch
+```bash
+git clone https://github.com/acsylla/acsylla.git
+cd acsylla
+docker run -v `pwd`:/io -e PYTHON_VERSION=3.14  quay.io/pypa/musllinux_1_2_x86_64  /io/bin/build_musllinux_1_2_wheel.sh
+```
+
+Example for build musllinux wheel for Python 3.14 ***aarch64*** from master branch
+```bash
+git clone https://github.com/acsylla/acsylla.git
+cd acsylla
+docker run --platform linux/arm64 -v `pwd`:/io -e PYTHON_VERSION=3.14  quay.io/pypa/musllinux_1_2_aarch64  /io/bin/build_musllinux_1_2_wheel.sh
+```
+
 ## Basic usage
 ```python
 import acsylla

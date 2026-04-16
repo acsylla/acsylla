@@ -11,13 +11,13 @@ cd /io
 
 apk add openssl-dev autoconf automake libtool linux-headers
 
-LIBUV_VERSION=1.51.0
+LIBUV_VERSION=1.52.1
 
 curl -O https://dist.libuv.org/dist/v$LIBUV_VERSION/libuv-v$LIBUV_VERSION.tar.gz
 tar -xzvf libuv-v$LIBUV_VERSION.tar.gz
 cd libuv-v$LIBUV_VERSION
 sh autogen.sh
-./configure
+CFLAGS="-O3 -flto -fPIC" LDFLAGS="-flto" ./configure --with-pic
 make
 make install
 cd ..
@@ -25,6 +25,7 @@ cd ..
 git config --global --add safe.directory /io
 
 export LIBUV_ROOT_DIR="/usr/local"
+export UV_LIBRARY_PATH="/usr/local/lib"
 
 make install-driver
 

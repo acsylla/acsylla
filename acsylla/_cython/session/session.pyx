@@ -22,7 +22,6 @@ cdef class Session:
         cdef char* error_message = NULL
 
         cdef bytes keyspace
-        cdef CallbackWrapper cb_wrapper
 
         if self.keyspace is not None:
             keyspace = self.keyspace.encode()
@@ -35,10 +34,10 @@ cdef class Session:
         else:
             cass_future = cass_session_connect(self.cass_session, self.cass_cluster)
 
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
+        future = cass_future_to_asyncio(cass_future, self.cluster)
 
         try:
-            await cb_wrapper.__await__()
+            await future
             cass_error = cass_future_error_code(cass_future)
             cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
             raise_if_error(cass_error, error_message)
@@ -100,8 +99,6 @@ cdef class Session:
         cdef size_t length = 0
         cdef char* error_message = NULL
 
-        cdef CallbackWrapper cb_wrapper
-
         if self.closed == 1:
             return
 
@@ -110,10 +107,10 @@ cdef class Session:
         self.closed = 1
 
         cass_future = cass_session_close(self.cass_session)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
+        future = cass_future_to_asyncio(cass_future, self.cluster)
 
         try:
-            await cb_wrapper.__await__()
+            await future
             cass_error = cass_future_error_code(cass_future)
             cass_future_error_message(cass_future, <const char**> &error_message, <size_t *> &length)
             raise_if_error(cass_error, error_message)
@@ -133,7 +130,6 @@ cdef class Session:
         cdef const CassResult* cass_result = NULL
 
         cdef Result result
-        cdef CallbackWrapper cb_wrapper
         cdef CassUuid tracing_id
         cdef char tracing_id_str[CASS_UUID_STRING_LENGTH]
 
@@ -144,10 +140,10 @@ cdef class Session:
             native_types = statement.native_types or False
 
         cass_future = cass_session_execute(self.cass_session, statement.cass_statement)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
+        future = cass_future_to_asyncio(cass_future, self.cluster)
 
         try:
-            await cb_wrapper.__await__()
+            await future
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)
@@ -177,7 +173,6 @@ cdef class Session:
 
         cdef bytes encoded_statement
         cdef PreparedStatement prepared
-        cdef CallbackWrapper cb_wrapper
 
         if self.closed == 1:
             raise RuntimeError("Session closed")
@@ -185,10 +180,10 @@ cdef class Session:
         encoded_statement = statement.encode()
 
         cass_future = cass_session_prepare_n(self.cass_session, encoded_statement, len(encoded_statement))
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
+        future = cass_future_to_asyncio(cass_future, self.cluster)
 
         try:
-            await cb_wrapper.__await__()
+            await future
             cass_prepared = cass_future_get_prepared(cass_future)
             if cass_prepared == NULL:
                 cass_error = cass_future_error_code(cass_future)
@@ -213,7 +208,6 @@ cdef class Session:
         cdef const CassResult* cass_result = NULL
 
         cdef Result result
-        cdef CallbackWrapper cb_wrapper
         cdef CassUuid tracing_id
         cdef char tracing_id_str[CASS_UUID_STRING_LENGTH]
 
@@ -221,10 +215,10 @@ cdef class Session:
             raise RuntimeError("Session closed")
 
         cass_future = cass_session_execute_batch(self.cass_session, batch.cass_batch)
-        cb_wrapper = CallbackWrapper.new_(cass_future, self.cluster)
+        future = cass_future_to_asyncio(cass_future, self.cluster)
 
         try:
-            await cb_wrapper.__await__()
+            await future
             cass_result = cass_future_get_result(cass_future)
             if cass_result == NULL:
                 cass_error = cass_future_error_code(cass_future)

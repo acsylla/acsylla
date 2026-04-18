@@ -39,11 +39,11 @@ cdef class Cluster:
     def _handle_events(self):
         """ Function called from the Asyncio Loop because some
         data was added into the queue, it gets from the queue
-        the data and calls the corresponding CallbackWrappers.
+        the data and resolves the corresponding asyncio.Futures.
         """
         cdef bytes _ = self._read_socket.recv(1)
         cdef void* data
-        cdef CallbackWrapper cb_wrapper
+        cdef object future
 
         while True:
             self.posix_to_python._queue_mutex.lock()
@@ -54,9 +54,10 @@ cdef class Cluster:
                 data = self.posix_to_python._queue.front()
                 self.posix_to_python._queue.pop()
                 self.posix_to_python._queue_mutex.unlock()
-                cb_wrapper = <CallbackWrapper> data
-                cb_wrapper.set_result()
-                Py_DECREF(cb_wrapper)
+                future = <object> data
+                if not future.done():
+                    future.set_result(None)
+                Py_DECREF(future)
 
     def __init__(
         self,

@@ -1,6 +1,12 @@
 Changelog
 =========
 
+1.1.0
+======
+- Improve performance
+- Update LIBUV_VERSION to 1.52.1
+- Add build for musllinux
+
 1.0.2
 ======
 - Fix gh release actions 

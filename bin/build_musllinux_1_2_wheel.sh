@@ -9,7 +9,7 @@ source /$PYTHON_VERSION/bin/activate
 
 cd /io
 
-dnf install openssl-devel -y
+apk add openssl-dev autoconf automake libtool linux-headers
 
 LIBUV_VERSION=1.52.1
 

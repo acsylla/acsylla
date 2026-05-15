@@ -22,7 +22,8 @@ extension = Extension(
     sources=["acsylla/_cython/cyacsylla.cpp"],
     include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
     extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
-    extra_compile_args=["-std=c++14"],
+    extra_compile_args=["-std=c++14", "-O3", "-flto"],
+    extra_link_args=["-flto"],
     libraries=["ssl", "crypto", "uv", "z"],
 )
 
@@ -36,7 +37,7 @@ class acsylla_build_ext(build_ext):
             extension.libraries.remove("ssl")
             extension.libraries.remove("crypto")
         libuv_path = os.environ.get("UV_LIBRARY_PATH")
-        if os.sys.platform == "darwin" and libuv_path is not None:
+        if libuv_path is not None:
             extension.extra_objects.append(os.path.join(libuv_path, "libuv.a"))
             extension.libraries.remove("uv")
         super().build_extensions()

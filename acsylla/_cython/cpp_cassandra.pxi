@@ -219,7 +219,8 @@ cdef extern from "cassandra.h":
     pass
 
   ctypedef struct CassUuid:
-    pass
+    cass_uint64_t time_and_version
+    cass_uint64_t clock_seq_and_node
 
   ctypedef struct CassInet:
     pass

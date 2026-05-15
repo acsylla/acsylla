@@ -1,0 +1,52 @@
+name: CI musllinux x86_64
+
+on:
+  # Trigger the workflow on push or pull request,
+  # but only for the master branch
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.14t" ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Generate musllinux_1_2_x86_64-wheel
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          mkdir /tmp/acsylla
+          cp -r . /tmp/acsylla
+          docker run -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/musllinux_1_2_x86_64 /io/bin/build_musllinux_1_2_wheel.sh
+          mkdir dist
+          cp /tmp/acsylla/dist/acsylla-*.whl dist/
+      - name: Test dependencies for musllinux_1_2_x86_64-wheel
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install default-jre
+          cd /tmp/acsylla
+          make certs
+          docker compose up -d
+          # wait till casssandra server is up, to be improved
+          # by checking the readiness of the serivce
+          sleep 90
+      - name: Test generated musllinux_1_2_x86_64-wheel
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          docker run --network=host -v /tmp/acsylla:/io -e "PYTHON_VERSION=${{matrix.python-version}}" quay.io/pypa/musllinux_1_2_x86_64 /io/bin/test.sh

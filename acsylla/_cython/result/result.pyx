@@ -79,7 +79,9 @@ cdef class Result:
             yield name[:length].decode()
 
     def columns_names(self):
-        return list(self.columns())
+        if self._columns_names_cache is None:
+            self._columns_names_cache = list(self.columns())
+        return self._columns_names_cache
 
     def first(self):
         """ Return the first result, if there is no row

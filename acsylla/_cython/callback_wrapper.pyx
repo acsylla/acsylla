@@ -1,32 +1,31 @@
-cdef class CallbackWrapper:
+cdef inline object cass_future_to_asyncio(CassFuture* cass_future, Cluster cluster):
+    """Attach an asyncio.Future to a CassFuture.
 
-    async def __await__(self):
-        result = await self.future
-        return result
-    
-    cdef void set_result(self):
-        if self.future.done():
-            return
+    The returned future is resolved (via set_result(None)) from the event loop
+    when the CassFuture completes.  The caller must `await` it.
 
-        self.future.set_result(None)
+    An extra reference to the future is taken here and released in
+    Cluster._handle_events after set_result is called.  This keeps the future
+    alive between the C callback push and the Python-side resolution.
+    """
+    cdef object future
+    cdef CallbackContainer* container
+    cdef CassError error
 
-    @staticmethod
-    cdef CallbackWrapper new_(CassFuture* cass_future, Cluster cluster):
-        cdef CallbackWrapper cb_wrapper
+    future = cluster.loop.create_future()
+    Py_INCREF(future)
 
-        cb_wrapper = CallbackWrapper()
-        cb_wrapper.future = cluster.loop.create_future()
-        Py_INCREF(cb_wrapper)
+    container = new CallbackContainer(
+        <PosixToPython*>cluster.posix_to_python,
+        <void*>future,
+    )
+    error = cass_future_set_callback(
+        cass_future,
+        <CassFutureCallback>posix_to_python_callback,
+        <void*>container,
+    )
+    if error != CASS_OK:
+        Py_DECREF(future)
+        raise_if_error(error)
 
-        cdef CallbackContainer* container
-        container = new CallbackContainer(<PosixToPython*>cluster.posix_to_python, <void*>cb_wrapper)
-        error = cass_future_set_callback(
-            cass_future,
-            <CassFutureCallback>posix_to_python_callback,
-            <void*>container
-        )
-        if error != CASS_OK:
-            Py_DECREF(cb_wrapper)
-            raise_if_error(error)
-
-        return cb_wrapper
+    return future

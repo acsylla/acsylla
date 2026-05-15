@@ -6,47 +6,113 @@ from cpython.datetime cimport datetime
 from cpython.datetime cimport get_utc
 from cpython.datetime cimport time
 from cpython.datetime cimport timedelta
-from libc.math cimport floor
 from libc.time cimport time_t
+
+from uuid import UUID
 
 import_datetime()
 
 
-import re
-
-_duration_re = re.compile(r"(\d+)(y|Y|mo|MO|mO|Mo|w|W|d|D|h|H|s|S|ms|MS|mS|Ms|us|US|uS|Us|µs|µS|ns|NS|nS|Ns|m|M)")
-
-
 cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s) except *:
+    """Parse Cassandra duration string like '1y2mo3w4d5h6m7s8ms9us10ns'.
+
+    Matches legacy regex-based behaviour: scans the string for
+    <digits><unit> pairs and silently skips anything that isn't a valid pair
+    (orphan trailing digits, whitespace, etc.). Raises ValueError only if no
+    valid pair is found.  A leading '-' negates the whole duration.
+    """
+    cdef bytes b = s.encode('utf-8')
+    cdef Py_ssize_t n = len(b)
+    cdef Py_ssize_t i = 0
     cdef cass_int32_t months = 0
     cdef cass_int32_t days = 0
     cdef cass_int64_t nanos = 0
-    cdef list matched = _duration_re.findall(s)
+    cdef bint negative = False
+    cdef bint had_any = False
+    cdef cass_int64_t value
+    cdef int c, c2
+    cdef int unit_len
 
-    for value, key in matched:
-        if key in ('y', 'Y'):
-            months += int(value) * 12
-        elif key in ('mo', 'MO'):
-            months += int(value)
-        elif key in ('w', 'W'):
-            days += int(value) * 7
-        elif key in ('d', 'D'):
-            days += int(value)
-        elif key in ('h', 'H'):
-            nanos += int(value) * 60 * 60 * 1000 * 1000 * 1000
-        elif key in ('m', 'M'):
-            nanos += int(value) * 60 * 1000 * 1000 * 1000
-        elif key in ('s', 'S'):
-            nanos += int(value) * 1000 * 1000 * 1000
-        elif key in ('ms', 'MS'):
-            nanos += int(value) * 1000 * 1000
-        elif key in ('us', 'µs', 'US'):
-            nanos += int(value) * 1000
-        elif key in ('ns', 'NS'):
-            nanos += int(value)
-    if not matched:
+    if n == 0:
         raise ValueError(f'Unknown duration format for value: "{s}"')
-    if s[0] == '-':
+
+    if b[0] == 0x2d:  # '-'
+        negative = True
+
+    while i < n:
+        # skip to next digit
+        while i < n and not (0x30 <= b[i] <= 0x39):
+            i += 1
+        if i >= n:
+            break
+
+        # parse digits into C int
+        value = 0
+        while i < n and 0x30 <= b[i] <= 0x39:
+            value = value * 10 + (b[i] - 0x30)
+            i += 1
+        if i >= n:
+            break
+
+        c = b[i]
+        unit_len = 0
+
+        # µ (UTF-8: 0xc2 0xb5) followed by s/S → microseconds
+        if c == 0xc2 and i + 1 < n and b[i + 1] == 0xb5:
+            if i + 2 < n and (b[i + 2] == 0x73 or b[i + 2] == 0x53):
+                nanos += value * 1000
+                unit_len = 3
+        else:
+            # ASCII unit, case-insensitive
+            if 0x41 <= c <= 0x5A:
+                c += 32
+            c2 = 0
+            if i + 1 < n:
+                c2 = b[i + 1]
+                if 0x41 <= c2 <= 0x5A:
+                    c2 += 32
+
+            if c == 0x79:                                  # 'y'
+                months += value * 12
+                unit_len = 1
+            elif c == 0x6d and c2 == 0x6f:                 # 'mo'
+                months += value
+                unit_len = 2
+            elif c == 0x77:                                # 'w'
+                days += value * 7
+                unit_len = 1
+            elif c == 0x64:                                # 'd'
+                days += value
+                unit_len = 1
+            elif c == 0x68:                                # 'h'
+                nanos += value * <cass_int64_t>3600000000000
+                unit_len = 1
+            elif c == 0x6d and c2 == 0x73:                 # 'ms'
+                nanos += value * 1000000
+                unit_len = 2
+            elif c == 0x75 and c2 == 0x73:                 # 'us'
+                nanos += value * 1000
+                unit_len = 2
+            elif c == 0x6e and c2 == 0x73:                 # 'ns'
+                nanos += value
+                unit_len = 2
+            elif c == 0x6d:                                # 'm' (minutes)
+                nanos += value * <cass_int64_t>60000000000
+                unit_len = 1
+            elif c == 0x73:                                # 's'
+                nanos += value * <cass_int64_t>1000000000
+                unit_len = 1
+
+        if unit_len > 0:
+            had_any = True
+            i += unit_len
+        else:
+            i += 1  # unknown char, skip and keep scanning
+
+    if not had_any:
+        raise ValueError(f'Unknown duration format for value: "{s}"')
+
+    if negative:
         return -months, -days, -nanos
     return months, days, nanos
 
@@ -70,24 +136,78 @@ cdef inline cass_bool_t as_bool(object value) except *:
 
 
 cdef inline (cass_byte_t*, cass_int32_t) as_cass_decimal(object value) except *:
-    value = str(value) if not isinstance(value, str) else value
-    scale = value.split('.')
-    if not scale[0].isdigit():
-        raise ValueError(f'Bad value for decimal type: "{value}"')
-    if len(scale) == 2:
-        if not scale[1].isdigit():
-            raise ValueError(f'Bad value for decimal type: "{value}"')
-        scale = len(scale[1])
-    else:
-        scale = 0
+    cdef str s
+    cdef bytes b
+    cdef Py_ssize_t n, i, dot_pos, digits_start
+    cdef cass_int32_t scale
 
-    return value.encode(), scale
+    if isinstance(value, str):
+        s = <str>value
+    else:
+        s = str(value)
+
+    b = s.encode('ascii')
+    n = len(b)
+    if n == 0:
+        raise ValueError(f'Bad value for decimal type: "{value}"')
+
+    digits_start = 1 if (b[0] == 0x2b or b[0] == 0x2d) else 0
+    if digits_start >= n:
+        raise ValueError(f'Bad value for decimal type: "{value}"')
+
+    dot_pos = -1
+    i = digits_start
+    while i < n:
+        if b[i] == 0x2e:  # '.'
+            if dot_pos != -1:
+                raise ValueError(f'Bad value for decimal type: "{value}"')
+            dot_pos = i
+        elif not (0x30 <= b[i] <= 0x39):
+            raise ValueError(f'Bad value for decimal type: "{value}"')
+        i += 1
+
+    if dot_pos == -1:
+        scale = 0
+    else:
+        if dot_pos == digits_start or dot_pos == n - 1:
+            raise ValueError(f'Bad value for decimal type: "{value}"')
+        scale = <cass_int32_t>(n - 1 - dot_pos)
+
+    return b, scale
 
 
 cdef inline CassUuid as_cass_uuid(object value) except *:
     cdef CassUuid cass_uuid
     cdef CassError error
-    error = cass_uuid_from_string(as_bytes(value), &cass_uuid)
+    cdef object int_val
+    cdef bytes b
+    cdef cass_uint64_t uuid_hi, uuid_lo
+    cdef cass_uint64_t time_low, time_mid, time_hi_and_version
+
+    if isinstance(value, UUID):
+        int_val = value.int
+        uuid_hi = <cass_uint64_t>((int_val >> 64) & 0xFFFFFFFFFFFFFFFF)
+        uuid_lo = <cass_uint64_t>(int_val & 0xFFFFFFFFFFFFFFFF)
+
+        # Repack top half into CassUuid.time_and_version layout:
+        #   bits 0-31  = time_low
+        #   bits 32-47 = time_mid
+        #   bits 48-63 = time_hi_and_version
+        time_low = (uuid_hi >> 32) & 0xFFFFFFFF
+        time_mid = (uuid_hi >> 16) & 0xFFFF
+        time_hi_and_version = uuid_hi & 0xFFFF
+        cass_uuid.time_and_version = (time_hi_and_version << 48) | (time_mid << 32) | time_low
+        cass_uuid.clock_seq_and_node = uuid_lo
+        return cass_uuid
+
+    if isinstance(value, str):
+        b = (<str>value).encode('ascii')
+    elif isinstance(value, bytes):
+        b = value
+    else:
+        b = str(value).encode('ascii')
+
+    error = cass_uuid_from_string(b, &cass_uuid)
     if error:
         raise ValueError(f'Bad UUID value: "{value}"')
     return cass_uuid
@@ -107,55 +227,308 @@ cdef inline time_t _timegm(int year, unsigned month, unsigned day, unsigned hour
     return 60 * (60 * (24L * days_since_epoch + hour) + minute) + second
 
 
+cdef inline int _try_parse_iso_date_days(str s, int* out) except -1:
+    """Parse 'YYYY-MM-DD' (optionally followed by T/space and time) to days
+    since epoch. Returns 1 on success, 0 on format mismatch.
+    """
+    cdef bytes b
+    try:
+        b = s.encode('ascii')
+    except UnicodeEncodeError:
+        return 0
+    cdef Py_ssize_t n = len(b)
+    cdef int year, month, day
+
+    if n < 10:
+        return 0
+    if not (0x30 <= b[0] <= 0x39 and 0x30 <= b[1] <= 0x39
+            and 0x30 <= b[2] <= 0x39 and 0x30 <= b[3] <= 0x39):
+        return 0
+    if b[4] != 0x2d or b[7] != 0x2d:
+        return 0
+    if not (0x30 <= b[5] <= 0x39 and 0x30 <= b[6] <= 0x39
+            and 0x30 <= b[8] <= 0x39 and 0x30 <= b[9] <= 0x39):
+        return 0
+    if n > 10 and b[10] != 0x54 and b[10] != 0x74 and b[10] != 0x20:
+        return 0
+
+    year = (b[0] - 0x30) * 1000 + (b[1] - 0x30) * 100 + (b[2] - 0x30) * 10 + (b[3] - 0x30)
+    month = (b[5] - 0x30) * 10 + (b[6] - 0x30)
+    day = (b[8] - 0x30) * 10 + (b[9] - 0x30)
+
+    out[0] = days_from_civil(year, month, day)
+    return 1
+
+
 cdef inline cass_uint32_t as_cass_date(object value) except *:
     cdef cass_uint32_t cass_date
     cdef time_t epoch_secs
+    cdef int days_out
 
-    if isinstance(value, (str, date, datetime)):
-        if isinstance(value, str):
-            value = datetime.fromisoformat(value)
-        epoch_secs = _timegm(value.year, value.month, value.day, 0, 0, 0)
-    else:
-        epoch_secs = value
+    if isinstance(value, str):
+        if _try_parse_iso_date_days(value, &days_out) == 1:
+            return <cass_uint32_t>(days_out + 2147483648)
+        value = datetime.fromisoformat(value)
 
+    if isinstance(value, (date, datetime)):
+        return <cass_uint32_t>(days_from_civil(value.year, value.month, value.day) + 2147483648)
+
+    epoch_secs = value
     cass_date = cass_date_from_epoch(epoch_secs)
     return cass_date
 
 
+cdef inline int _try_parse_iso_time_ns(str s, cass_int64_t* out) except -1:
+    """Parse 'HH:MM[:SS[.fraction]][Z|±HH[:]MM]' to nanoseconds since midnight."""
+    cdef bytes b
+    try:
+        b = s.encode('ascii')
+    except UnicodeEncodeError:
+        return 0
+    cdef Py_ssize_t n = len(b)
+    cdef Py_ssize_t i = 5
+    cdef int hour = 0, minute = 0, second = 0, frac_digits = 0
+    cdef cass_int64_t nanos_frac = 0
+    cdef int tz_sign = 0, tz_hour = 0, tz_min = 0
+    cdef cass_int64_t nanos
+
+    if n < 5:
+        return 0
+    if not (0x30 <= b[0] <= 0x39 and 0x30 <= b[1] <= 0x39):
+        return 0
+    if b[2] != 0x3a:
+        return 0
+    if not (0x30 <= b[3] <= 0x39 and 0x30 <= b[4] <= 0x39):
+        return 0
+
+    hour = (b[0] - 0x30) * 10 + (b[1] - 0x30)
+    minute = (b[3] - 0x30) * 10 + (b[4] - 0x30)
+
+    if i < n and b[i] == 0x3a:
+        i += 1
+        if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+            return 0
+        second = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+        i += 2
+
+        if i < n and b[i] == 0x2e:
+            i += 1
+            while i < n and 0x30 <= b[i] <= 0x39:
+                if frac_digits < 9:
+                    nanos_frac = nanos_frac * 10 + (b[i] - 0x30)
+                    frac_digits += 1
+                i += 1
+            if frac_digits == 0:
+                return 0
+            while frac_digits < 9:
+                nanos_frac *= 10
+                frac_digits += 1
+
+    if i < n:
+        if b[i] == 0x5a or b[i] == 0x7a:
+            i += 1
+        elif b[i] == 0x2b or b[i] == 0x2d:
+            tz_sign = 1 if b[i] == 0x2b else -1
+            i += 1
+            if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                return 0
+            tz_hour = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+            i += 2
+            if i < n and b[i] == 0x3a:
+                i += 1
+            if i + 1 <= n and i + 1 < n and 0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39:
+                tz_min = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                i += 2
+        else:
+            return 0
+
+    if i != n:
+        return 0
+
+    nanos = (<cass_int64_t>hour * 3600 + <cass_int64_t>minute * 60 + second) * 1000000000 + nanos_frac
+    if tz_sign != 0:
+        nanos -= <cass_int64_t>tz_sign * (tz_hour * 3600 + tz_min * 60) * 1000000000
+
+    out[0] = nanos
+    return 1
+
+
+cdef inline cass_int64_t _time_to_ns(object value):
+    cdef cass_int64_t t = (<cass_int64_t>value.hour * 3600
+                           + <cass_int64_t>value.minute * 60
+                           + value.second) * 1_000_000_000
+    t += <cass_int64_t>value.microsecond * 1_000
+    cdef object offset
+    if value.tzinfo is not None:
+        offset = value.utcoffset()
+        if offset is not None:
+            t -= <cass_int64_t>(offset.total_seconds() * 1_000_000_000)
+    return t
+
+
 cdef inline cass_int64_t as_cass_time(object value) except *:
-    cdef CassError error
-    cdef cass_int64_t time_of_day
+    cdef cass_int64_t out_val
 
     if isinstance(value, str):
+        if _try_parse_iso_time_ns(value, &out_val) == 1:
+            return out_val
         value = time.fromisoformat(value)
-    if isinstance(value, (time, datetime)):
-        time_of_day = (value.hour * 60 * 60 + value.minute * 60 + value.second) * 1_000_000_000
-        if value.tzinfo:
-            time_of_day -= value.utcoffset().total_seconds() * 1_000_000_000
-        time_of_day += value.microsecond * 1_000
-    else:
-        time_of_day = value * 1_000_000_000
 
-    return time_of_day
+    if isinstance(value, (time, datetime)):
+        return _time_to_ns(value)
+
+    return <cass_int64_t>(value * 1_000_000_000)
+
+
+cdef inline int _try_parse_iso_timestamp_ms(str s, cass_int64_t* out) except -1:
+    """Fast path ISO 8601 parser. Returns 1 on success, 0 on format mismatch.
+
+    Treats naive strings (no timezone) as UTC to match the existing behaviour
+    where `datetime.fromisoformat` + `.replace(tzinfo=get_utc())` was used.
+    """
+    cdef bytes b
+    try:
+        b = s.encode('ascii')
+    except UnicodeEncodeError:
+        return 0
+    cdef Py_ssize_t n = len(b)
+    cdef Py_ssize_t i
+    cdef int year, month, day
+    cdef int hour = 0, minute = 0, second = 0, microsecond = 0
+    cdef int frac_digits
+    cdef int tz_sign = 0
+    cdef int tz_hour = 0, tz_min = 0
+    cdef int days
+    cdef cass_int64_t ms
+
+    if n < 10:
+        return 0
+    if not (0x30 <= b[0] <= 0x39 and 0x30 <= b[1] <= 0x39
+            and 0x30 <= b[2] <= 0x39 and 0x30 <= b[3] <= 0x39):
+        return 0
+    if b[4] != 0x2d or b[7] != 0x2d:  # '-'
+        return 0
+    if not (0x30 <= b[5] <= 0x39 and 0x30 <= b[6] <= 0x39
+            and 0x30 <= b[8] <= 0x39 and 0x30 <= b[9] <= 0x39):
+        return 0
+
+    year = (b[0] - 0x30) * 1000 + (b[1] - 0x30) * 100 + (b[2] - 0x30) * 10 + (b[3] - 0x30)
+    month = (b[5] - 0x30) * 10 + (b[6] - 0x30)
+    day = (b[8] - 0x30) * 10 + (b[9] - 0x30)
+
+    i = 10
+
+    if i < n:
+        # Date/time separator: 'T', 't' or ' '
+        if b[i] != 0x54 and b[i] != 0x74 and b[i] != 0x20:
+            return 0
+        i += 1
+        if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+            return 0
+        hour = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+        i += 2
+
+        if i < n and b[i] == 0x3a:  # ':'
+            i += 1
+            if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                return 0
+            minute = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+            i += 2
+
+            if i < n and b[i] == 0x3a:
+                i += 1
+                if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                    return 0
+                second = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                i += 2
+
+                if i < n and b[i] == 0x2e:  # '.'
+                    i += 1
+                    frac_digits = 0
+                    microsecond = 0
+                    while i < n and 0x30 <= b[i] <= 0x39:
+                        if frac_digits < 6:
+                            microsecond = microsecond * 10 + (b[i] - 0x30)
+                            frac_digits += 1
+                        i += 1
+                    if frac_digits == 0:
+                        return 0
+                    while frac_digits < 6:
+                        microsecond *= 10
+                        frac_digits += 1
+
+        # Optional timezone
+        if i < n:
+            if b[i] == 0x5a or b[i] == 0x7a:  # 'Z' / 'z'
+                i += 1
+            elif b[i] == 0x2b or b[i] == 0x2d:  # '+' / '-'
+                tz_sign = 1 if b[i] == 0x2b else -1
+                i += 1
+                if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                    return 0
+                tz_hour = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                i += 2
+                if i < n and b[i] == 0x3a:
+                    i += 1
+                if i + 1 <= n and i + 1 < n and 0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39:
+                    tz_min = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                    i += 2
+            else:
+                return 0
+
+        if i != n:
+            return 0
+
+    days = days_from_civil(year, month, day)
+    ms = (<cass_int64_t>days * 86400000
+          + <cass_int64_t>hour * 3600000
+          + <cass_int64_t>minute * 60000
+          + <cass_int64_t>second * 1000
+          + <cass_int64_t>(microsecond // 1000))
+
+    if tz_sign != 0:
+        ms -= <cass_int64_t>tz_sign * (tz_hour * 3600000 + tz_min * 60000)
+
+    out[0] = ms
+    return 1
+
+
+cdef inline cass_int64_t _datetime_to_ms(datetime dt):
+    cdef int year = dt.year
+    cdef int month = dt.month
+    cdef int day = dt.day
+    cdef int hour = dt.hour
+    cdef int minute = dt.minute
+    cdef int second = dt.second
+    cdef int microsecond = dt.microsecond
+    cdef int days = days_from_civil(year, month, day)
+    cdef cass_int64_t ms = (<cass_int64_t>days * 86400000
+                            + <cass_int64_t>hour * 3600000
+                            + <cass_int64_t>minute * 60000
+                            + <cass_int64_t>second * 1000
+                            + <cass_int64_t>(microsecond // 1000))
+    cdef object offset
+    if dt.tzinfo is not None:
+        offset = dt.utcoffset()
+        if offset is not None:
+            ms -= <cass_int64_t>(offset.total_seconds() * 1000)
+    return ms
 
 
 cdef inline cass_int64_t as_cass_timestamp(object value) except *:
     cdef datetime dt
+    cdef cass_int64_t out
 
     if isinstance(value, str):
+        if _try_parse_iso_timestamp_ms(value, &out) == 1:
+            return out
         dt = datetime.fromisoformat(value)
     elif isinstance(value, datetime):
         dt = value
     else:
         return <cass_int64_t>(value * 1_000)
 
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=get_utc())
-
-    # cass timestamp type has millisecond resolution
-    dt = dt.replace(microsecond=dt.microsecond // 1_000 * 1_000)
-
-    return <cass_int64_t>(floor(dt.timestamp() * 1_000))
+    return _datetime_to_ms(dt)
 
 
 cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object value) except *:

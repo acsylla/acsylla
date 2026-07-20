@@ -6,6 +6,7 @@ Changelog
 - Improve performance
 - Update LIBUV_VERSION to 1.52.1
 - Add build for musllinux
+- Remove Python 3.8 from CI
 
 1.0.2
 ======

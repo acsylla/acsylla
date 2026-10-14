@@ -45,7 +45,7 @@ cd /io
 yum install cmake -y
 yum install openssl openssl-devel -y
 
-LIBUV_VERSION=1.44.2
+LIBUV_VERSION=1.53.0
 
 curl -O https://dist.libuv.org/dist/v$LIBUV_VERSION/libuv-v$LIBUV_VERSION.tar.gz
 tar -xzvf libuv-v$LIBUV_VERSION.tar.gz

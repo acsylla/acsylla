@@ -1,0 +1,52 @@
+diff --git vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
+index 80e2ab6a..16b3a56d 100644
+--- vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
++++ vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
+@@ -295,19 +295,20 @@ public:
+ 
+ private:
+   static Result match_common_name_ipaddr(X509* cert, const String& address) {
+-    X509_NAME* name = X509_get_subject_name(cert);
++    // OpenSSL 4.0 returns const pointers here, older versions take non-const ones
++    X509_NAME* name = const_cast<X509_NAME*>(X509_get_subject_name(cert));
+     if (name == NULL) {
+       return INVALID_CERT;
+     }
+ 
+     int i = -1;
+     while ((i = X509_NAME_get_index_by_NID(name, NID_commonName, i)) > 0) {
+-      X509_NAME_ENTRY* name_entry = X509_NAME_get_entry(name, i);
++      X509_NAME_ENTRY* name_entry = const_cast<X509_NAME_ENTRY*>(X509_NAME_get_entry(name, i));
+       if (name_entry == NULL) {
+         return INVALID_CERT;
+       }
+ 
+-      ASN1_STRING* str = X509_NAME_ENTRY_get_data(name_entry);
++      ASN1_STRING* str = const_cast<ASN1_STRING*>(X509_NAME_ENTRY_get_data(name_entry));
+       if (str == NULL) {
+         return INVALID_CERT;
+       }
+@@ -326,19 +327,20 @@ private:
+   }
+ 
+   static Result match_common_name_dns(X509* cert, const String& hostname) {
+-    X509_NAME* name = X509_get_subject_name(cert);
++    // OpenSSL 4.0 returns const pointers here, older versions take non-const ones
++    X509_NAME* name = const_cast<X509_NAME*>(X509_get_subject_name(cert));
+     if (name == NULL) {
+       return INVALID_CERT;
+     }
+ 
+     int i = -1;
+     while ((i = X509_NAME_get_index_by_NID(name, NID_commonName, i)) >= 0) {
+-      X509_NAME_ENTRY* name_entry = X509_NAME_get_entry(name, i);
++      X509_NAME_ENTRY* name_entry = const_cast<X509_NAME_ENTRY*>(X509_NAME_get_entry(name, i));
+       if (name_entry == NULL) {
+         return INVALID_CERT;
+       }
+ 
+-      ASN1_STRING* str = X509_NAME_ENTRY_get_data(name_entry);
++      ASN1_STRING* str = const_cast<ASN1_STRING*>(X509_NAME_ENTRY_get_data(name_entry));
+       if (str == NULL) {
+         return INVALID_CERT;
+       }

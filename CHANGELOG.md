@@ -8,6 +8,7 @@ Changelog
 - Fix `as_cql_query()` of metadata for names that are reserved CQL keywords or case-sensitive, all names are quoted now
 - Fix duplicated user type in metadata when the type name needs quotes (patch for cpp-driver `vendor/unquote-udt-name.patch`)
 - Fix order of user types in `KeyspaceMeta.as_cql_query()`, a type is created after the types it uses
+- Fix build with OpenSSL 4.0 (patch for cpp-driver `vendor/openssl4-const.patch`)
 
 1.1.0
 ======

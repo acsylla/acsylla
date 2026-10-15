@@ -1,6 +1,12 @@
 Changelog
 =========
 
+1.1.2
+======
+- Fix possible event loop deadlock under high load
+- Wake up the event loop only when the queue was empty
+- Add `acsylla.metadata` with CQL keywords as in python-driver [#107](https://github.com/acsylla/acsylla/issues/107)
+
 1.1.1
 ======
 - Add support for Python 3.15 and 3.15t

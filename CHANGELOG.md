@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.1.1
+======
+- Add support for Python 3.15 and 3.15t
+- Update LIBUV_VERSION to 1.53.0
+- Fix `as_cql_query()` of metadata for names that are reserved CQL keywords or case-sensitive, all names are quoted now
+- Fix duplicated user type in metadata when the type name needs quotes (patch for cpp-driver `vendor/unquote-udt-name.patch`)
+- Fix order of user types in `KeyspaceMeta.as_cql_query()`, a type is created after the types it uses
+
 1.1.0
 ======
 - Improve performance

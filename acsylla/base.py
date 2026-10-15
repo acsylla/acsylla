@@ -1593,6 +1593,53 @@ class LogMessage:
     message: str
 
 
+# Type names the metadata reports for anything that is not a user defined type.
+_NOT_UDT_TYPE_NAMES = frozenset(
+    (
+        "unknown",
+        "custom",
+        "ascii",
+        "bigint",
+        "blob",
+        "boolean",
+        "counter",
+        "decimal",
+        "double",
+        "float",
+        "int",
+        "text",
+        "timestamp",
+        "uuid",
+        "varchar",
+        "varint",
+        "timeuuid",
+        "inet",
+        "date",
+        "time",
+        "smallint",
+        "tinyint",
+        "duration",
+        "list",
+        "map",
+        "set",
+        "tuple",
+    )
+)
+
+
+def _quote_name(name: str) -> str:
+    """Returns the name as a quoted CQL identifier, so reserved keywords and
+    case-sensitive names are kept as they are."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _quote_type(type_name: str) -> str:
+    """Quotes the type name only when it is a user defined type."""
+    if type_name in _NOT_UDT_TYPE_NAMES:
+        return type_name
+    return _quote_name(type_name)
+
+
 @dataclass
 class NestedTypeMeta:
     """User type field metadata."""
@@ -1630,31 +1677,33 @@ class UserTypeMeta:
         For example CREATE TYPE keyspace_name.type_name... if with_keyspace is
         set to False, statement will be CREATE TYPE type_name.."""
 
-        keyspace = f"{self.keyspace}."
+        keyspace = f"{_quote_name(self.keyspace)}."
         if with_keyspace is False:
             keyspace = ""
-        query = f"CREATE TYPE {keyspace}{self.name} ("
+        query = f"CREATE TYPE {keyspace}{_quote_name(self.name)} ("
         for field in self.fields:
             nested = ""
             if field.nested_types:
                 nested = []
                 for el in field.nested_types:
                     if el.is_frozen:
-                        nested.append(f"frozen<{el.type}>")
+                        nested.append(f"frozen<{_quote_type(el.type)}>")
                     else:
-                        nested.append(f"{el.type}")
+                        nested.append(f"{_quote_type(el.type)}")
                 nested = ", ".join(nested)
 
+            field_name = _quote_name(field.name)
+            field_type = _quote_type(field.type)
             if field.is_frozen:
                 if field.nested_types:
-                    query += f"\n\t{field.name} frozen<{field.type}<{nested}>>,"
+                    query += f"\n\t{field_name} frozen<{field_type}<{nested}>>,"
                 else:
-                    query += f"\n\t{field.name} frozen<{field.type}>,"
+                    query += f"\n\t{field_name} frozen<{field_type}>,"
             else:
                 if field.nested_types:
-                    query += f"\n\t{field.name} {field.type}<{nested}>,"
+                    query += f"\n\t{field_name} {field_type}<{nested}>,"
                 else:
-                    query += f"\n\t{field.name} {field.type},"
+                    query += f"\n\t{field_name} {field_type},"
         query = query[:-1]
         query += "\n);"
 
@@ -1688,11 +1737,13 @@ class FunctionMeta:
         For example CREATE FUNCTION keyspace_name.function_name... if with_keyspace
         is set to False, statement will be CREATE FUNCTION function_name..."""
 
-        keyspace = f"{self.keyspace}."
+        keyspace = f"{_quote_name(self.keyspace)}."
         if with_keyspace is False:
             keyspace = ""
-        args = ", ".join([" ".join(k) for k in zip(self.argument_names, self.argument_types)])
-        query = f"CREATE FUNCTION {keyspace}{self.name}({args})\n\t"
+        args = ", ".join(
+            [f"{_quote_name(name)} {type_}" for name, type_ in zip(self.argument_names, self.argument_types)]
+        )
+        query = f"CREATE FUNCTION {keyspace}{_quote_name(self.name)}({args})\n\t"
         if self.called_on_null_input:
             query += "CALLED ON NULL INPUT\n\t"
         else:
@@ -1730,14 +1781,15 @@ class AggregateMeta:
         For example CREATE AGGREGATE keyspace_name.aggregate_name... if with_keyspace
         is set to False, statement will be CREATE AGGREGATE aggregate_name..."""
 
-        keyspace = f"{self.keyspace}."
+        keyspace = f"{_quote_name(self.keyspace)}."
         if with_keyspace is False:
             keyspace = ""
         args = ", ".join(self.argument_types)
-        query = f"CREATE AGGREGATE {keyspace}{self.name}({args})\n\t"
-        query += f"SFUNC {self.state_func}\n\t"
+        final_func = _quote_name(self.final_func) if self.final_func else self.final_func
+        query = f"CREATE AGGREGATE {keyspace}{_quote_name(self.name)}({args})\n\t"
+        query += f"SFUNC {_quote_name(self.state_func)}\n\t"
         query += f"STYPE {self.state_type}\n\t"
-        query += f"FINALFUNC {self.final_func}\n\t"
+        query += f"FINALFUNC {final_func}\n\t"
         query += f"INITCOND {self.initcond};"
 
         if formatted is False:
@@ -1781,16 +1833,16 @@ class IndexMeta:
         CREATE INDEX index_name...
         """
 
-        keyspace = f"{self.keyspace}."
+        keyspace = f"{_quote_name(self.keyspace)}."
         if with_keyspace is False:
             keyspace = ""
         target = self.target
         if target.startswith('{"pk":["'):
             target = json.loads(target)
-            pk = ",".join([k for k in target["pk"]])
-            ck = ",".join([k for k in target["ck"]])
+            pk = ",".join([_quote_name(k) for k in target["pk"]])
+            ck = ",".join([_quote_name(k) for k in target["ck"]])
             target = f"(({pk}), {ck})"
-        query = f"CREATE INDEX {self.name} ON {keyspace}{self.table} ({target});"
+        query = f"CREATE INDEX {_quote_name(self.name)} ON {keyspace}{_quote_name(self.table)} ({target});"
 
         if formatted is False:
             query = query.replace("\n\t", " ")
@@ -1840,22 +1892,22 @@ class MaterializedViewMeta:
         if with_keyspace is set to False, statement will be
         CREATE MATERIALIZED VIEW view_name..."""
 
-        keyspace = f"{self.keyspace_name}."
+        keyspace = f"{_quote_name(self.keyspace_name)}."
         if with_keyspace is False:
             keyspace = ""
-        query = f"CREATE MATERIALIZED VIEW {keyspace}{self.name} AS\n\t"
+        query = f"CREATE MATERIALIZED VIEW {keyspace}{_quote_name(self.name)} AS\n\t"
         if self.include_all_columns is True:
             query += "SELECT *\n\t"
         else:
-            columns = ", ".join([k.column_name for k in self.columns])
+            columns = ", ".join([_quote_name(k.column_name) for k in self.columns])
             query += f"SELECT {columns}\n\t"
-        query += f"FROM {keyspace}{self.base_table_name}\n\t"
+        query += f"FROM {keyspace}{_quote_name(self.base_table_name)}\n\t"
         query += f"WHERE {self.where_clause}\n\t"
-        pk = ", ".join([k.column_name for k in self.columns if k.kind in ("partition_key", "clustering")])
+        pk = ", ".join([_quote_name(k.column_name) for k in self.columns if k.kind in ("partition_key", "clustering")])
         query += f"PRIMARY KEY ({pk})\n\t"
         order = ", ".join(
             [
-                f"{k.column_name} {k.clustering_order.upper()}"
+                f"{_quote_name(k.column_name)} {k.clustering_order.upper()}"
                 for k in self.columns
                 if k.clustering_order.upper() != "NONE"
             ]
@@ -1919,17 +1971,17 @@ class TableMeta:
         For example CREATE TABLE keyspace_name.table_name... if with_keyspace
         is set to False, statement will be CREATE TABLE table_name..."""
 
-        keyspace = f"{self.keyspace_name}."
+        keyspace = f"{_quote_name(self.keyspace_name)}."
         if with_keyspace is False:
             keyspace = ""
-        query = f"CREATE TABLE {keyspace}{self.table_name} (\n\t"
+        query = f"CREATE TABLE {keyspace}{_quote_name(self.table_name)} (\n\t"
         for colum in self.columns:
-            query += f"{colum.name} {colum.type},\n\t"
-        pk = ", ".join([k.column_name for k in self.columns if k.kind in ("partition_key", "clustering")])
+            query += f"{_quote_name(colum.name)} {colum.type},\n\t"
+        pk = ", ".join([_quote_name(k.column_name) for k in self.columns if k.kind in ("partition_key", "clustering")])
         query += f"PRIMARY KEY ({pk})\n"
         order = ", ".join(
             [
-                f"{k.column_name} {k.clustering_order.upper()}"
+                f"{_quote_name(k.column_name)} {k.clustering_order.upper()}"
                 for k in self.columns
                 if k.clustering_order.upper() != "NONE"
             ]
@@ -1963,6 +2015,30 @@ class TableMeta:
         return query
 
 
+def _sort_user_types(user_types: List["UserTypeMeta"]) -> List["UserTypeMeta"]:
+    """Returns user types ordered so every type comes after the user types
+    used by its fields, otherwise the original order is kept."""
+    names = {user_type.name for user_type in user_types}
+    pending = list(user_types)
+    created = set()
+    ordered = []
+    while pending:
+        for index, user_type in enumerate(pending):
+            used = set()
+            for field in user_type.fields:
+                used.add(field.type)
+                used.update(nested.type for nested in field.nested_types or [])
+            if (used & names) - {user_type.name} <= created:
+                break
+        else:
+            # Dependencies can't be resolved, keep the original order
+            index = 0
+        user_type = pending.pop(index)
+        created.add(user_type.name)
+        ordered.append(user_type)
+    return ordered
+
+
 @dataclass
 class KeyspaceMeta:
     """Keyspace metadata."""
@@ -1992,12 +2068,12 @@ class KeyspaceMeta:
         is set to False, statement will be CREATE TABLE table_name..."""
 
         query = [
-            f"CREATE KEYSPACE {self.name} "
+            f"CREATE KEYSPACE {_quote_name(self.name)} "
             f"WITH replication = {self.replication} "
             f"AND durable_writes = {self.durable_writes};"
         ]
         if full_schema is True:
-            for user_type in self.user_types:
+            for user_type in _sort_user_types(self.user_types):
                 query += user_type.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)
             for function in self.functions:
                 query += function.as_cql_query(formatted=formatted, with_keyspace=with_keyspace)

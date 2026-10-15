@@ -42,7 +42,7 @@ cdef class Logger:
     }
 
     def __cinit__(self):
-        self._read_socket, self._write_socket = socket.socketpair()
+        self._read_socket, self._write_socket = _wakeup_socketpair()
         loop = asyncio.get_running_loop()
         loop.add_reader(self._read_socket, self._handle_message)
         self.posix_to_python = new PosixToPythonLogger(self._write_socket.fileno())
@@ -70,10 +70,10 @@ cdef class Logger:
             self._write_socket = None
 
     def _handle_message(self):
-        cdef bytes _ = self._read_socket.recv(1)
         cdef shared_ptr[CassLogMessage] data
         cdef CassLogMessage* message
 
+        _drain_wakeup_socket(self._read_socket)
         while True:
             self.posix_to_python._queue_mutex.lock()
             try:
@@ -86,30 +86,36 @@ cdef class Logger:
             finally:
                 self.posix_to_python._queue_mutex.unlock()
 
-            log_level = cass_log_level_string(message.severity).decode()
-            log_message = message.message.decode()
+            try:
+                log_level = cass_log_level_string(message.severity).decode()
+                log_message = message.message.decode()
 
-            if self.logging_callback is not None:
-                from acsylla import LogMessage
-                log = LogMessage(
-                    time_ms=message.time_ms,
-                    log_level=log_level,
-                    file=message.file.decode(),
-                    line=message.line,
-                    function=message.function.decode(),
-                    message=log_message
-                )
-                if asyncio.iscoroutinefunction(self.logging_callback):
-                    asyncio.create_task(self.logging_callback(log))
+                if self.logging_callback is not None:
+                    from acsylla import LogMessage
+                    log = LogMessage(
+                        time_ms=message.time_ms,
+                        log_level=log_level,
+                        file=message.file.decode(),
+                        line=message.line,
+                        function=message.function.decode(),
+                        message=log_message
+                    )
+                    if asyncio.iscoroutinefunction(self.logging_callback):
+                        asyncio.create_task(self.logging_callback(log))
+                    else:
+                        self.logging_callback(log)
                 else:
-                    self.logging_callback(log)
-            else:
-                logger_fn = self.logger_fn.get(log_level)
-                if logger_fn:
-                    logger_fn(log_message)
-
-            free(<void*>message.file)
-            free(<void*>message.function)
+                    logger_fn = self.logger_fn.get(log_level)
+                    if logger_fn:
+                        logger_fn(log_message)
+            except Exception as exc:
+                # Keep handling the rest of the queue, its wake-up bytes are already read
+                asyncio.get_running_loop().call_exception_handler(
+                    {"message": "Exception while handling a driver log message", "exception": exc}
+                )
+            finally:
+                free(<void*>message.file)
+                free(<void*>message.function)
 
     def set_log_level(self, level):
         if level is not None:

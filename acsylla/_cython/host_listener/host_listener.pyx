@@ -5,7 +5,7 @@ from libcpp.memory cimport shared_ptr
 
 cdef class HostListener:
     def __cinit__(self):
-        self._read_socket, self._write_socket = socket.socketpair()
+        self._read_socket, self._write_socket = _wakeup_socketpair()
         loop = asyncio.get_running_loop()
         loop.add_reader(self._read_socket, self._handle_message)
         self.posix_to_python = new PosixToPythonHostListener(self._write_socket.fileno())
@@ -36,19 +36,31 @@ cdef class HostListener:
     def _handle_message(self):
         cdef shared_ptr[HostListenerMessage] data
         cdef HostListenerMessage* message
-        cdef bytes _ = self._read_socket.recv(1)
-        self.posix_to_python._queue_mutex.lock()
-        data = self.posix_to_python._queue.front()
-        self.posix_to_python._queue.pop()
-        self.posix_to_python._queue_mutex.unlock()
-        message = data.get()
-        if self.host_listener_callback is not None:
-            from acsylla import HostListenerEvent
-            event = HostListenerEvent(message.event)
-            if asyncio.iscoroutinefunction(self.host_listener_callback):
-                asyncio.create_task(self.host_listener_callback(event, message.address.decode()))
-            else:
-                self.host_listener_callback(event, message.address.decode())
+
+        _drain_wakeup_socket(self._read_socket)
+        while True:
+            self.posix_to_python._queue_mutex.lock()
+            if self.posix_to_python._queue.empty():
+                self.posix_to_python._queue_mutex.unlock()
+                break
+            data = self.posix_to_python._queue.front()
+            self.posix_to_python._queue.pop()
+            self.posix_to_python._queue_mutex.unlock()
+            message = data.get()
+            if self.host_listener_callback is None:
+                continue
+            try:
+                from acsylla import HostListenerEvent
+                event = HostListenerEvent(message.event)
+                if asyncio.iscoroutinefunction(self.host_listener_callback):
+                    asyncio.create_task(self.host_listener_callback(event, message.address.decode()))
+                else:
+                    self.host_listener_callback(event, message.address.decode())
+            except Exception as exc:
+                # Keep handling the rest of the queue, its wake-up bytes are already read
+                asyncio.get_running_loop().call_exception_handler(
+                    {"message": "Exception while handling a host listener event", "exception": exc}
+                )
 
     def set_host_listener_callback(self, callback):
         self.host_listener_callback = callback

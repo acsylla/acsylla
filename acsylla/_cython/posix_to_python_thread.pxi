@@ -13,6 +13,7 @@ cdef extern from "<queue>" namespace "std" nogil:
         void pop()
         void push(T&)
         size_t size()
+        void swap(queue&)
 
 cdef extern from "<mutex>" namespace "std" nogil:
     cdef cppclass mutex:

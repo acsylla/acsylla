@@ -1,7 +1,10 @@
 from cpython.dict cimport PyDict_SetItem
-from cpython.list cimport PyList_GET_ITEM, PyList_New, PyList_SET_ITEM
-from cpython.tuple cimport PyTuple_New, PyTuple_SET_ITEM
+from cpython.list cimport PyList_GET_ITEM
+from cpython.list cimport PyList_New
+from cpython.list cimport PyList_SET_ITEM
 from cpython.ref cimport Py_INCREF
+from cpython.tuple cimport PyTuple_New
+from cpython.tuple cimport PyTuple_SET_ITEM
 
 
 cdef class Row:

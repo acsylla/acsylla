@@ -2,6 +2,23 @@ import random
 import socket
 
 
+def _wakeup_socketpair():
+    """Returns a non-blocking (read, write) socket pair used by driver threads to
+    wake up the asyncio loop."""
+    read_socket, write_socket = socket.socketpair()
+    read_socket.setblocking(False)
+    write_socket.setblocking(False)
+    return read_socket, write_socket
+
+
+def _drain_wakeup_socket(read_socket):
+    try:
+        while read_socket.recv(4096):
+            pass
+    except BlockingIOError:
+        pass
+
+
 cdef class Cluster:
     def destroy(self):
         if self.host_listener:
@@ -28,7 +45,7 @@ cdef class Cluster:
 
     def __cinit__(self):
         self.loop = asyncio.get_running_loop()
-        self._read_socket, self._write_socket = socket.socketpair()
+        self._read_socket, self._write_socket = _wakeup_socketpair()
         self.loop.add_reader(self._read_socket, self._handle_events)
         self.posix_to_python = new PosixToPython(self._write_socket.fileno())
         self.ssl = NULL
@@ -41,20 +58,19 @@ cdef class Cluster:
         data was added into the queue, it gets from the queue
         the data and resolves the corresponding asyncio.Futures.
         """
-        cdef bytes _ = self._read_socket.recv(1)
-        cdef void* data
+        cdef queue[void*] pending
         cdef object future
 
+        _drain_wakeup_socket(self._read_socket)
         while True:
             self.posix_to_python._queue_mutex.lock()
-            if self.posix_to_python._queue.empty():
-                self.posix_to_python._queue_mutex.unlock()
+            pending.swap(self.posix_to_python._queue)
+            self.posix_to_python._queue_mutex.unlock()
+            if pending.empty():
                 break
-            else:
-                data = self.posix_to_python._queue.front()
-                self.posix_to_python._queue.pop()
-                self.posix_to_python._queue_mutex.unlock()
-                future = <object> data
+            while not pending.empty():
+                future = <object> pending.front()
+                pending.pop()
                 if not future.done():
                     future.set_result(None)
                 Py_DECREF(future)

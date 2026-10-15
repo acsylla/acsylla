@@ -35,11 +35,15 @@ CallbackContainer::CallbackContainer(PosixToPython* h, void* d) {
 
 void posix_to_python_callback(CassFuture* cass_future, void* data){
     CallbackContainer* container = (CallbackContainer*)data;
+    bool was_empty;
     {
         std::lock_guard<std::mutex> lock(container->handler->_queue_mutex);
+        was_empty = container->handler->_queue.empty();
         container->handler->_queue.push(container->data);
     }
-    write(container->handler->write_fd, "1", 1);
+    if (was_empty) {
+        write(container->handler->write_fd, "1", 1);
+    }
     delete container;
 }
 

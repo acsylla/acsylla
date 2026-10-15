@@ -1,0 +1,22 @@
+diff --git vendor/cpp-driver/src/data_type_parser.cpp vendor/cpp-driver/src/data_type_parser.cpp
+index fe98f969..21916f9a 100644
+--- vendor/cpp-driver/src/data_type_parser.cpp
++++ vendor/cpp-driver/src/data_type_parser.cpp
+@@ -143,6 +143,17 @@ DataType::ConstPtr DataTypeCqlNameParser::parse(const String& type, SimpleDataTy
+     return DataType::ConstPtr(new CustomType(type_name.substr(1, type_name.size() - 2)));
+   }
+ 
++  if (type_name.size() >= 2 && type_name[0] == '"' && type_name[type_name.size() - 1] == '"') {
++    // Remove double quotes and unescape doubled ones, so a quoted user type
++    // (e.g. "MyType") resolves to the type registered under its real name
++    String unquoted;
++    for (size_t i = 1; i < type_name.size() - 1; ++i) {
++      unquoted.push_back(type_name[i]);
++      if (type_name[i] == '"') ++i;
++    }
++    type_name = unquoted;
++  }
++
+   UserType::ConstPtr user_type(keyspace->get_or_create_user_type(type_name, is_frozen));
+ 
+   if (user_type->is_frozen() != is_frozen) {

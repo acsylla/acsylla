@@ -11,7 +11,7 @@ cd /io
 
 apk add openssl-dev autoconf automake libtool linux-headers
 
-LIBUV_VERSION=1.52.1
+LIBUV_VERSION=1.53.0
 
 curl -O https://dist.libuv.org/dist/v$LIBUV_VERSION/libuv-v$LIBUV_VERSION.tar.gz
 tar -xzvf libuv-v$LIBUV_VERSION.tar.gz

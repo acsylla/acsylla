@@ -2020,7 +2020,7 @@ def _sort_user_types(user_types: List["UserTypeMeta"]) -> List["UserTypeMeta"]:
     used by its fields, otherwise the original order is kept."""
     names = {user_type.name for user_type in user_types}
     pending = list(user_types)
-    created = set()
+    created: Set[str] = set()
     ordered = []
     while pending:
         for index, user_type in enumerate(pending):

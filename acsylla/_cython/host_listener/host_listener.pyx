@@ -1,3 +1,4 @@
+import inspect
 import socket
 
 from libcpp.memory cimport shared_ptr
@@ -52,7 +53,7 @@ cdef class HostListener:
             try:
                 from acsylla import HostListenerEvent
                 event = HostListenerEvent(message.event)
-                if asyncio.iscoroutinefunction(self.host_listener_callback):
+                if inspect.iscoroutinefunction(self.host_listener_callback):
                     asyncio.create_task(self.host_listener_callback(event, message.address.decode()))
                 else:
                     self.host_listener_callback(event, message.address.decode())

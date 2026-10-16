@@ -15,7 +15,7 @@ cdef class Result:
     cdef Result new_(const CassResult* cass_result, int8_t native_types):
         cdef Result result
 
-        result = Result()
+        result = Result.__new__(Result)
         result.cass_result = cass_result
         result.native_types = native_types
         return result

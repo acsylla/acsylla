@@ -87,7 +87,7 @@ cdef class Statement:
 
         encoded_statement = statement_str.encode()
 
-        statement = Statement()
+        statement = Statement.__new__(Statement)
         statement.prepared = 0
 
         if parameters is None:
@@ -139,7 +139,7 @@ cdef class Statement:
 
         cdef Statement statement
 
-        statement = Statement()
+        statement = Statement.__new__(Statement)
         statement.session = session
         statement.cass_statement = cass_statement
         statement.cass_prepared = cass_prepared
@@ -284,6 +284,9 @@ cdef class Statement:
             raise ValueError(f"Value {value} not supported for non-PreparedStatement")
 
     def bind(self, int idx, object value, object value_type = None):
+        self._bind(idx, value, value_type)
+
+    cdef int _bind(self, int idx, object value, object value_type) except -1:
         cdef CassError error = CASS_OK
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
@@ -361,6 +364,7 @@ cdef class Statement:
             error = bind_udt(self.cass_statement, idx, value, cass_data_type)
         if error:
             raise_if_error(error)
+        return 0
 
     def bind_list(self, list values, object value_types=None):
         cdef int idx
@@ -368,9 +372,9 @@ cdef class Statement:
         idx = 0
         for value in values:
             if value_types is not None:
-                self.bind(idx, value, value_types[idx])
+                self._bind(idx, value, value_types[idx])
             else:
-                self.bind(idx, value, None)
+                self._bind(idx, value, None)
             idx += 1
 
     def bind_tuple(self, tuple values, object value_types):
@@ -380,9 +384,9 @@ cdef class Statement:
         idx = 0
         for value in values:
             if value_types is not None:
-                self.bind(idx, value, value_types[idx])
+                self._bind(idx, value, value_types[idx])
             else:
-                self.bind(idx, value, None)
+                self._bind(idx, value, None)
             idx += 1
 
     def bind_by_name(self, str name, object value, object value_type = None):

@@ -47,6 +47,7 @@ install-driver: install-jemalloc
 	patch -N -p0 < vendor/unquote-udt-name.patch || echo Already applied
 	patch -N -p0 < vendor/openssl4-const.patch || echo Already applied
 	patch -N -p0 < vendor/jemalloc-allocator.patch || echo Already applied
+	patch -N -p0 < vendor/routing-key-token.patch || echo Already applied
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \
 		cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS="-fPIC -flto" -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS="-fPIC -flto" -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -D CMAKE_BUILD_TYPE=Release .. && \

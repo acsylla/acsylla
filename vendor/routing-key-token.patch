@@ -1,0 +1,18 @@
+diff --git vendor/cpp-driver/src/request_handler.cpp vendor/cpp-driver/src/request_handler.cpp
+index 9591006f..924c8fe0 100644
+--- vendor/cpp-driver/src/request_handler.cpp
++++ vendor/cpp-driver/src/request_handler.cpp
+@@ -362,8 +362,11 @@ void RequestHandler::internal_retry(RequestExecution* request_execution) {
+     const RoutableRequest* routable_req = dynamic_cast<const RoutableRequest*>(request());
+     if (routable_req) {
+       String routing_key;
+-      routable_req->get_routing_key(&routing_key);
+-      token = Murmur3Partitioner::hash(routing_key);
++      // A request without a routing key (e.g. a simple statement) keeps the placeholder token,
++      // so it goes to the least busy connection of the pool instead of always the same shard
++      if (routable_req->get_routing_key(&routing_key)) {
++        token = Murmur3Partitioner::hash(routing_key);
++      }
+     }
+ 
+     PooledConnection::Ptr connection =

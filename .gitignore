@@ -16,3 +16,4 @@ dist
 *.cpp
 *.pyc
 *.swo
+vendor/jemalloc-[0-9]*

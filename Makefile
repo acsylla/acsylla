@@ -24,12 +24,29 @@ setup-build:
 
 compile: clean cythonize setup-build
 
-install-driver:
+JEMALLOC_VERSION = 5.3.0
+JEMALLOC_SHA256 = 2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa
+JEMALLOC_DIR = $(current_dir)/vendor/jemalloc-$(JEMALLOC_VERSION)
+
+install-jemalloc:
+	test -f $(JEMALLOC_DIR)/lib/libjemalloc_pic.a || ( \
+		cd $(current_dir)/vendor && \
+		curl -sSLO https://github.com/jemalloc/jemalloc/releases/download/$(JEMALLOC_VERSION)/jemalloc-$(JEMALLOC_VERSION).tar.bz2 && \
+		$(PYTHON) -c "import hashlib, sys; sys.exit(hashlib.sha256(open('jemalloc-$(JEMALLOC_VERSION).tar.bz2', 'rb').read()).hexdigest() != '$(JEMALLOC_SHA256)')" && \
+		tar -xjf jemalloc-$(JEMALLOC_VERSION).tar.bz2 && \
+		rm jemalloc-$(JEMALLOC_VERSION).tar.bz2 && \
+		cd $(JEMALLOC_DIR) && \
+		./configure --with-jemalloc-prefix=acsylla_je_ --with-private-namespace=acsylla_je_ --without-export \
+			--disable-cxx --disable-libdl --disable-initial-exec-tls --disable-zone-allocator && \
+		$(MAKE) build_lib_static EXTRA_CFLAGS=-g0)
+
+install-driver: install-jemalloc
 	git submodule update --init --recursive
 	patch -N -p0 < vendor/std-move.patch || echo Already applied
 	patch -N -p0 < vendor/prevent-stdout-spam.patch || echo Already applied
 	patch -N -p0 < vendor/unquote-udt-name.patch || echo Already applied
 	patch -N -p0 < vendor/openssl4-const.patch || echo Already applied
+	patch -N -p0 < vendor/jemalloc-allocator.patch || echo Already applied
 	mkdir -p $(current_dir)/vendor/cpp-driver/build
 	cd $(current_dir)/vendor/cpp-driver/build && \
 		cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -D CASS_BUILD_STATIC=ON -D CMAKE_CXX_FLAGS="-fPIC -flto" -D CASS_BUILD_SHARED=OFF -D CASS_USE_STATIC_LIBS=ON -D CMAKE_C_FLAGS="-fPIC -flto" -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -D CMAKE_BUILD_TYPE=Release .. && \
@@ -68,4 +85,4 @@ doc:
 	rm -rf docs/_build
 	make -C docs/ html
 
-.PHONY: clean setup-build install install-dev compile test stress mypy lint format certs
+.PHONY: clean setup-build install install-dev install-jemalloc compile test stress mypy lint format certs

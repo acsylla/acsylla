@@ -1,0 +1,27 @@
+diff --git vendor/cpp-driver/src/memory.cpp vendor/cpp-driver/src/memory.cpp
+index 5ad3d5b1..b1fbb76d 100644
+--- vendor/cpp-driver/src/memory.cpp
++++ vendor/cpp-driver/src/memory.cpp
+@@ -55,9 +55,19 @@ void operator delete[](void* ptr) throw() {
+ }
+ #endif
+ 
+-CassMallocFunction Memory::malloc_func_ = NULL;
+-CassReallocFunction Memory::realloc_func_ = NULL;
+-CassFreeFunction Memory::free_func_ = NULL;
++// jemalloc built by acsylla (see install-jemalloc in Makefile). The driver allocates
++// in its IO threads and frees in the application threads and the other way around,
++// jemalloc handles it much better than the system allocator. Constant initialization,
++// so it is set before any static object of the driver allocates memory.
++extern "C" {
++void* acsylla_je_malloc(size_t size);
++void* acsylla_je_realloc(void* ptr, size_t size);
++void acsylla_je_free(void* ptr);
++}
++
++CassMallocFunction Memory::malloc_func_ = acsylla_je_malloc;
++CassReallocFunction Memory::realloc_func_ = acsylla_je_realloc;
++CassFreeFunction Memory::free_func_ = acsylla_je_free;
+ 
+ #if UV_VERSION_MAJOR >= 1 && UV_VERSION_MINOR >= 6
+ static void* calloc_(size_t count, size_t size) {

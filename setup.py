@@ -16,12 +16,15 @@ if vi < (3, 7):
 CPP_CASSANDRA_DIR = os.path.join("vendor", "cpp-driver")
 CPP_CASSANDRA_INCLUDE_DIR = os.path.join(CPP_CASSANDRA_DIR, "include")
 CPP_CASSANDRA_STATIC_LIB_DIR = os.path.join(CPP_CASSANDRA_DIR, "build", "libscylla-cpp-driver_static.a")
+JEMALLOC_DIR = os.path.join("vendor", "jemalloc-5.3.0")
+JEMALLOC_INCLUDE_DIR = os.path.join(JEMALLOC_DIR, "include")
+JEMALLOC_STATIC_LIB = os.path.join(JEMALLOC_DIR, "lib", "libjemalloc_pic.a")
 
 extension = Extension(
     "acsylla._cython.cyacsylla",
     sources=["acsylla/_cython/cyacsylla.cpp"],
-    include_dirs=[CPP_CASSANDRA_INCLUDE_DIR],
-    extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR],
+    include_dirs=[CPP_CASSANDRA_INCLUDE_DIR, JEMALLOC_INCLUDE_DIR],
+    extra_objects=[CPP_CASSANDRA_STATIC_LIB_DIR, JEMALLOC_STATIC_LIB],
     extra_compile_args=["-std=c++14", "-O3", "-flto"],
     extra_link_args=["-flto"],
     libraries=["ssl", "crypto", "uv", "z"],

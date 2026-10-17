@@ -1,0 +1,275 @@
+--- vendor/cpp-driver/src/cluster.cpp
++++ vendor/cpp-driver/src/cluster.cpp
+@@ -771,7 +771,11 @@
+   LockedHostMap::const_iterator it = hosts_.find(address);
+ 
+   if (it == hosts_.end()) {
+-    LOG_WARN("Received UP event for an unknown host %s", address.to_string().c_str());
++    // E.g. a node that came back with another address, its NEW_NODE event can be missed or come
++    // before the node is in system.peers
++    LOG_INFO("Received UP event for an unknown host %s, refreshing it",
++             address.to_string().c_str());
++    if (connection_) connection_->refresh_new_node(address);
+     return;
+   }
+ 
+@@ -783,7 +787,33 @@
+   // `notify_host_down()` to trigger the DOWN status.
+ }
+ 
+-void Cluster::on_add(const Host::Ptr& host) { notify_host_add(host); }
++void Cluster::on_add(const Host::Ptr& host) {
++  if (host->has_host_id()) {
++    Vector<Address> old_addresses;
++    for (HostMap::const_iterator it = hosts_.begin(), end = hosts_.end(); it != end; ++it) {
++      const Host::Ptr& known = it->second;
++      if (!known->has_host_id() ||
++          known->host_id().time_and_version != host->host_id().time_and_version ||
++          known->host_id().clock_seq_and_node != host->host_id().clock_seq_and_node) {
++        continue;
++      }
++      if (known->address() == host->address()) {
++        // Already added, e.g. by both the NEW_NODE and the UP event of the node
++        LOG_DEBUG("Host %s is already added", host->address_string().c_str());
++        return;
++      }
++      old_addresses.push_back(known->address());
++    }
++    // The node changed its address, the old address is not removed by an event
++    for (Vector<Address>::const_iterator it = old_addresses.begin(), end = old_addresses.end();
++         it != end; ++it) {
++      LOG_INFO("Host %s is now %s, removing the old address", it->to_string().c_str(),
++               host->address_string().c_str());
++      notify_host_remove(*it);
++    }
++  }
++  notify_host_add(host);
++}
+ 
+ void Cluster::on_remove(const Address& address) { notify_host_remove(address); }
+ 
+--- vendor/cpp-driver/src/control_connection.cpp
++++ vendor/cpp-driver/src/control_connection.cpp
+@@ -35,6 +35,10 @@
+ #include <iomanip>
+ #include <iterator>
+ 
++// The refresh of a node without a row in system.peers is retried after 0.5, 1, 2, 4 and 8 seconds
++#define CASS_REFRESH_NODE_MAX_RETRIES 5
++#define CASS_REFRESH_NODE_RETRY_DELAY_MS 500ULL
++
+ using namespace datastax;
+ using namespace datastax::internal::core;
+ 
+@@ -161,15 +165,18 @@
+    * @param control_connection The control connection the query is run on.
+    */
+   RefreshNodeCallback(const Address& address, ControlConnection::RefreshNodeType type,
+-                      bool is_all_peers, const String& query, ControlConnection* control_connection)
++                      bool is_all_peers, const String& query, ControlConnection* control_connection,
++                      int attempt = 0)
+       : ControlRequestCallback(query, control_connection, ControlConnection::on_refresh_node)
+       , address(address)
+       , type(type)
+-      , is_all_peers(is_all_peers) {}
++      , is_all_peers(is_all_peers)
++      , attempt(attempt) {}
+ 
+   const Address address;
+   const ControlConnection::RefreshNodeType type;
+   const bool is_all_peers;
++  const int attempt; // The number of previous refreshes without a row for the node
+ };
+ 
+ /**
+@@ -356,7 +363,17 @@
+   listener_ = listener ? listener : &nop_listener__;
+ }
+ 
+-void ControlConnection::refresh_node(RefreshNodeType type, const Address& address) {
++void ControlConnection::refresh_node(RefreshNodeType type, const Address& address, int attempt) {
++  if (type == NEW_NODE) {
++    // Both the NEW_NODE and the UP event of a node refresh it, one refresh with its retries is
++    // enough
++    if (attempt == 0 && refreshing_new_nodes_.count(address) > 0) {
++      LOG_DEBUG("Refresh of node %s is already running", address.to_string().c_str());
++      return;
++    }
++    refreshing_new_nodes_.insert(address);
++  }
++
+   bool is_connected_host = connection_->host()->rpc_address().equals(address, false);
+ 
+   String query;
+@@ -378,7 +395,8 @@
+ 
+   LOG_DEBUG("Refresh node: %s", query.c_str());
+ 
+-  RequestCallback::Ptr callback(new RefreshNodeCallback(address, type, is_all_peers, query, this));
++  RequestCallback::Ptr callback(
++      new RefreshNodeCallback(address, type, is_all_peers, query, this, attempt));
+   if (write_and_flush(callback) < 0) {
+     LOG_ERROR("No more stream available while attempting to refresh node info");
+     defunct();
+@@ -391,6 +409,10 @@
+ }
+ 
+ void ControlConnection::handle_refresh_node(RefreshNodeCallback* callback) {
++  if (callback->type == NEW_NODE) {
++    refreshing_new_nodes_.erase(callback->address);
++  }
++
+   bool found_host = false;
+   const Row* row = NULL;
+   ResultIterator rows(callback->result().get());
+@@ -404,11 +426,27 @@
+     }
+   } else if (rows.next()) {
+     row = rows.row();
+-    found_host = true;
++    // The row of a node that came back with another address can still have the old rpc_address
++    found_host = connection_->host()->rpc_address().equals(callback->address, false) ||
++                 settings_.address_factory->is_peer(row, connection_->host(), callback->address);
+   }
+ 
+   if (!found_host) {
+     String address_str = callback->address.to_string();
++    if (!callback->is_all_peers) {
++      // The listen address of the node can be stale, the next refresh reads all peers
++      listen_addresses_.erase(callback->address);
++    }
++    if (callback->attempt < CASS_REFRESH_NODE_MAX_RETRIES) {
++      // The event of a node can come before its row is in system.peers, e.g. when the node
++      // comes back with another address
++      uint64_t delay_ms = CASS_REFRESH_NODE_RETRY_DELAY_MS << callback->attempt;
++      LOG_INFO("No row found for host %s in %s's peers system table yet, retrying in %llu ms",
++               address_str.c_str(), address_string().c_str(),
++               static_cast<unsigned long long>(delay_ms));
++      schedule_refresh_node(callback->type, callback->address, callback->attempt + 1, delay_ms);
++      return;
++    }
+     LOG_ERROR("No row found for host %s in %s's peers system table. "
+               "%s will be ignored.",
+               address_str.c_str(), address_string().c_str(), address_str.c_str());
+@@ -429,8 +467,50 @@
+         listener_->on_remove(host->address());
+         listener_->on_add(host);
+         break;
++    }
++  }
++}
++
++void ControlConnection::schedule_refresh_node(RefreshNodeType type, const Address& address,
++                                              int attempt, uint64_t delay_ms) {
++  RefreshNodeRetry retry = { type, address, attempt, uv_now(loop()) + delay_ms };
++  refresh_node_retries_.push_back(retry);
++  if (type == NEW_NODE) {
++    refreshing_new_nodes_.insert(address);
++  }
++  start_refresh_node_timer();
++}
++
++void ControlConnection::start_refresh_node_timer() {
++  if (refresh_node_retries_.empty()) return;
++  uint64_t due_ms = refresh_node_retries_.front().due_ms;
++  for (Vector<RefreshNodeRetry>::const_iterator it = refresh_node_retries_.begin(),
++                                                end = refresh_node_retries_.end();
++       it != end; ++it) {
++    due_ms = std::min(due_ms, it->due_ms);
++  }
++  uint64_t now_ms = uv_now(loop());
++  refresh_node_timer_.start(loop(), due_ms > now_ms ? due_ms - now_ms : 0,
++                            bind_callback(&ControlConnection::on_refresh_node_timer, this));
++}
++
++void ControlConnection::on_refresh_node_timer(Timer* timer) {
++  uint64_t now_ms = uv_now(loop());
++  Vector<RefreshNodeRetry> due;
++  Vector<RefreshNodeRetry> later;
++  for (Vector<RefreshNodeRetry>::const_iterator it = refresh_node_retries_.begin(),
++                                                end = refresh_node_retries_.end();
++       it != end; ++it) {
++    (it->due_ms <= now_ms ? due : later).push_back(*it);
++  }
++  refresh_node_retries_.swap(later);
++  if (!connection_->is_closing()) {
++    for (Vector<RefreshNodeRetry>::const_iterator it = due.begin(), end = due.end(); it != end;
++         ++it) {
++      refresh_node(it->type, it->address, it->attempt);
+     }
+   }
++  start_refresh_node_timer();
+ }
+ 
+ void ControlConnection::refresh_keyspace(const StringRef& keyspace_name) {
+@@ -686,6 +766,9 @@
+ }
+ 
+ void ControlConnection::on_close(Connection* connection) {
++  refresh_node_timer_.stop();
++  refresh_node_retries_.clear();
++  refreshing_new_nodes_.clear();
+   listener_->on_close(this);
+   dec_ref();
+ }
+--- vendor/cpp-driver/src/control_connection.hpp
++++ vendor/cpp-driver/src/control_connection.hpp
+@@ -29,7 +29,9 @@
+ #include "request_callback.hpp"
+ #include "response.hpp"
+ #include "scoped_ptr.hpp"
++#include "timer.hpp"
+ #include "token_map.hpp"
++#include "vector.hpp"
+ 
+ #include <stdint.h>
+ 
+@@ -257,6 +259,14 @@
+ 
+   uv_loop_t* loop() { return connection_->loop(); }
+   const Connection::Ptr& connection() const { return connection_; }
++
++  /**
++   * Read the row of a node from system.peers and add the node, e.g. for an UP event of a node
++   * that is not known.
++   *
++   * @param address The address of the node.
++   */
++  void refresh_new_node(const Address& address) { refresh_node(NEW_NODE, address); }
+ 
+ private:
+   friend class ControlConnector;
+@@ -267,9 +277,22 @@
+   friend class RefreshFunctionCallback;
+ 
+ private:
+-  void refresh_node(RefreshNodeType type, const Address& address);
++  void refresh_node(RefreshNodeType type, const Address& address, int attempt = 0);
+   static void on_refresh_node(ControlRequestCallback* callback);
+   void handle_refresh_node(RefreshNodeCallback* callback);
++
++  // A node can be announced before its row is in system.peers, e.g. when it comes back with
++  // another address, then its refresh is retried later
++  struct RefreshNodeRetry {
++    RefreshNodeType type;
++    Address address;
++    int attempt;
++    uint64_t due_ms;
++  };
++  void schedule_refresh_node(RefreshNodeType type, const Address& address, int attempt,
++                             uint64_t delay_ms);
++  void start_refresh_node_timer();
++  void on_refresh_node_timer(Timer* timer);
+ 
+   void refresh_keyspace(const StringRef& keyspace_name);
+   static void on_refresh_keyspace(ControlRequestCallback* callback);
+@@ -299,6 +322,9 @@
+   VersionNumber dse_server_version_;
+   ListenAddressMap listen_addresses_;
+   ControlConnectionListener* listener_;
++  Vector<RefreshNodeRetry> refresh_node_retries_;
++  Timer refresh_node_timer_;
++  AddressSet refreshing_new_nodes_; // Nodes with a NEW_NODE refresh running or scheduled
+ };
+ 
+ }}} // namespace datastax::internal::core

@@ -1,0 +1,59 @@
+--- vendor/cpp-driver/src/connection_pool.cpp
++++ vendor/cpp-driver/src/connection_pool.cpp
+@@ -107,16 +107,21 @@
+ 
+   notify_up_or_down();
+ 
+-  // We had non-critical errors or some connections closed
++  // We had non-critical errors, some connections closed or, with a sharded host, the pool was
++  // created with fewer connections than shards. When the host answered (the pool has a
++  // connection), the missing connections are opened right away instead of after the first delay
++  // of the reconnection policy (2 seconds by default), only their retries wait. An empty pool
++  // more likely than not means that the host is down, then the policy delays them as before.
++  const bool connect_now = has_connections();
+   for (size_t shard_num = 0u; shard_num < connections_by_shard_.size(); ++shard_num) {
+     const int needed = num_connections_per_shard_ - connections_by_shard_[shard_num].size();
+     for (int32_t i = 0; i < needed; ++i) {
+       if (si && (si->shard_aware_port() || si->shard_aware_port_ssl())) {
+         // Reconnect with port-based shard awareness
+-        schedule_reconnect(nullptr, shard_num);
++        schedule_reconnect(nullptr, shard_num, connect_now);
+       } else {
+         // Traditional or no shard awareness
+-        schedule_reconnect();
++        schedule_reconnect(nullptr, CassNullopt, connect_now);
+       }
+     }
+   }
+@@ -244,7 +249,8 @@
+   }
+ }
+ 
+-void ConnectionPool::schedule_reconnect(ReconnectionSchedule* schedule, CassOptional<int32_t> desired_shard_num) {
++void ConnectionPool::schedule_reconnect(ReconnectionSchedule* schedule, CassOptional<int32_t> desired_shard_num,
++                                        bool connect_now) {
+   DelayedConnector::Ptr connector(new DelayedConnector(
+       host_, protocol_version_, bind_callback(&ConnectionPool::on_reconnect, this)));
+ 
+@@ -253,7 +259,8 @@
+   }
+   reconnection_schedules_[connector.get()] = schedule;
+ 
+-  uint64_t delay_ms = schedule->next_delay_ms();
++  // The schedule keeps its first delay for the retry when connecting right away fails
++  uint64_t delay_ms = connect_now ? 0 : schedule->next_delay_ms();
+ 
+   if (desired_shard_num) {
+     const auto& si = host_->sharding_info();
+--- vendor/cpp-driver/src/connection_pool.hpp
++++ vendor/cpp-driver/src/connection_pool.hpp
+@@ -228,7 +228,8 @@
+   /** Adds connection to the pool. It's the caller's responsibility
+    *  to keep track of the connections count. */
+   void add_connection(const PooledConnection::Ptr& connection);
+-  void schedule_reconnect(ReconnectionSchedule* schedule = NULL, CassOptional<int32_t> desired_shard_num = CassNullopt);
++  void schedule_reconnect(ReconnectionSchedule* schedule = NULL, CassOptional<int32_t> desired_shard_num = CassNullopt,
++                          bool connect_now = false);
+   void internal_close();
+   void maybe_closed();
+ 

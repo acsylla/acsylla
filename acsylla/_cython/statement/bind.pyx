@@ -697,35 +697,38 @@ cdef inline CassCollection* get_collection(object value, const CassDataType* cas
 
     collection_type = cass_data_type_type(cass_data_type)
 
-    if collection_type == CASS_VALUE_TYPE_MAP:
-        if isinstance(value, dict):
-            value = value.items()
-        for k, v in value:
+    try:
+        if collection_type == CASS_VALUE_TYPE_MAP:
+            if isinstance(value, dict):
+                value = value.items()
+            for k, v in value:
+                sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
+                sub_value_type = cass_data_type_type(sub_data_type)
+                bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type)
+                sub_data_type = cass_data_type_sub_data_type(cass_data_type, 1)
+                sub_value_type = cass_data_type_type(sub_data_type)
+                bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+        else:
             sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
             sub_value_type = cass_data_type_type(sub_data_type)
-            bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type)
-            sub_data_type = cass_data_type_sub_data_type(cass_data_type, 1)
-            sub_value_type = cass_data_type_type(sub_data_type)
-            bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
-    else:
-        sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
-        sub_value_type = cass_data_type_type(sub_data_type)
-        # The element type is the same for all elements, the common ones skip the dispatch
-        if sub_value_type == CASS_VALUE_TYPE_INT:
-            for v in value:
-                error = cass_collection_append_int32(collection, v if type(v) is int else int(v))
-                if error:
-                    cass_collection_free(collection)
-                    raise_if_error(error)
-        elif sub_value_type == CASS_VALUE_TYPE_BIGINT:
-            for v in value:
-                error = cass_collection_append_int64(collection, v if type(v) is int else int(v))
-                if error:
-                    cass_collection_free(collection)
-                    raise_if_error(error)
-        else:
-            for v in value:
-                bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+            # The element type is the same for all elements, the common ones skip the dispatch
+            if sub_value_type == CASS_VALUE_TYPE_INT:
+                for v in value:
+                    error = cass_collection_append_int32(collection, v if type(v) is int else int(v))
+                    if error:
+                        raise_if_error(error)
+            elif sub_value_type == CASS_VALUE_TYPE_BIGINT:
+                for v in value:
+                    error = cass_collection_append_int64(collection, v if type(v) is int else int(v))
+                    if error:
+                        raise_if_error(error)
+            else:
+                for v in value:
+                    bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+    except BaseException:
+        # A value that can not be bound, the collection is not returned to be freed
+        cass_collection_free(collection)
+        raise
 
     return collection
 
@@ -804,12 +807,15 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
                              CASS_VALUE_TYPE_LIST):
         collection = get_collection(value, cass_data_type)
         error = cass_tuple_set_collection(cass_tuple, index, collection)
+        cass_collection_free(collection)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
         nested_tuple = get_tuple(value, cass_data_type)
         error = cass_tuple_set_tuple(cass_tuple, index, nested_tuple)
+        cass_tuple_free(nested_tuple)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
         user_type = get_udt(value, cass_data_type)
         error = cass_tuple_set_user_type(cass_tuple, index, user_type)
+        cass_user_type_free(user_type)
 
     if error:
         raise_if_error(error)
@@ -829,13 +835,18 @@ cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_typ
     cass_tuple = cass_tuple_new(tuple_len)
 
     cdef size_t i = 0
-    for v in value:
-        sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
-        if sub_data_type == NULL:
-            raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind Tuple index {i}'.encode())
-        sub_value_type = cass_data_type_type(sub_data_type)
-        bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type)
-        i += 1
+    try:
+        for v in value:
+            sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
+            if sub_data_type == NULL:
+                raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind Tuple index {i}'.encode())
+            sub_value_type = cass_data_type_type(sub_data_type)
+            bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type)
+            i += 1
+    except BaseException:
+        # A value that can not be bound, the tuple is not returned to be freed
+        cass_tuple_free(cass_tuple)
+        raise
 
     return cass_tuple
 
@@ -1014,30 +1025,35 @@ cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_ty
     cdef size_t field_count
     cdef Py_ssize_t field
     cdef bytes name
-    if isinstance(value, dict):
-        field_count = cass_data_type_sub_type_count(cass_data_type)
-        for k, v in value.items():
-            # The field named exactly like the key, set by index: no lookups by name in the driver
-            field = udt_field_index(cass_data_type, field_count, k, i) if isinstance(k, str) else -1
-            if field >= 0:
-                sub_data_type = cass_data_type_sub_data_type(cass_data_type, field)
-                bind_udt_value_by_index(user_type, field, v, sub_data_type, cass_data_type_type(sub_data_type))
-            else:
-                # The driver's lookup by name, which ignores case unless the name is quoted
-                name = k.encode()
-                sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, name)
+    try:
+        if isinstance(value, dict):
+            field_count = cass_data_type_sub_type_count(cass_data_type)
+            for k, v in value.items():
+                # The field named exactly like the key, set by index: no lookups by name in the driver
+                field = udt_field_index(cass_data_type, field_count, k, i) if isinstance(k, str) else -1
+                if field >= 0:
+                    sub_data_type = cass_data_type_sub_data_type(cass_data_type, field)
+                    bind_udt_value_by_index(user_type, field, v, sub_data_type, cass_data_type_type(sub_data_type))
+                else:
+                    # The driver's lookup by name, which ignores case unless the name is quoted
+                    name = k.encode()
+                    sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, name)
+                    if sub_data_type == NULL:
+                        raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
+                    bind_udt_value_by_name(user_type, name, v, sub_data_type, cass_data_type_type(sub_data_type))
+                i += 1
+        else:
+            for v in value:
+                sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
                 if sub_data_type == NULL:
-                    raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
-                bind_udt_value_by_name(user_type, name, v, sub_data_type, cass_data_type_type(sub_data_type))
-            i += 1
-    else:
-        for v in value:
-            sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
-            if sub_data_type == NULL:
-                raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind UDT value "{v}" with index {i}'.encode())
-            sub_value_type = cass_data_type_type(sub_data_type)
-            bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type)
-            i += 1
+                    raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind UDT value "{v}" with index {i}'.encode())
+                sub_value_type = cass_data_type_type(sub_data_type)
+                bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type)
+                i += 1
+    except BaseException:
+        # A value that can not be bound, the UDT is not returned to be freed
+        cass_user_type_free(user_type)
+        raise
 
     return user_type
 

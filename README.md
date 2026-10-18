@@ -79,7 +79,7 @@ Cassandra's native protocol. The current version works with:
 
 * Scylla and Scylla Enterprise
 * Apache Cassandra® versions 2.1, 2.2 and 3.0+
-* Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.15 for Linux and MacOS, including free-threaded 3.14t and 3.15t  
+* Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.15 for Linux and MacOS, the free-threaded 3.14t and 3.15t run it with the GIL enabled  
 
 ## Install
 

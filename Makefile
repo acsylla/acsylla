@@ -27,6 +27,12 @@ compile: clean cythonize setup-build
 JEMALLOC_VERSION = 5.3.0
 JEMALLOC_SHA256 = 2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa
 JEMALLOC_DIR = $(current_dir)/vendor/jemalloc-$(JEMALLOC_VERSION)
+# jemalloc does not start on a system with larger pages than it was built for, every allocation
+# fails. Linux on aarch64 has 4K, 16K or 64K pages and the wheels are built on 4K, so they are
+# built for 64K pages.
+ifeq ($(shell uname -s)-$(shell uname -m),Linux-aarch64)
+JEMALLOC_LG_PAGE = --with-lg-page=16
+endif
 
 install-jemalloc:
 	test -f $(JEMALLOC_DIR)/lib/libjemalloc_pic.a || ( \
@@ -37,7 +43,7 @@ install-jemalloc:
 		rm jemalloc-$(JEMALLOC_VERSION).tar.bz2 && \
 		cd $(JEMALLOC_DIR) && \
 		./configure --with-jemalloc-prefix=acsylla_je_ --with-private-namespace=acsylla_je_ --without-export \
-			--disable-cxx --disable-libdl --disable-initial-exec-tls --disable-zone-allocator && \
+			--disable-cxx --disable-libdl --disable-initial-exec-tls --disable-zone-allocator $(JEMALLOC_LG_PAGE) && \
 		$(MAKE) build_lib_static EXTRA_CFLAGS=-g0)
 
 install-driver: install-jemalloc

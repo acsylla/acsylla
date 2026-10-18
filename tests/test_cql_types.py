@@ -274,3 +274,50 @@ class TestCQLTypes:
                 if k == "value_udt_type":
                     continue
                 assert v == expected_values[k]
+
+    async def test_bind_udt_dict_keys_not_in_field_order(self, session, id_generation):
+        query = cql_types.insert_query("udt", "int")
+        prepared = await session.create_prepared(query)
+        statement = prepared.bind()
+        _id = next(id_generation)
+        statement.bind(0, _id)
+        # Not in the order of the fields, and a key in another case, found by the driver ignoring it
+        statement.bind(1, {"value_text": "text", "VALUE_BIGINT": 2, "value_int": 1})
+        await session.execute(statement)
+
+        result = await session.execute(self.query("value_int", "udt", _id))
+        value = result.first().column_value("value_int")
+        assert value["value_int"] == 1
+        assert value["value_bigint"] == 2
+        assert value["value_text"] == "text"
+
+    async def test_bind_tuple_with_nested_values(self, session, id_generation):
+        await session.execute(
+            create_statement(
+                "CREATE TABLE IF NOT EXISTS test_nested_tuple (id int PRIMARY KEY, value frozen<tuple<"
+                "frozen<list<int>>, frozen<tuple<int, text>>, frozen<test_udt_nested_type>>>)"
+            )
+        )
+        prepared = await session.create_prepared("INSERT INTO test_nested_tuple (id, value) VALUES (?, ?)")
+        statement = prepared.bind()
+        _id = next(id_generation)
+        statement.bind(0, _id)
+        statement.bind(1, ([1, 2, 3], (4, "text"), {"value_int": 5, "value_text": "nested"}))
+        await session.execute(statement)
+
+        result = await session.execute(create_statement(f"SELECT value FROM test_nested_tuple WHERE id={_id}"))
+        values, nested_tuple, nested_udt = result.first().column_value("value")
+        assert values == [1, 2, 3]
+        assert tuple(nested_tuple) == (4, "text")
+        assert nested_udt["value_int"] == 5
+        assert nested_udt["value_text"] == "nested"
+
+        # A value that can not be bound in a nested collection, tuple or UDT frees what was built
+        invalid_values = [
+            (["bad_int"], (4, "text"), {}),
+            ([1], ("bad_int", "text"), {}),
+            ([1], (4, "text"), {"value_int": "bad_int"}),
+        ]
+        for value in invalid_values:
+            with pytest.raises(ValueError):
+                statement.bind(1, value)

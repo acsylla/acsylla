@@ -6,7 +6,9 @@ from datetime import timedelta
 from datetime import timezone
 from decimal import Decimal
 from ipaddress import IPv4Address
+from ipaddress import IPv4Interface
 from ipaddress import IPv6Address
+from ipaddress import IPv6Interface
 from uuid import UUID
 
 UTC = timezone.utc
@@ -140,6 +142,9 @@ native_types = {
             ("::1", "::1"),
             (IPv4Address("127.0.0.1"), "127.0.0.1"),
             (IPv6Address("::1"), "::1"),
+            # The address of an interface, without its network
+            (IPv4Interface("10.0.0.5/24"), "10.0.0.5"),
+            (IPv6Interface("fe80::1/64"), "fe80::1"),
         ],
         "invalid": [("bad_ip", ValueError), (1234, ValueError)],
     },
@@ -155,7 +160,7 @@ native_types = {
     },
     "text": {
         "value_type": ValueType.TEXT,
-        "valid": [("abcdé text", "abcdé text"), (121, "121"), (date(1, 2, 3), "0001-02-03")],
+        "valid": [("abcdé text", "abcdé text"), (121, "121"), (date(1, 2, 3), "0001-02-03"), ("a\x00b", "a\x00b")],
         "invalid": [],
     },
     "time": {

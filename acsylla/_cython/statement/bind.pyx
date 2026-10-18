@@ -1,13 +1,35 @@
 cdef extern from "utils.cpp":
     int days_from_civil(int y, unsigned m, unsigned d) nogil
 
+from cpython.bytes cimport PyBytes_AS_STRING
+from cpython.bytes cimport PyBytes_GET_SIZE
+from cpython.datetime cimport PyDateTime_Check
+from cpython.datetime cimport PyTime_Check
 from cpython.datetime cimport date
+from cpython.datetime cimport date_day
+from cpython.datetime cimport date_month
+from cpython.datetime cimport date_year
 from cpython.datetime cimport datetime
+from cpython.datetime cimport datetime_hour
+from cpython.datetime cimport datetime_microsecond
+from cpython.datetime cimport datetime_minute
+from cpython.datetime cimport datetime_second
+from cpython.datetime cimport datetime_tzinfo
 from cpython.datetime cimport get_utc
 from cpython.datetime cimport time
+from cpython.datetime cimport time_hour
+from cpython.datetime cimport time_microsecond
+from cpython.datetime cimport time_minute
+from cpython.datetime cimport time_second
+from cpython.datetime cimport time_tzinfo
 from cpython.datetime cimport timedelta
+from cpython.long cimport PyLong_AsUnsignedLongLongMask
+from cpython.unicode cimport PyUnicode_AsUTF8AndSize
+from libc.string cimport memcmp
 from libc.time cimport time_t
 
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
 from uuid import UUID
 
 import_datetime()
@@ -123,6 +145,21 @@ cdef inline as_bytes(object value, str encoding='utf-8'):
     return value.encode(encoding) if isinstance(value, str) else str(value).encode(encoding)
 
 
+cdef inline object as_utf8(object value, const char** data, Py_ssize_t* size):
+    """The UTF-8 bytes of a text value without a copy into a new bytes object: the UTF-8 buffer of
+    a str is cached in the str (an ASCII str is its own UTF-8). Returns the object that owns the
+    buffer, the caller keeps it alive while the buffer is used."""
+    cdef object owner = value
+    if isinstance(owner, bytes):
+        data[0] = PyBytes_AS_STRING(owner)
+        size[0] = PyBytes_GET_SIZE(owner)
+        return owner
+    if not isinstance(owner, str):
+        owner = str(owner)
+    data[0] = PyUnicode_AsUTF8AndSize(owner, size)
+    return owner
+
+
 cdef inline as_blob(object value):
     if isinstance(value, bytes):
         return value
@@ -186,8 +223,9 @@ cdef inline CassUuid as_cass_uuid(object value) except *:
 
     if isinstance(value, UUID):
         int_val = value.int
-        uuid_hi = <cass_uint64_t>((int_val >> 64) & 0xFFFFFFFFFFFFFFFF)
-        uuid_lo = <cass_uint64_t>(int_val & 0xFFFFFFFFFFFFFFFF)
+        # The low 64 bits of a Python int without creating new int objects for the masks
+        uuid_hi = <cass_uint64_t>PyLong_AsUnsignedLongLongMask(int_val >> 64)
+        uuid_lo = <cass_uint64_t>PyLong_AsUnsignedLongLongMask(int_val)
 
         # Repack top half into CassUuid.time_and_version layout:
         #   bits 0-31  = time_low
@@ -216,6 +254,26 @@ cdef inline CassUuid as_cass_uuid(object value) except *:
 cdef inline CassInet as_cass_inet(object value) except *:
     cdef CassInet cass_inet
     cdef CassError error
+    cdef cass_uint32_t ipv4
+    cdef bytes packed
+    cdef int i
+
+    if not isinstance(value, (str, bytes)):
+        # str() of an ipaddress object is several times slower than the whole bind of it
+        if isinstance(value, IPv4Address):
+            ipv4 = <cass_uint32_t>PyLong_AsUnsignedLongLongMask(int(value))
+            cass_inet.address[0] = (ipv4 >> 24) & 0xFF
+            cass_inet.address[1] = (ipv4 >> 16) & 0xFF
+            cass_inet.address[2] = (ipv4 >> 8) & 0xFF
+            cass_inet.address[3] = ipv4 & 0xFF
+            cass_inet.address_length = 4
+            return cass_inet
+        if isinstance(value, IPv6Address):
+            packed = value.packed
+            for i in range(16):
+                cass_inet.address[i] = <cass_uint8_t>packed[i]
+            cass_inet.address_length = 16
+            return cass_inet
     error = cass_inet_from_string(as_bytes(value), &cass_inet)
     if error:
         raise ValueError(f'Bad IP address value: "{value}"')
@@ -270,8 +328,8 @@ cdef inline cass_uint32_t as_cass_date(object value) except *:
             return <cass_uint32_t>(days_out + 2147483648)
         value = datetime.fromisoformat(value)
 
-    if isinstance(value, (date, datetime)):
-        return <cass_uint32_t>(days_from_civil(value.year, value.month, value.day) + 2147483648)
+    if isinstance(value, date):  # datetime is a date too
+        return <cass_uint32_t>(days_from_civil(date_year(value), date_month(value), date_day(value)) + 2147483648)
 
     epoch_secs = value
     cass_date = cass_date_from_epoch(epoch_secs)
@@ -353,13 +411,20 @@ cdef inline int _try_parse_iso_time_ns(str s, cass_int64_t* out) except -1:
     return 1
 
 
-cdef inline cass_int64_t _time_to_ns(object value):
-    cdef cass_int64_t t = (<cass_int64_t>value.hour * 3600
-                           + <cass_int64_t>value.minute * 60
-                           + value.second) * 1_000_000_000
-    t += <cass_int64_t>value.microsecond * 1_000
+cdef inline cass_int64_t _time_to_ns(object value) except? -1:
+    # The fields from the C structs of time and datetime, not attribute lookups
+    cdef cass_int64_t t
+    cdef object tzinfo
     cdef object offset
-    if value.tzinfo is not None:
+    if PyTime_Check(value):
+        t = (<cass_int64_t>time_hour(value) * 3600 + <cass_int64_t>time_minute(value) * 60
+             + time_second(value)) * 1_000_000_000 + <cass_int64_t>time_microsecond(value) * 1_000
+        tzinfo = time_tzinfo(value)
+    else:
+        t = (<cass_int64_t>datetime_hour(value) * 3600 + <cass_int64_t>datetime_minute(value) * 60
+             + datetime_second(value)) * 1_000_000_000 + <cass_int64_t>datetime_microsecond(value) * 1_000
+        tzinfo = datetime_tzinfo(value)
+    if tzinfo is not None:
         offset = value.utcoffset()
         if offset is not None:
             t -= <cass_int64_t>(offset.total_seconds() * 1_000_000_000)
@@ -552,6 +617,9 @@ cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object v
 # CASS_VALUE_TYPE_MAP, CASS_VALUE_TYPE_SET, CASS_VALUE_TYPE_LIST
 cdef inline void bind_collection_by_value_type(CassCollection* collection, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
     cdef CassError error = CASS_OK
+    cdef const char* text
+    cdef Py_ssize_t text_size
+    cdef object text_owner
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for collection value "{value}"'.encode())
@@ -574,7 +642,8 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
         error = cass_collection_append_string(collection, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_collection_append_string(collection, as_bytes(value))
+        text_owner = as_utf8(value, &text, &text_size)
+        error = cass_collection_append_string_n(collection, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
@@ -641,8 +710,22 @@ cdef inline CassCollection* get_collection(object value, const CassDataType* cas
     else:
         sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
         sub_value_type = cass_data_type_type(sub_data_type)
-        for i, v in enumerate(value):
-            bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+        # The element type is the same for all elements, the common ones skip the dispatch
+        if sub_value_type == CASS_VALUE_TYPE_INT:
+            for v in value:
+                error = cass_collection_append_int32(collection, v if type(v) is int else int(v))
+                if error:
+                    cass_collection_free(collection)
+                    raise_if_error(error)
+        elif sub_value_type == CASS_VALUE_TYPE_BIGINT:
+            for v in value:
+                error = cass_collection_append_int64(collection, v if type(v) is int else int(v))
+                if error:
+                    cass_collection_free(collection)
+                    raise_if_error(error)
+        else:
+            for v in value:
+                bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
 
     return collection
 
@@ -666,6 +749,9 @@ cdef inline  CassError bind_collection_by_name(CassStatement* statement, bytes n
 # CASS_VALUE_TYPE_TUPLE
 cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
     cdef CassError error = CASS_OK
+    cdef const char* text
+    cdef Py_ssize_t text_size
+    cdef object text_owner
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for Tuple index {index} value "{value}"'.encode())
@@ -690,7 +776,8 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
         error = cass_tuple_set_string(cass_tuple, index, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_tuple_set_string(cass_tuple, index, as_bytes(value))
+        text_owner = as_utf8(value, &text, &text_size)
+        error = cass_tuple_set_string_n(cass_tuple, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
@@ -741,12 +828,14 @@ cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_typ
 
     cass_tuple = cass_tuple_new(tuple_len)
 
-    for i, v in enumerate(value):
+    cdef size_t i = 0
+    for v in value:
         sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
         if sub_data_type == NULL:
             raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind Tuple index {i}'.encode())
         sub_value_type = cass_data_type_type(sub_data_type)
         bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type)
+        i += 1
 
     return cass_tuple
 
@@ -768,6 +857,9 @@ cdef inline bind_tuple_by_name(CassStatement* statement, bytes name, object valu
 # CASS_VALUE_TYPE_UDT
 cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
     cdef CassError error = CASS_OK
+    cdef const char* text
+    cdef Py_ssize_t text_size
+    cdef object text_owner
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {name} value "{value}"'.encode())
@@ -795,7 +887,8 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
         error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value))
+        text_owner = as_utf8(value, &text, &text_size)
+        error = cass_user_type_set_string_by_name_n(user_type, name, len(name), text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
@@ -836,6 +929,9 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
 cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
     cdef CassCollection* collection
     cdef CassError error = CASS_OK
+    cdef const char* text
+    cdef Py_ssize_t text_size
+    cdef object text_owner
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {index} value "{value}"'.encode())
@@ -851,7 +947,7 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
         error = cass_user_type_set_int32(user_type, index, int(value))
     elif cass_value_type in (CASS_VALUE_TYPE_BIGINT,
                              CASS_VALUE_TYPE_COUNTER):
-        error = cass_user_type_set_int64(user_type, index, value)
+        error = cass_user_type_set_int64(user_type, index, int(value))
     elif cass_value_type == CASS_VALUE_TYPE_FLOAT:
         error = cass_user_type_set_float(user_type, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
@@ -863,7 +959,8 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
         error = cass_user_type_set_string(user_type, index, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
-        error = cass_user_type_set_string(user_type, index, as_bytes(value))
+        text_owner = as_utf8(value, &text, &text_size)
+        error = cass_user_type_set_string_n(user_type, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                              CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
@@ -913,22 +1010,58 @@ cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_ty
     if user_type == NULL:
         raise ValueError(f'Unable to bind UDT with value {value}')
 
+    cdef size_t i = 0
+    cdef size_t field_count
+    cdef Py_ssize_t field
+    cdef bytes name
     if isinstance(value, dict):
+        field_count = cass_data_type_sub_type_count(cass_data_type)
         for k, v in value.items():
-            sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, k.encode())
-            if sub_data_type == NULL:
-                raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
-            sub_value_type = cass_data_type_type(sub_data_type)
-            bind_udt_value_by_name(user_type, k.encode(), v, sub_data_type, sub_value_type)
+            # The field named exactly like the key, set by index: no lookups by name in the driver
+            field = udt_field_index(cass_data_type, field_count, k, i) if isinstance(k, str) else -1
+            if field >= 0:
+                sub_data_type = cass_data_type_sub_data_type(cass_data_type, field)
+                bind_udt_value_by_index(user_type, field, v, sub_data_type, cass_data_type_type(sub_data_type))
+            else:
+                # The driver's lookup by name, which ignores case unless the name is quoted
+                name = k.encode()
+                sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, name)
+                if sub_data_type == NULL:
+                    raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
+                bind_udt_value_by_name(user_type, name, v, sub_data_type, cass_data_type_type(sub_data_type))
+            i += 1
     else:
-        for i, v in enumerate(value):
+        for v in value:
             sub_data_type = cass_data_type_sub_data_type(cass_data_type, i)
             if sub_data_type == NULL:
                 raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind UDT value "{v}" with index {i}'.encode())
             sub_value_type = cass_data_type_type(sub_data_type)
             bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type)
+            i += 1
 
     return user_type
+
+
+cdef inline Py_ssize_t udt_field_index(const CassDataType* cass_data_type, size_t field_count, str key, size_t hint) except -2:
+    """Index of the UDT field named exactly `key`, or -1. The field at `hint` is tried first, the
+    keys of a dict usually come in the order of the fields."""
+    cdef const char* key_data
+    cdef Py_ssize_t key_size
+    cdef const char* field_name
+    cdef size_t field_name_size
+    cdef size_t i
+    key_data = PyUnicode_AsUTF8AndSize(key, &key_size)
+    if hint < field_count and cass_data_type_sub_type_name(cass_data_type, hint, &field_name, &field_name_size) == CASS_OK:
+        if field_name_size == <size_t>key_size and memcmp(field_name, key_data, key_size) == 0:
+            return hint
+    for i in range(field_count):
+        if i == hint:
+            continue
+        if cass_data_type_sub_type_name(cass_data_type, i, &field_name, &field_name_size) != CASS_OK:
+            continue
+        if field_name_size == <size_t>key_size and memcmp(field_name, key_data, key_size) == 0:
+            return i
+    return -1
 
 
 cdef inline CassError bind_udt(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type)  except *:

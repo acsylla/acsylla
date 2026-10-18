@@ -290,6 +290,9 @@ cdef class Statement:
         cdef CassError error = CASS_OK
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
+        cdef const char* text
+        cdef Py_ssize_t text_size
+        cdef object text_owner
 
         if self.cass_prepared:
             cass_data_type = cass_prepared_parameter_data_type(self.cass_prepared, idx)
@@ -335,7 +338,8 @@ cdef class Statement:
             error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value, 'ascii'))
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
-            error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value))
+            text_owner = as_utf8(value, &text, &text_size)
+            error = cass_statement_bind_string_n(self.cass_statement, idx, text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                                  CASS_VALUE_TYPE_VARINT,
                                  CASS_VALUE_TYPE_CUSTOM):
@@ -392,6 +396,10 @@ cdef class Statement:
     def bind_by_name(self, str name, object value, object value_type = None):
         cdef const CassDataType* cass_data_type
         cdef CassValueType cass_value_type
+        cdef const char* text
+        cdef Py_ssize_t text_size
+        cdef object text_owner
+        cdef bytes name_bytes
 
         if self.prepared == 0:
             if value_type is None:
@@ -430,7 +438,9 @@ cdef class Statement:
             error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value, 'ascii'))
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
-            error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value))
+            text_owner = as_utf8(value, &text, &text_size)
+            name_bytes = name.encode()
+            error = cass_statement_bind_string_by_name_n(self.cass_statement, name_bytes, len(name_bytes), text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
                                  CASS_VALUE_TYPE_VARINT,
                                  CASS_VALUE_TYPE_CUSTOM):

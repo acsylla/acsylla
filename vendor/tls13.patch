@@ -1,0 +1,194 @@
+--- vendor/cpp-driver/src/socket.hpp
++++ vendor/cpp-driver/src/socket.hpp
+@@ -206,12 +206,7 @@
+    *
+    * @param The socket handling the write.
+    */
+-  SocketWriteBase(Socket* socket)
+-      : socket_(socket)
+-      , is_flushed_(false) {
+-    req_.data = this;
+-    buffers_.reserve(MIN_BUFFERS_SIZE);
+-  }
++  SocketWriteBase(Socket* socket);
+ 
+   virtual ~SocketWriteBase() {}
+ 
+@@ -260,6 +255,8 @@
+   Socket* socket_;
+   uv_write_t req_;
+   bool is_flushed_;
++  // The handler of the socket when the write was created, a write of another handler is not reused
++  size_t handler_generation_;
+   BufferVec buffers_;
+   RequestVec requests_;
+ };
+@@ -300,6 +297,11 @@
+   void set_handler(SocketHandlerBase* handler);
+ 
+   /**
++   * The number of times the handler of the socket was set.
++   */
++  size_t handler_generation() const { return handler_generation_; }
++
++  /**
+    * Write a request to the socket and coalesce with outstanding requests. This
+    * method doesn't flush.
+    *
+@@ -368,6 +370,7 @@
+ 
+   uv_tcp_t tcp_;
+   ScopedPtr<SocketHandlerBase> handler_;
++  size_t handler_generation_;
+ 
+   SocketWriteBase::List pending_writes_;
+   SocketWriteVec free_writes_;
+--- vendor/cpp-driver/src/socket.cpp
++++ vendor/cpp-driver/src/socket.cpp
+@@ -224,6 +224,14 @@
+ }
+ 
+ uv_tcp_t* SocketWriteBase::tcp() { return &socket_->tcp_; }
++
++SocketWriteBase::SocketWriteBase(Socket* socket)
++    : socket_(socket)
++    , is_flushed_(false)
++    , handler_generation_(socket->handler_generation()) {
++  req_.data = this;
++  buffers_.reserve(MIN_BUFFERS_SIZE);
++}
+ 
+ void SocketWriteBase::on_close() {
+   for (RequestVec::iterator i = requests_.begin(), end = requests_.end(); i != end; ++i) {
+@@ -267,7 +275,10 @@
+ 
+   socket->pending_writes_.remove(this);
+ 
+-  if (socket->free_writes_.size() < socket->max_reusable_write_objects_) {
++  // A write of the handler that was replaced, e.g. by on_write() above finishing the SSL handshake,
++  // is of the type of that handler: not reused by the new one
++  if (handler_generation_ == socket->handler_generation_ &&
++      socket->free_writes_.size() < socket->max_reusable_write_objects_) {
+     clear();
+     socket->free_writes_.push_back(this);
+   } else {
+@@ -278,7 +289,8 @@
+ }
+ 
+ Socket::Socket(const Address& address, size_t max_reusable_write_objects)
+-    : is_defunct_(false)
++    : handler_generation_(0)
++    , is_defunct_(false)
+     , max_reusable_write_objects_(max_reusable_write_objects)
+     , address_(address) {
+   tcp_.data = this;
+@@ -288,6 +300,7 @@
+ 
+ void Socket::set_handler(SocketHandlerBase* handler) {
+   handler_.reset(handler);
++  ++handler_generation_;
+   cleanup_free_writes();
+   free_writes_.clear();
+   if (handler_) {
+--- vendor/cpp-driver/src/socket_connector.hpp
++++ vendor/cpp-driver/src/socket_connector.hpp
+@@ -142,6 +142,7 @@
+ private:
+   void internal_connect(uv_loop_t* loop);
+   void ssl_handshake();
++  void ssl_handshake_finish();
+   void finish();
+ 
+   void on_error(SocketError code, const String& message);
+@@ -170,6 +171,8 @@
+   CassError ssl_error_code_;
+ 
+   ScopedPtr<SslSession> ssl_session_;
++  // The handshake is finished once, see ssl_handshake_finish()
++  bool is_handshake_finished_;
+ 
+   SocketSettings settings_;
+ };
+--- vendor/cpp-driver/src/socket_connector.cpp
++++ vendor/cpp-driver/src/socket_connector.cpp
+@@ -65,7 +65,13 @@
+     delete request;
+     if (status != 0) {
+       connector_->on_error(SocketConnector::SOCKET_ERROR_WRITE, "Write error");
++      return;
+     }
++    // With TLS 1.3 the handshake is done once the last data of the client is written, the server
++    // may send nothing more to read
++    if (connector_->ssl_session_->is_handshake_done()) {
++      connector_->ssl_handshake_finish();
++    }
+   }
+ 
+   virtual void on_close() {
+@@ -106,7 +112,8 @@
+     : address_(address)
+     , callback_(callback)
+     , error_code_(SOCKET_OK)
+-    , ssl_error_code_(CASS_OK) {}
++    , ssl_error_code_(CASS_OK)
++    , is_handshake_finished_(false) {}
+ 
+ SocketConnector* SocketConnector::with_settings(const SocketSettings& settings) {
+   settings_ = settings;
+@@ -211,23 +218,33 @@
+     }
+   }
+ 
+-  // Write any outgoing data created by the handshake process.
++  // Write any outgoing data created by the handshake process. If the handshake is done with it
++  // (TLS 1.3), it finishes once the data is written, see SslHandshakeHandler::on_write().
+   char buf[SSL_HANDSHAKE_MAX_BUFFER_SIZE];
+   size_t size = ssl_session_->outgoing().read(buf, SSL_HANDSHAKE_MAX_BUFFER_SIZE);
+   if (size > 0) {
+     socket_->write_and_flush(new BufferSocketRequest(Buffer(buf, size)));
+-  } else if (ssl_session_->is_handshake_done()) { // If the handshake process is done then verify
+-                                                  // the certificate and finish.
+-    ssl_session_->verify();
+-    if (ssl_session_->has_error()) {
+-      on_error(SOCKET_ERROR_SSL_VERIFY,
+-               "Error verifying peer certificate: " + ssl_session_->error_message());
+-      return;
+-    }
+-    finish();
++  } else if (ssl_session_->is_handshake_done()) {
++    ssl_handshake_finish();
+   }
+ }
+ 
++void SocketConnector::ssl_handshake_finish() {
++  // With TLS 1.3 both the write of the last data of the client and data of the server read after
++  // it (e.g. a session ticket) see the handshake done
++  if (is_handshake_finished_) return;
++  is_handshake_finished_ = true;
++
++  // Verify the certificate and finish
++  ssl_session_->verify();
++  if (ssl_session_->has_error()) {
++    on_error(SOCKET_ERROR_SSL_VERIFY,
++             "Error verifying peer certificate: " + ssl_session_->error_message());
++    return;
++  }
++  finish();
++}
++
+ void SocketConnector::finish() {
+   if (socket_) socket_->set_handler(NULL);
+   callback_(this);
+--- vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
++++ vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
+@@ -537,10 +537,6 @@
+     , trusted_store_(X509_STORE_new()) {
+   SSL_CTX_set_cert_store(ssl_ctx_, trusted_store_);
+   SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_NONE, ssl_no_verify_callback);
+-#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+-  // Limit to TLS 1.2 for now. TLS 1.3 has broken the handshake code.
+-  SSL_CTX_set_max_proto_version(ssl_ctx_, TLS1_2_VERSION);
+-#endif
+ #if DEBUG_SSL
+   SSL_CTX_set_info_callback(ssl_ctx_, ssl_info_callback);
+ #endif

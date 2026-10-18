@@ -1,0 +1,59 @@
+--- vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
++++ vendor/cpp-driver/src/ssl/ssl_openssl_impl.cpp
+@@ -238,22 +238,6 @@
+ end:
+   if (x != NULL) X509_free(x);
+   return ret;
+-}
+-
+-static X509* load_cert(const char* cert, size_t cert_size) {
+-  BIO* bio = BIO_new_mem_buf(const_cast<char*>(cert), cert_size);
+-  if (bio == NULL) {
+-    return NULL;
+-  }
+-
+-  X509* x509 = PEM_read_bio_X509(bio, NULL, pem_password_callback, NULL);
+-  if (x509 == NULL) {
+-    ssl_log_errors("Unable to load certificate");
+-  }
+-
+-  BIO_free_all(bio);
+-
+-  return x509;
+ }
+ 
+ static EVP_PKEY* load_key(const char* key, size_t key_size, const char* password) {
+@@ -570,13 +554,29 @@
+ }
+ 
+ CassError OpenSslContext::add_trusted_cert(const char* cert, size_t cert_length) {
+-  X509* x509 = load_cert(cert, cert_length);
+-  if (x509 == NULL) {
++  BIO* bio = BIO_new_mem_buf(const_cast<char*>(cert), cert_length);
++  if (bio == NULL) {
++    return CASS_ERROR_SSL_INVALID_CERT;
++  }
++
++  // All the certificates of a bundle, not only the first one
++  int num_certs = 0;
++  for (X509* x509 = PEM_read_bio_X509(bio, NULL, pem_password_callback, NULL); x509 != NULL;
++       x509 = PEM_read_bio_X509(bio, NULL, pem_password_callback, NULL)) {
++    X509_STORE_add_cert(trusted_store_, x509);
++    X509_free(x509);
++    num_certs++;
++  }
++
++  BIO_free_all(bio);
++
++  if (num_certs == 0) {
++    ssl_log_errors("Unable to load certificate");
+     return CASS_ERROR_SSL_INVALID_CERT;
+   }
+ 
+-  X509_STORE_add_cert(trusted_store_, x509);
+-  X509_free(x509);
++  // The end of the bundle is an error too, it would fail the next PEM read of this thread
++  ERR_clear_error();
+ 
+   return CASS_OK;
+ }

@@ -12,6 +12,8 @@ Changelog
 - Open the connections to all shards of a ScyllaDB node right away once it answers instead of after the 2 second reconnect delay (patch for cpp-driver `vendor/connect-shards-now.patch`)
 - Fix a crash when a ScyllaDB node that was down when the session started comes back (patch for cpp-driver `vendor/pool-learns-shards.patch`)
 - Keep using a ScyllaDB node that comes back with another IP address instead of ignoring it, and drop its old address (patch for cpp-driver `vendor/node-address-change.patch`)
+- Support TLS 1.3, the driver was limited to TLS 1.2 and could not connect to a server that accepts only TLS 1.3 (patch for cpp-driver `vendor/tls13.patch`, from CASSCPP-16 of apache/cassandra-cpp-driver)
+- Trust all the certificates of `ssl_trusted_cert`, not only the first one of a bundle (patch for cpp-driver `vendor/trusted-cert-bundle.patch`, from apache/cassandra-cpp-driver#522)
 - Use `inspect.iscoroutinefunction`, `asyncio.iscoroutinefunction` is deprecated since Python 3.14
 
 1.1.2

@@ -77,6 +77,46 @@ cdef extern from *:
     object acsylla_varint_as_int(const unsigned char* varint, size_t size)
     bytes acsylla_int_as_varint(object value)
 
+cdef extern from *:
+    """
+    /* PyMemberDef is in Python.h from Python 3.12 */
+    #if PY_VERSION_HEX < 0x030C0000
+    #include "structmember.h"
+    #endif
+
+    /* The offset in its objects of a slot of __slots__, from the member descriptor of the slot */
+    static Py_ssize_t acsylla_member_offset(PyObject* descriptor) {
+        return ((PyMemberDescrObject*)descriptor)->d_member->offset;
+    }
+
+    /* A uuid.UUID of 16 bytes as UUID._from_int() of Python 3.14 makes it: the int of the bytes in its slot int and
+       SafeUUID.unknown in its slot is_safe */
+    static PyObject* acsylla_new_uuid(PyObject* type, const unsigned char* data, PyObject* is_safe,
+                                      Py_ssize_t int_offset, Py_ssize_t is_safe_offset) {
+    #if PY_VERSION_HEX >= 0x030D0000
+        PyObject* value = PyLong_FromUnsignedNativeBytes(data, 16, Py_ASNATIVEBYTES_BIG_ENDIAN);
+    #else
+        PyObject* value = _PyLong_FromByteArray(data, 16, 0, 0);
+    #endif
+        PyObject* uuid;
+        if (value == NULL) {
+            return NULL;
+        }
+        uuid = ((PyTypeObject*)type)->tp_alloc((PyTypeObject*)type, 0);
+        if (uuid == NULL) {
+            Py_DECREF(value);
+            return NULL;
+        }
+        *(PyObject**)((char*)uuid + int_offset) = value;
+        Py_INCREF(is_safe);
+        *(PyObject**)((char*)uuid + is_safe_offset) = is_safe;
+        return uuid;
+    }
+    """
+    Py_ssize_t acsylla_member_offset(object descriptor)
+    object acsylla_new_uuid(object type, const unsigned char* data, object is_safe, Py_ssize_t int_offset,
+                            Py_ssize_t is_safe_offset)
+
 cimport cython
 
 from cpython.datetime cimport date_new
@@ -97,11 +137,38 @@ from decimal import Decimal
 from decimal import MAX_EMAX
 from decimal import MAX_PREC
 from decimal import MIN_EMIN
+from types import MemberDescriptorType
+from uuid import SafeUUID
+from uuid import UUID
 
 import_datetime()
 
 # Changes the exponent of a Decimal without rounding its digits
 cdef object DECIMAL_EXACT = Context(prec=MAX_PREC, Emax=MAX_EMAX, Emin=MIN_EMIN)
+
+# A uuid.UUID is made as UUID._from_int() makes it, its slots written at their offsets: 10 times faster than
+# UUID(bytes=...). When uuid.UUID is not the class of these two slots any more, its constructor makes it
+cdef object UUID_UNKNOWN = SafeUUID.unknown
+cdef Py_ssize_t UUID_INT_OFFSET = -1
+cdef Py_ssize_t UUID_IS_SAFE_OFFSET = -1
+
+
+cdef void find_uuid_slots() except *:
+    global UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET
+    if (UUID.__new__ is not object.__new__ or set(UUID.__slots__) != {"int", "is_safe", "__weakref__"}
+            or not isinstance(UUID.__dict__.get("int"), MemberDescriptorType)
+            or not isinstance(UUID.__dict__.get("is_safe"), MemberDescriptorType)):
+        return
+    int_offset = acsylla_member_offset(UUID.__dict__["int"])
+    is_safe_offset = acsylla_member_offset(UUID.__dict__["is_safe"])
+    data = bytes(range(16))
+    made = acsylla_new_uuid(UUID, data, UUID_UNKNOWN, int_offset, is_safe_offset)
+    if made == UUID(bytes=data) and made.int == UUID(bytes=data).int and made.is_safe is UUID_UNKNOWN:
+        UUID_INT_OFFSET = int_offset
+        UUID_IS_SAFE_OFFSET = is_safe_offset
+
+
+find_uuid_slots()
 
 
 cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
@@ -124,7 +191,7 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
     elif cass_type in (CASS_VALUE_TYPE_BIGINT, CASS_VALUE_TYPE_COUNTER):
         return _int64(cass_value)
     elif cass_type in (CASS_VALUE_TYPE_UUID, CASS_VALUE_TYPE_TIMEUUID):
-        return _uuid(cass_value)
+        return _uuid(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_FLOAT:
         return _float(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DOUBLE:
@@ -221,19 +288,45 @@ cdef inline object _int64(const CassValue* cass_value):
     return output
 
 
-cdef inline object _uuid(const CassValue* cass_value):
-    cdef char output[CASS_UUID_STRING_LENGTH]
-    cdef CassError error
-    cdef CassUuid uuid
+cdef inline object uuid_text(const cass_byte_t* data):
+    """The xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx of a uuid."""
+    cdef char buffer[36]
+    cdef Py_ssize_t i, length = 0
+    cdef const char* hexdigits = "0123456789abcdef"
+    for i in range(16):
+        if i == 4 or i == 6 or i == 8 or i == 10:
+            buffer[length] = b"-"
+            length += 1
+        buffer[length] = hexdigits[data[i] >> 4]
+        buffer[length + 1] = hexdigits[data[i] & 15]
+        length += 2
+    return PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, buffer, 36)
 
-    error = cass_value_get_uuid(cass_value, &uuid)
+
+cdef inline object _uuid(const CassValue* cass_value, int8_t flags):
+    """ Returns the uuid.UUID of a uuid or timeuuid column, its str with native_types or legacy_types.
+
+    Raises a derived `CassException` if the value can not be retrieved"""
+    cdef const cass_byte_t* data = NULL
+    cdef size_t size = 0
+    cdef CassError error
+
+    error = cass_value_get_bytes(cass_value, &data, &size)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
 
-    cass_uuid_string(uuid, output)
-    return output.decode()
+    if size == 0:
+        # An empty value
+        return None
+    if size != 16:
+        raise ValueError(f"a uuid of {size} bytes")
+    if flags & (NATIVE_TYPES | LEGACY_TYPES):
+        return uuid_text(data)
+    if UUID_INT_OFFSET >= 0:
+        return acsylla_new_uuid(UUID, data, UUID_UNKNOWN, UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET)
+    return UUID(bytes=data[:16])
 
 
 cdef inline object _float(const CassValue* cass_value):

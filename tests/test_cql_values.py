@@ -27,20 +27,23 @@ from types import FunctionType
 from uuid import UUID
 
 import acsylla
+import copy
+import gc
 import math
 import os
+import pickle
 import pytest
 import re
 import struct
+import uuid
 import warnings
+import weakref
 
 pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-UUIDS = "stage 4: uuid"
 INET = "stage 5: inet"
-UUIDS_INET = "stages 4, 5: uuid, inet"
 DURATION = "stage 6: Duration"
 VECTOR = "stage 7: vector"
 UNHASHABLE = "stage 8: unhashable set elements and map keys"
@@ -335,8 +338,8 @@ CASES = [
         legacy=Decimal("1234.5678"),
         legacy_native="1234.5678",
     ),
-    Case("uuid", "uuid", UUID_1, UUID(UUID_1), UUID_1, todo={"read": UUIDS}, legacy=UUID_1),
-    Case("timeuuid", "timeuuid", TIMEUUID_1, UUID(TIMEUUID_1), TIMEUUID_1, todo={"read": UUIDS}, legacy=TIMEUUID_1),
+    Case("uuid", "uuid", UUID_1, UUID(UUID_1), UUID_1, legacy=UUID_1),
+    Case("timeuuid", "timeuuid", TIMEUUID_1, UUID(TIMEUUID_1), TIMEUUID_1, legacy=TIMEUUID_1),
     Case(
         "inet",
         "inet",
@@ -502,14 +505,14 @@ CASES = [
         {"street": "Main", "num": 5},
         {"street": "Main", "num": 5},
     ),
-    Case("list-uuid", "list<uuid>", f"[{UUID_1}]", [UUID(UUID_1)], [UUID_1], todo={"read": UUIDS}, legacy=[UUID_1]),
+    Case("list-uuid", "list<uuid>", f"[{UUID_1}]", [UUID(UUID_1)], [UUID_1], legacy=[UUID_1]),
     Case(
         "map-timeuuid-inet",
         "map<timeuuid, inet>",
         f"{{{TIMEUUID_1}: '10.0.0.1'}}",
         {UUID(TIMEUUID_1): IPv4Address("10.0.0.1")},
         {TIMEUUID_1: "10.0.0.1"},
-        todo={"read": UUIDS_INET},
+        todo={"read": INET},
         legacy={TIMEUUID_1: "10.0.0.1"},
     ),
     Case(
@@ -992,6 +995,31 @@ class TestRead:
             statement = create_statement("SELECT value_counter FROM cql_counters WHERE id = 1")
             result = await session.execute(statement, native_types=native_types)
             assert same(result.first().column_value("value_counter"), 5)
+
+
+class TestUUID:
+    """A uuid.UUID made from its slots is the one of its constructor."""
+
+    @pytest.mark.parametrize("case_name", ["uuid", "timeuuid"])
+    async def test_object(self, session, case_name):
+        case = next(c for c in CASES if c.id == case_name)
+        value = (await read(session, case.cql_type, READ_ID + case_id(case)))[0]
+        expected = UUID(case.literal)
+        assert type(value) is UUID
+        assert value == expected and hash(value) == hash(expected) and value.int == expected.int
+        assert str(value) == case.literal and repr(value) == repr(expected)
+        assert value.is_safe is uuid.SafeUUID.unknown
+        assert value.version == expected.version
+        if case_name == "timeuuid":
+            assert value.time == expected.time
+        assert pickle.loads(pickle.dumps(value)) == expected
+        assert copy.copy(value) == expected and copy.deepcopy(value) == expected
+        assert {value: 1}[expected] == 1
+        # Freed with its last reference
+        reference = weakref.ref(value)
+        del value
+        gc.collect()
+        assert reference() is None
 
 
 class TestWrite:

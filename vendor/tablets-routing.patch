@@ -1,0 +1,849 @@
+--- vendor/cpp-driver/src/connection_pool.cpp
++++ vendor/cpp-driver/src/connection_pool.cpp
+@@ -147,6 +147,19 @@
+   return *it;
+ }
+ 
++PooledConnection::Ptr ConnectionPool::find_least_busy(int64_t token, int32_t shard) const {
++  if (shard >= 0 && static_cast<size_t>(shard) < connections_by_shard_.size()) {
++    const auto& shard_pool = connections_by_shard_[shard];
++    PooledConnection::Vec::const_iterator it =
++        std::min_element(shard_pool.begin(), shard_pool.end(), least_busy_comp);
++    if (it != shard_pool.end() && !(*it)->is_closing()) {
++      return *it;
++    }
++    return find_least_busy(CASS_INT64_MIN);
++  }
++  return find_least_busy(token);
++}
++
+ bool ConnectionPool::has_connections() const {
+   return std::any_of(connections_by_shard_.begin(), connections_by_shard_.end(),
+       [] (const PooledConnection::Vec& v) { return !v.empty(); });
+--- vendor/cpp-driver/src/connection_pool.hpp
++++ vendor/cpp-driver/src/connection_pool.hpp
+@@ -138,6 +138,16 @@
+   PooledConnection::Ptr find_least_busy(int64_t token) const;
+ 
+   /**
++   * Find the least busy connection to a shard, when the shard of a request is known from its
++   * tablet instead of its token.
++   *
++   * @param token The token of the request, used when the shard is unknown (-1).
++   * @param shard The shard or -1.
++   * @return The least busy connection or null if no connection is available.
++   */
++  PooledConnection::Ptr find_least_busy(int64_t token, int32_t shard) const;
++
++  /**
+    * Determine if the pool has any valid connections.
+    *
+    * @return Returns true if the pool has valid connections.
+@@ -169,6 +179,7 @@
+ public:
+   uv_loop_t* loop() { return loop_; }
+   const Address& address() const { return host_->address(); }
++  const Host::Ptr& host() const { return host_; }
+   ProtocolVersion protocol_version() const { return protocol_version_; }
+   const String& keyspace() const { return keyspace_; }
+ 
+--- vendor/cpp-driver/src/connection_pool_manager.cpp
++++ vendor/cpp-driver/src/connection_pool_manager.cpp
+@@ -49,6 +49,7 @@
+     , listener_(listener ? listener : &nop_connection_pool_manager_listener__)
+     , close_state_(CLOSE_STATE_OPEN)
+     , keyspace_(keyspace)
++    , pools_version_(0)
+     , metrics_(metrics)
+     , shard_port_calculator_(shard_port_calculator)
+ #ifdef CASS_INTERNAL_DIAGNOSTICS
+@@ -72,6 +73,31 @@
+   return it->second->find_least_busy(token);
+ }
+ 
++PooledConnection::Ptr ConnectionPoolManager::find_least_busy(const Address& address, int64_t token,
++                                                             int32_t shard) const {
++  ConnectionPool::Map::const_iterator it = pools_.find(address);
++  if (it == pools_.end()) {
++    return PooledConnection::Ptr();
++  }
++  return it->second->find_least_busy(token, shard);
++}
++
++Host::Ptr ConnectionPoolManager::find_host(const CassUuid& host_id) const {
++  // A host that came back with another address has a pool for each address until the old one is
++  // removed, the pool with connections is the one to use
++  Host::Ptr found;
++  for (ConnectionPool::Map::const_iterator it = pools_.begin(), end = pools_.end(); it != end;
++       ++it) {
++    const Host::Ptr& host = it->second->host();
++    if (host->has_host_id() && host->host_id().time_and_version == host_id.time_and_version &&
++        host->host_id().clock_seq_and_node == host_id.clock_seq_and_node) {
++      if (it->second->has_connections()) return host;
++      if (!found) found = host;
++    }
++  }
++  return found;
++}
++
+ bool ConnectionPoolManager::has_connections(const Address& address) const {
+   ConnectionPool::Map::const_iterator it = pools_.find(address);
+   return it != pools_.end() && it->second->has_connections();
+@@ -186,6 +212,7 @@
+ 
+ void ConnectionPoolManager::on_close(ConnectionPool* pool) {
+   pools_.erase(pool->address());
++  ++pools_version_;
+   to_flush_.erase(pool);
+   maybe_closed();
+ }
+@@ -193,6 +220,7 @@
+ void ConnectionPoolManager::add_pool(const ConnectionPool::Ptr& pool) {
+   LOG_DEBUG("Adding pool for host %s", pool->address().to_string().c_str());
+   pools_[pool->address()] = pool;
++  ++pools_version_;
+ }
+ 
+ // This must be the last call in a function because it can potentially
+--- vendor/cpp-driver/src/connection_pool_manager.hpp
++++ vendor/cpp-driver/src/connection_pool_manager.hpp
+@@ -24,6 +24,7 @@
+ #include "histogram_wrapper.hpp"
+ #include "ref_counted.hpp"
+ #include "string.hpp"
++#include "tablets.hpp"
+ 
+ #include <uv.h>
+ 
+@@ -57,7 +58,8 @@
+  */
+ class ConnectionPoolManager
+     : public RefCounted<ConnectionPoolManager>
+-    , public ConnectionPoolListener {
++    , public ConnectionPoolListener
++    , public TabletHostResolver {
+ public:
+   typedef SharedRefPtr<ConnectionPoolManager> Ptr;
+ 
+@@ -88,6 +90,30 @@
+   PooledConnection::Ptr find_least_busy(const Address& address, int64_t token) const;
+ 
+   /**
++   * Find the least busy connection to a shard of a given host, see
++   * `ConnectionPool::find_least_busy(int64_t, int32_t)`.
++   */
++  PooledConnection::Ptr find_least_busy(const Address& address, int64_t token,
++                                        int32_t shard) const;
++
++  /**
++   * Find the host of a pool by its host ID, a pool with connections first.
++   *
++   * @return The host or null if no pool connects to it.
++   */
++  virtual Host::Ptr find_host(const CassUuid& host_id) const;
++
++  /**
++   * Changes every time a pool is added or closed.
++   */
++  virtual uint64_t pools_version() const { return pools_version_; }
++
++  /**
++   * Tablets known to the request processor of the manager.
++   */
++  TabletMap& tablets() { return tablets_; }
++
++  /**
+    * Non-token-aware version of `find_least_busy()`, kept only for testing.
+    */
+   PooledConnection::Ptr find_least_busy(const Address& address) const {
+@@ -205,6 +231,9 @@
+ 
+   String keyspace_;
+ 
++  TabletMap tablets_;
++  uint64_t pools_version_;
++
+   Metrics* const metrics_;
+   const ShardPortCalculator* shard_port_calculator_;
+ 
+--- vendor/cpp-driver/src/connector.cpp
++++ vendor/cpp-driver/src/connector.cpp
+@@ -31,6 +31,7 @@
+ #include "request.hpp"
+ #include "startup_request.hpp"
+ #include "shard_port_calculator.hpp"
++#include "tablets.hpp"
+ 
+ #include "response.hpp"
+ #include "result_response.hpp"
+@@ -318,10 +319,12 @@
+     }
+   }
+ 
++  bool tablets_routing_v1 = supported_options_.count(SCYLLA_TABLETS_ROUTING_V1) > 0;
++
+   connection_->write_and_flush(RequestCallback::Ptr(new StartupCallback(
+       this, Request::ConstPtr(new StartupRequest(settings_.application_name,
+                                                  settings_.application_version, settings_.client_id,
+-                                                 settings_.no_compact)))));
++                                                 settings_.no_compact, tablets_routing_v1)))));
+ }
+ 
+ void Connector::on_authenticate(const String& class_name) {
+--- vendor/cpp-driver/src/host.cpp
++++ vendor/cpp-driver/src/host.cpp
+@@ -95,8 +95,11 @@
+     , rack_id_(0)
+     , dc_id_(0)
+     , address_string_(address.to_string())
++    , has_host_id_(false)
+     , connection_count_(0)
+     , inflight_request_count_(0) {
++  host_id_.time_and_version = 0;
++  host_id_.clock_seq_and_node = 0;
+   uv_mutex_init(&mutex_);
+ }
+ 
+@@ -145,6 +148,12 @@
+ 
+   row->get_string_by_name("partitioner", &partitioner_);
+ 
++  CassUuid host_id;
++  if (row->get_uuid_by_name("host_id", &host_id)) {
++    host_id_ = host_id;
++    has_host_id_ = true;
++  }
++
+   if (use_tokens) {
+     v = row->get_by_name("tokens");
+     if (v != NULL && v->is_collection()) {
+--- vendor/cpp-driver/src/host.hpp
++++ vendor/cpp-driver/src/host.hpp
+@@ -139,6 +139,10 @@
+   }
+ 
+   const String& partitioner() const { return partitioner_; }
++
++  // Host ID from system.local or system.peers, tablets name their replicas by it
++  bool has_host_id() const { return has_host_id_; }
++  const CassUuid& host_id() const { return host_id_; }
+ 
+   const Vector<String>& tokens() const { return tokens_; }
+ 
+@@ -233,6 +237,8 @@
+   String rack_;
+   String dc_;
+   String partitioner_;
++  bool has_host_id_;
++  CassUuid host_id_;
+   Vector<String> tokens_;
+   Atomic<int32_t> connection_count_;
+   Atomic<int32_t> inflight_request_count_;
+--- vendor/cpp-driver/src/request_handler.cpp
++++ vendor/cpp-driver/src/request_handler.cpp
+@@ -163,6 +163,7 @@
+     , future_(future)
+     , is_done_(false)
+     , running_executions_(0)
++    , token_(CASS_INT64_MIN)
+     , start_time_ns_(uv_hrtime())
+     , listener_(&nop_request_listener__)
+     , manager_(NULL)
+@@ -201,6 +202,23 @@
+   const String& keyspace(!request()->keyspace().empty() ? request()->keyspace()
+                                                         : manager_->keyspace());
+ 
++  const RoutableRequest* routable_req = dynamic_cast<const RoutableRequest*>(request());
++  if (routable_req) {
++    String routing_key;
++    // A request without a routing key (e.g. a simple statement) keeps the placeholder token,
++    // so it goes to the least busy connection of the pool instead of always the same shard
++    if (routable_req->get_routing_key(&routing_key)) {
++      token_ = Murmur3Partitioner::hash(routing_key);
++    }
++  }
++
++  // The tablet of a request to a table with tablets decides its replicas and their shards
++  StringRef tablet_keyspace, table;
++  if (token_ != CASS_INT64_MIN && !manager_->tablets().empty() &&
++      tablet_table(&tablet_keyspace, &table)) {
++    tablet_replicas_ = manager_->tablets().find(tablet_keyspace, table, token_, *manager_);
++  }
++
+   // If a specific host is set then bypass the load balancing policy and use a
+   // specialized single host query plan.
+   if (request()->host()) {
+@@ -242,6 +260,68 @@
+   future_->add_attempted_address(address);
+ }
+ 
++bool RequestHandler::tablet_table(StringRef* keyspace, StringRef* table) const {
++  const Request* routed = request();
++  if (routed->opcode() == CQL_OPCODE_BATCH) {
++    // A batch is routed by the first of its statements with a routing key
++    const BatchRequest::StatementVec& statements =
++        static_cast<const BatchRequest*>(routed)->statements();
++    routed = NULL;
++    String routing_key;
++    for (BatchRequest::StatementVec::const_iterator it = statements.begin(),
++                                                    end = statements.end();
++         it != end; ++it) {
++      if ((*it)->get_routing_key(&routing_key)) {
++        routed = it->get();
++        break;
++      }
++    }
++    if (routed == NULL) return false;
++  }
++  // Only a bound statement knows its table, from the metadata of its prepared statement
++  if (routed->opcode() != CQL_OPCODE_EXECUTE) return false;
++  const ResultResponse::ConstPtr& prepared =
++      static_cast<const ExecuteRequest*>(routed)->prepared()->result();
++  *keyspace = prepared->keyspace();
++  *table = prepared->table();
++  if ((keyspace->empty() || table->empty()) && prepared->metadata() &&
++      prepared->metadata()->column_count() > 0) {
++    // Without the global table spec every bound variable has its own
++    const ColumnDefinition& column = prepared->metadata()->get_column_definition(0);
++    *keyspace = column.keyspace;
++    *table = column.table;
++  }
++  return !keyspace->empty() && !table->empty();
++}
++
++void RequestHandler::update_tablets(const Response::Ptr& response, Protected) {
++  const CustomPayloadVec& payload = response->custom_payload();
++  for (CustomPayloadVec::const_iterator it = payload.begin(), end = payload.end(); it != end;
++       ++it) {
++    if (it->name != SCYLLA_TABLETS_ROUTING_V1_PAYLOAD) continue;
++
++    StringRef keyspace, table;
++    if (!tablet_table(&keyspace, &table)) return;
++
++    int64_t first_token, last_token;
++    TabletReplicaIds ids;
++    if (!TabletMap::decode_payload(it->value, &first_token, &last_token, &ids)) {
++      LOG_WARN("Invalid %s custom payload", SCYLLA_TABLETS_ROUTING_V1_PAYLOAD);
++      return;
++    }
++    TabletReplicas::ConstPtr replicas =
++        manager_->tablets().update(keyspace, table, first_token, last_token, ids, *manager_);
++    if (replicas) {
++      LOG_DEBUG("Tablet (%lld, %lld] of %.*s.%.*s has %u of %u replicas with a pool",
++                static_cast<long long>(first_token), static_cast<long long>(last_token),
++                static_cast<int>(keyspace.size()), keyspace.data(), static_cast<int>(table.size()),
++                table.data(), static_cast<unsigned>(replicas->hosts()->size()),
++                static_cast<unsigned>(ids.size()));
++    }
++    return;
++  }
++}
++
+ void RequestHandler::notify_result_metadata_changed(const String& prepared_id, const String& query,
+                                                     const String& keyspace,
+                                                     const String& result_metadata_id,
+@@ -358,19 +438,11 @@
+ 
+   bool is_done = false;
+   while (!is_done && request_execution->current_host()) {
+-    int64_t token = CASS_INT64_MIN;
+-    const RoutableRequest* routable_req = dynamic_cast<const RoutableRequest*>(request());
+-    if (routable_req) {
+-      String routing_key;
+-      // A request without a routing key (e.g. a simple statement) keeps the placeholder token,
+-      // so it goes to the least busy connection of the pool instead of always the same shard
+-      if (routable_req->get_routing_key(&routing_key)) {
+-        token = Murmur3Partitioner::hash(routing_key);
+-      }
+-    }
+-
+-    PooledConnection::Ptr connection =
+-        manager_->find_least_busy(request_execution->current_host()->address(), token);
++    int32_t shard = tablet_replicas_
++                        ? tablet_replicas_->shard(request_execution->current_host().get())
++                        : -1;
++    PooledConnection::Ptr connection = manager_->find_least_busy(
++        request_execution->current_host()->address(), token_, shard);
+     if (connection) {
+       int32_t result = connection->write(request_execution);
+ 
+@@ -476,6 +548,9 @@
+ 
+   switch (response->opcode()) {
+     case CQL_OPCODE_RESULT:
++      if (!response->response_body()->custom_payload().empty()) {
++        request_handler_->update_tablets(response->response_body(), RequestHandler::Protected());
++      }
+       on_result_response(connection, response);
+       break;
+     case CQL_OPCODE_ERROR:
+--- vendor/cpp-driver/src/request_handler.hpp
++++ vendor/cpp-driver/src/request_handler.hpp
+@@ -33,6 +33,7 @@
+ #include "small_vector.hpp"
+ #include "speculative_execution.hpp"
+ #include "string.hpp"
++#include "tablets.hpp"
+ #include "timestamp_generator.hpp"
+ 
+ #include <uv.h>
+@@ -173,6 +174,13 @@
+   const RequestWrapper& wrapper() const { return wrapper_; }
+   const Request* request() const { return wrapper_.request().get(); }
+   CassConsistency consistency() const { return wrapper_.consistency(); }
++
++  /**
++   * Replicas of the tablet of the request, used instead of the token map replicas.
++   *
++   * @return The replicas or NULL if the request has no known tablet.
++   */
++  const TabletReplicas* tablet_replicas() const { return tablet_replicas_.get(); }
+ 
+ public:
+   class Protected {
+@@ -190,6 +198,8 @@
+ 
+   void add_attempted_address(const Address& address, Protected);
+ 
++  void update_tablets(const Response::Ptr& response, Protected);
++
+   void notify_result_metadata_changed(const String& prepared_id, const String& query,
+                                       const String& keyspace, const String& result_metadata_id,
+                                       const ResultResponse::ConstPtr& result_response, Protected);
+@@ -216,6 +226,7 @@
+ private:
+   void stop_request();
+   void internal_retry(RequestExecution* request_execution);
++  bool tablet_table(StringRef* keyspace, StringRef* table) const;
+ 
+ private:
+   RequestWrapper wrapper_;
+@@ -224,6 +235,9 @@
+   bool is_done_;
+   int running_executions_;
+ 
++  int64_t token_; // CASS_INT64_MIN when the request has no routing key
++  TabletReplicas::ConstPtr tablet_replicas_;
++
+   ScopedPtr<QueryPlan> query_plan_;
+   ScopedPtr<SpeculativeExecutionPlan> execution_plan_;
+   Timer timer_;
+--- vendor/cpp-driver/src/startup_request.cpp
++++ vendor/cpp-driver/src/startup_request.cpp
+@@ -16,6 +16,7 @@
+ 
+ #include "startup_request.hpp"
+ #include "driver_info.hpp"
++#include "tablets.hpp"
+ 
+ using namespace datastax::internal;
+ using namespace datastax::internal::core;
+@@ -41,6 +42,10 @@
+   if (no_compact_enabled_) {
+     options["NO_COMPACT"] = "true";
+   }
++  if (tablets_routing_v1_enabled_) {
++    // ScyllaDB then sends the tablet of a request routed to a wrong node or shard, see tablets.hpp
++    options[SCYLLA_TABLETS_ROUTING_V1] = "";
++  }
+ 
+   for (OptionsMap::const_iterator it = options.begin(), end = options.end(); it != end; ++it) {
+     length += sizeof(uint16_t) + it->first.size();
+--- vendor/cpp-driver/src/startup_request.hpp
++++ vendor/cpp-driver/src/startup_request.hpp
+@@ -28,17 +28,20 @@
+ class StartupRequest : public Request {
+ public:
+   StartupRequest(const String& application_name, const String& application_version,
+-                 const String& client_id, bool no_compact_enabled)
++                 const String& client_id, bool no_compact_enabled,
++                 bool tablets_routing_v1_enabled = false)
+       : Request(CQL_OPCODE_STARTUP)
+       , application_name_(application_name)
+       , application_version_(application_version)
+       , client_id_(client_id)
+-      , no_compact_enabled_(no_compact_enabled) {}
++      , no_compact_enabled_(no_compact_enabled)
++      , tablets_routing_v1_enabled_(tablets_routing_v1_enabled) {}
+ 
+   const String& application_name() const { return application_name_; }
+   const String& application_version() const { return application_version_; }
+   const String& client_id() const { return client_id_; }
+   bool no_compact_enabled() const { return no_compact_enabled_; }
++  bool tablets_routing_v1_enabled() const { return tablets_routing_v1_enabled_; }
+ 
+ private:
+   int encode(ProtocolVersion version, RequestCallback* callback, BufferVec* bufs) const;
+@@ -50,6 +53,7 @@
+   String application_version_;
+   String client_id_;
+   bool no_compact_enabled_;
++  bool tablets_routing_v1_enabled_;
+ };
+ 
+ }}} // namespace datastax::internal::core
+--- vendor/cpp-driver/src/token_aware_policy.cpp
++++ vendor/cpp-driver/src/token_aware_policy.cpp
+@@ -63,8 +63,12 @@
+         case CQL_OPCODE_BATCH:
+           String routing_key;
+           if (request->get_routing_key(&routing_key) && !keyspace.empty()) {
+-            if (token_map != NULL) {
+-              CopyOnWriteHostVec replicas = token_map->get_replicas(keyspace, routing_key);
++            // The token map knows the replicas of vnodes only, a table with tablets has its own
++            const TabletReplicas* tablet_replicas = request_handler->tablet_replicas();
++            if (tablet_replicas != NULL || token_map != NULL) {
++              CopyOnWriteHostVec replicas = tablet_replicas != NULL
++                                                ? tablet_replicas->hosts()
++                                                : token_map->get_replicas(keyspace, routing_key);
+               if (replicas && !replicas->empty()) {
+                 if (random_ != NULL) {
+                   random_shuffle(replicas->begin(), replicas->end(), random_);
+--- /dev/null
++++ vendor/cpp-driver/src/tablets.cpp
+@@ -0,0 +1,164 @@
++/*
++  Licensed under the Apache License, Version 2.0 (the "License");
++  you may not use this file except in compliance with the License.
++  You may obtain a copy of the License at
++
++  http://www.apache.org/licenses/LICENSE-2.0
++
++  Unless required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  See the License for the specific language governing permissions and
++  limitations under the License.
++*/
++
++#include "tablets.hpp"
++
++#include "serialization.hpp"
++
++#include <algorithm>
++
++using namespace datastax;
++using namespace datastax::internal;
++using namespace datastax::internal::core;
++
++TabletReplicas::ConstPtr TabletReplicas::resolve(const TabletReplicaId* ids, size_t count,
++                                                 const TabletHostResolver& hosts) {
++  SharedRefPtr<TabletReplicas> replicas(new TabletReplicas(ids, count, hosts.pools_version()));
++  for (size_t i = 0; i < count; ++i) {
++    Host::Ptr host = hosts.find_host(ids[i].host_id);
++    if (host) {
++      replicas->hosts_->push_back(host);
++      replicas->shards_.push_back(ids[i].shard);
++    }
++  }
++  return replicas;
++}
++
++int32_t TabletReplicas::shard(const Host* host) const {
++  // A tablet has as many replicas as the replication factor, a linear search is the fastest
++  for (size_t i = 0; i < hosts_->size(); ++i) {
++    if ((*hosts_)[i]->address() == host->address()) {
++      return shards_[i];
++    }
++  }
++  return -1;
++}
++
++bool TabletReplicas::has_ids(const TabletReplicaIds& ids) const {
++  if (ids.size() != ids_.size()) return false;
++  for (size_t i = 0; i < ids.size(); ++i) {
++    if (ids[i].shard != ids_[i].shard ||
++        ids[i].host_id.time_and_version != ids_[i].host_id.time_and_version ||
++        ids[i].host_id.clock_seq_and_node != ids_[i].host_id.clock_seq_and_node) {
++      return false;
++    }
++  }
++  return true;
++}
++
++const String& TabletMap::table_key(const StringRef& keyspace, const StringRef& table) const {
++  key_.assign(keyspace.data(), keyspace.size());
++  key_.push_back('.');
++  key_.append(table.data(), table.size());
++  return key_;
++}
++
++TabletReplicas::ConstPtr TabletMap::find(const StringRef& keyspace, const StringRef& table,
++                                         int64_t token, const TabletHostResolver& hosts) {
++  Map<String, TabletVec>::iterator it = tables_.find(table_key(keyspace, table));
++  if (it == tables_.end()) {
++    return TabletReplicas::ConstPtr();
++  }
++  TabletVec& tablets = it->second;
++  // The first tablet that ends at the token or after it
++  TabletVec::iterator tablet =
++      std::lower_bound(tablets.begin(), tablets.end(), token,
++                       [](const Tablet& tablet, int64_t token) { return tablet.last_token < token; });
++  if (tablet == tablets.end() || token <= tablet->first_token) {
++    return TabletReplicas::ConstPtr();
++  }
++  if (tablet->replicas->is_stale(hosts)) {
++    // Requests in flight keep the replicas they have, the tablet gets new ones
++    const Vector<TabletReplicaId>& ids = tablet->replicas->ids();
++    tablet->replicas = TabletReplicas::resolve(ids.data(), ids.size(), hosts);
++  }
++  return tablet->replicas;
++}
++
++TabletReplicas::ConstPtr TabletMap::update(const StringRef& keyspace, const StringRef& table,
++                                           int64_t first_token, int64_t last_token,
++                                           const TabletReplicaIds& ids,
++                                           const TabletHostResolver& hosts) {
++  TabletVec& tablets = tables_[table_key(keyspace, table)];
++  // Tablets (a, b] and (first_token, last_token] overlap when a < last_token and first_token < b.
++  // The tablets are sorted, so the ones that overlap the new tablet come one after another.
++  TabletVec::iterator begin = std::upper_bound(
++      tablets.begin(), tablets.end(), first_token,
++      [](int64_t first_token, const Tablet& tablet) { return first_token < tablet.last_token; });
++  TabletVec::iterator end = begin;
++  while (end != tablets.end() && end->first_token < last_token) {
++    ++end;
++  }
++  if (end - begin == 1 && begin->first_token == first_token && begin->last_token == last_token &&
++      begin->replicas->has_ids(ids) && !begin->replicas->is_stale(hosts)) {
++    return TabletReplicas::ConstPtr();
++  }
++  Tablet tablet = { first_token, last_token,
++                    TabletReplicas::resolve(ids.empty() ? NULL : &ids[0], ids.size(), hosts) };
++  if (begin == end) {
++    tablets.insert(begin, tablet);
++  } else {
++    *begin = tablet;
++    tablets.erase(begin + 1, end);
++  }
++  return tablet.replicas;
++}
++
++// An element of a tuple or a list: [int length][bytes]
++static bool decode_element(const char** pos, const char* end, StringRef* element) {
++  int32_t size = 0;
++  if (end - *pos < static_cast<ptrdiff_t>(sizeof(int32_t))) return false;
++  *pos = decode_int32(*pos, size);
++  if (size < 0 || end - *pos < size) return false;
++  *element = StringRef(*pos, size);
++  *pos += size;
++  return true;
++}
++
++bool TabletMap::decode_payload(const StringRef& payload, int64_t* first_token,
++                               int64_t* last_token, TabletReplicaIds* ids) {
++  const char* pos = payload.data();
++  const char* end = payload.data() + payload.size();
++  StringRef first, last, list;
++  if (!decode_element(&pos, end, &first) || first.size() != sizeof(int64_t) ||
++      !decode_element(&pos, end, &last) || last.size() != sizeof(int64_t) ||
++      !decode_element(&pos, end, &list)) {
++    return false;
++  }
++  decode_int64(first.data(), *first_token);
++  decode_int64(last.data(), *last_token);
++
++  pos = list.data();
++  end = list.data() + list.size();
++  int32_t count = 0;
++  if (end - pos < static_cast<ptrdiff_t>(sizeof(int32_t))) return false;
++  pos = decode_int32(pos, count);
++  if (count < 0) return false;
++  ids->clear();
++  for (int32_t i = 0; i < count; ++i) {
++    StringRef replica, host_id, shard;
++    if (!decode_element(&pos, end, &replica)) return false;
++    const char* replica_pos = replica.data();
++    const char* replica_end = replica.data() + replica.size();
++    if (!decode_element(&replica_pos, replica_end, &host_id) || host_id.size() != 16 ||
++        !decode_element(&replica_pos, replica_end, &shard) || shard.size() != sizeof(int32_t)) {
++      return false;
++    }
++    TabletReplicaId id;
++    decode_uuid(host_id.data(), &id.host_id);
++    decode_int32(shard.data(), id.shard);
++    ids->push_back(id);
++  }
++  return true;
++}
+--- /dev/null
++++ vendor/cpp-driver/src/tablets.hpp
+@@ -0,0 +1,178 @@
++/*
++  Licensed under the Apache License, Version 2.0 (the "License");
++  you may not use this file except in compliance with the License.
++  You may obtain a copy of the License at
++
++  http://www.apache.org/licenses/LICENSE-2.0
++
++  Unless required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  See the License for the specific language governing permissions and
++  limitations under the License.
++*/
++
++#ifndef DATASTAX_INTERNAL_TABLETS_HPP
++#define DATASTAX_INTERNAL_TABLETS_HPP
++
++#include "host.hpp"
++#include "map.hpp"
++#include "ref_counted.hpp"
++#include "small_vector.hpp"
++#include "string.hpp"
++#include "string_ref.hpp"
++#include "vector.hpp"
++
++// Key of the SUPPORTED and STARTUP option that enables the tablets routing extension of ScyllaDB
++#define SCYLLA_TABLETS_ROUTING_V1 "TABLETS_ROUTING_V1"
++// Key of the custom payload with the tablet of a request routed to a wrong node or shard
++#define SCYLLA_TABLETS_ROUTING_V1_PAYLOAD "tablets-routing-v1"
++
++namespace datastax { namespace internal { namespace core {
++
++/**
++ * A replica of a tablet as ScyllaDB names it.
++ */
++struct TabletReplicaId {
++  CassUuid host_id;
++  int32_t shard;
++};
++
++typedef SmallVector<TabletReplicaId, 8> TabletReplicaIds;
++
++/**
++ * The hosts that requests can be sent to, the connection pool manager of a request processor.
++ */
++class TabletHostResolver {
++public:
++  virtual ~TabletHostResolver() {}
++
++  /**
++   * Find a host with a connection pool by its host ID.
++   *
++   * @return The host or null if no pool connects to it.
++   */
++  virtual Host::Ptr find_host(const CassUuid& host_id) const = 0;
++
++  /**
++   * Changes every time a connection pool is added or removed, so the replicas of a tablet are
++   * looked up again only after that.
++   */
++  virtual uint64_t pools_version() const = 0;
++};
++
++/**
++ * Replicas of a tablet: the hosts and the shard of the tablet on each of them.
++ */
++class TabletReplicas : public RefCounted<TabletReplicas> {
++public:
++  typedef SharedRefPtr<const TabletReplicas> ConstPtr;
++
++  /**
++   * Find the hosts of the replicas. A replica without a pool (e.g. in an ignored data center or
++   * one that is still connecting) is left out.
++   */
++  static ConstPtr resolve(const TabletReplicaId* ids, size_t count,
++                          const TabletHostResolver& hosts);
++
++  const CopyOnWriteHostVec& hosts() const { return hosts_; }
++
++  /**
++   * The shard of the tablet on a host.
++   *
++   * @param host A host.
++   * @return The shard or -1 if the host is not a replica of the tablet.
++   */
++  int32_t shard(const Host* host) const;
++
++  /**
++   * Whether the replicas are the ones ScyllaDB sent, including the hosts without a pool.
++   */
++  bool has_ids(const TabletReplicaIds& ids) const;
++
++  /**
++   * Whether the hosts may have changed: a replica without a pool may have one now, or a replica
++   * came back with another address (the same host ID, a new host and pool).
++   */
++  bool is_stale(const TabletHostResolver& hosts) const {
++    return pools_version_ != hosts.pools_version();
++  }
++
++  const Vector<TabletReplicaId>& ids() const { return ids_; }
++
++private:
++  TabletReplicas(const TabletReplicaId* ids, size_t count, uint64_t pools_version)
++      : hosts_(new HostVec())
++      , ids_(ids, ids + count)
++      , pools_version_(pools_version) {}
++
++  CopyOnWriteHostVec hosts_;
++  Vector<int32_t> shards_;
++  Vector<TabletReplicaId> ids_;
++  uint64_t pools_version_;
++};
++
++/**
++ * Tablets of the tables with tablets, learned from the "tablets-routing-v1" custom payload that
++ * ScyllaDB sends in the result of a request routed to a wrong node or shard (see
++ * docs/dev/protocol-extensions.md in ScyllaDB). Every request processor has its own map, so it is
++ * used from a single thread without locking.
++ */
++class TabletMap {
++public:
++  bool empty() const { return tables_.empty(); }
++
++  /**
++   * Find the replicas of the tablet that owns a token. The replicas are looked up again if a pool
++   * was added or removed since, ScyllaDB would not send the tablet again while requests reach the
++   * replicas that are known.
++   *
++   * @return The replicas or NULL if the tablet is not known yet.
++   */
++  TabletReplicas::ConstPtr find(const StringRef& keyspace, const StringRef& table, int64_t token,
++                                const TabletHostResolver& hosts);
++
++  /**
++   * Add a tablet that ScyllaDB sent, the tablets it overlaps are replaced. Nothing changes if the
++   * same tablet is already known, ScyllaDB sends it for every request routed to a wrong shard.
++   *
++   * @param first_token The token before the first one of the tablet.
++   * @param last_token The last token of the tablet.
++   * @param ids The host IDs and shards of the replicas.
++   * @return The replicas of the added tablet or NULL if it was known.
++   */
++  TabletReplicas::ConstPtr update(const StringRef& keyspace, const StringRef& table,
++                                  int64_t first_token, int64_t last_token,
++                                  const TabletReplicaIds& ids, const TabletHostResolver& hosts);
++
++  /**
++   * Decode the "tablets-routing-v1" payload: tuple<bigint, bigint, list<tuple<uuid, int>>>.
++   *
++   * @param payload The value of the payload.
++   * @param first_token The token before the first one of the tablet.
++   * @param last_token The last token of the tablet.
++   * @param ids The host IDs and shards of the replicas.
++   * @return Returns false if the payload is malformed.
++   */
++  static bool decode_payload(const StringRef& payload, int64_t* first_token, int64_t* last_token,
++                             TabletReplicaIds* ids);
++
++private:
++  struct Tablet {
++    int64_t first_token; // Exclusive
++    int64_t last_token;  // Inclusive
++    TabletReplicas::ConstPtr replicas;
++  };
++
++  // Tablets do not overlap and are sorted by token
++  typedef Vector<Tablet> TabletVec;
++
++  const String& table_key(const StringRef& keyspace, const StringRef& table) const;
++
++  Map<String, TabletVec> tables_;
++  mutable String key_; // Reused, so finding a tablet does not allocate
++};
++
++}}} // namespace datastax::internal::core
++
++#endif

@@ -1,0 +1,112 @@
+--- vendor/cpp-driver/src/connection_pool.cpp
++++ vendor/cpp-driver/src/connection_pool.cpp
+@@ -107,14 +107,41 @@
+ 
+   notify_up_or_down();
+ 
++  connect_missing_shards();
++}
++
++void ConnectionPool::connect_missing_shards() {
++  const auto& si = host_->sharding_info();
+   // We had non-critical errors, some connections closed or, with a sharded host, the pool was
+   // created with fewer connections than shards. When the host answered (the pool has a
+   // connection), the missing connections are opened right away instead of after the first delay
+   // of the reconnection policy (2 seconds by default), only their retries wait. An empty pool
+   // more likely than not means that the host is down, then the policy delays them as before.
+   const bool connect_now = has_connections();
++  // Connections that are being opened already: to a given shard or, through the regular port, to
++  // any shard
++  Vector<int32_t> pending_by_shard(connections_by_shard_.size(), 0);
++  size_t pending_any = 0;
++  for (DelayedConnector::Vec::const_iterator it = pending_connections_.begin(),
++                                             end = pending_connections_.end();
++       it != end; ++it) {
++    const CassOptional<int32_t> shard = (*it)->desired_shard_num();
++    if (shard && *shard >= 0 && static_cast<size_t>(*shard) < pending_by_shard.size()) {
++      ++pending_by_shard[*shard];
++    } else {
++      ++pending_any;
++    }
++  }
+   for (size_t shard_num = 0u; shard_num < connections_by_shard_.size(); ++shard_num) {
+-    const int needed = num_connections_per_shard_ - connections_by_shard_[shard_num].size();
++    int needed = static_cast<int>(num_connections_per_shard_) -
++                 static_cast<int>(connections_by_shard_[shard_num].size()) -
++                 pending_by_shard[shard_num];
++    if (needed > 0 && pending_any > 0) {
++      // A pending connection to any shard may land on this one
++      const size_t taken = std::min(static_cast<size_t>(needed), pending_any);
++      needed -= static_cast<int>(taken);
++      pending_any -= taken;
++    }
+     for (int32_t i = 0; i < needed; ++i) {
+       if (si && (si->shard_aware_port() || si->shard_aware_port_ssl())) {
+         // Reconnect with port-based shard awareness
+@@ -127,6 +154,21 @@
+   }
+ }
+ 
++bool ConnectionPool::learn_shards() {
++  // A pool created while its host was down does not know the shards of the host, it has a single
++  // slot for all its connections. The first connection to the host tells them.
++  const auto& si = host_->sharding_info();
++  if (!si || si->get_shards_count() <= connections_by_shard_.size()) return false;
++  const auto hosts_shard_cnt = si->get_shards_count();
++  LOG_INFO("Connection pool (%p) of host %s learned that the host has %u shards",
++           static_cast<void*>(this), address().to_string().c_str(),
++           static_cast<unsigned>(hosts_shard_cnt));
++  connections_by_shard_.resize(hosts_shard_cnt);
++  num_connections_per_shard_ = settings_.num_connections_per_host / hosts_shard_cnt
++      + (settings_.num_connections_per_host % hosts_shard_cnt ? 1u : 0u);
++  return true;
++}
++
+ PooledConnection::Ptr ConnectionPool::find_least_busy(int64_t token) const {
+   if (token == CASS_INT64_MIN || !host_->sharding_info()) {
+     // We got a placeholder token, or a sensible token that is useless without the sharding info.
+@@ -142,8 +184,14 @@
+     return least_busy;
+   }
+ 
+-  // Otherwise, find the least busy connection pointing to the right shard (if possible)
+-  const auto& shard_pool = connections_by_shard_[host_->sharding_info()->shard_id(token)];
++  // Otherwise, find the least busy connection pointing to the right shard (if possible). The host
++  // knows its shards from any connection to it, a pool created while the host was down knows them
++  // from its first connection only, see learn_shards().
++  const size_t shard_num = host_->sharding_info()->shard_id(token);
++  if (shard_num >= connections_by_shard_.size()) {
++    return find_least_busy(CASS_INT64_MIN);
++  }
++  const auto& shard_pool = connections_by_shard_[shard_num];
+   PooledConnection::Vec::const_iterator it =
+       std::min_element(shard_pool.begin(), shard_pool.end(), least_busy_comp);
+   if (it == shard_pool.end() || (*it)->is_closing()) {
+@@ -368,10 +416,14 @@
+ 
+   if (connector->is_ok()) {
+     auto connection = connector->release_connection();
++    const bool shards_learned = learn_shards();
+     const size_t new_connections_shard = connection->shard_id();
+     if (connections_by_shard_[new_connections_shard].size() < num_connections_per_shard_) {
+       add_connection(PooledConnection::Ptr(new PooledConnection(this, connection)));
+       notify_up_or_down();
++      if (shards_learned) {
++        connect_missing_shards();
++      }
+     } else {
+       LOG_INFO("Reconnection to host %s connected us to shard %ld",
+                address().to_string().c_str(), new_connections_shard);
+--- vendor/cpp-driver/src/connection_pool.hpp
++++ vendor/cpp-driver/src/connection_pool.hpp
+@@ -230,6 +230,10 @@
+   void add_connection(const PooledConnection::Ptr& connection);
+   void schedule_reconnect(ReconnectionSchedule* schedule = NULL, CassOptional<int32_t> desired_shard_num = CassNullopt,
+                           bool connect_now = false);
++  /** Opens the connections that the shards of the host lack. */
++  void connect_missing_shards();
++  /** Sizes the pool for the shards of the host once they are known, returns true if it did. */
++  bool learn_shards();
+   void internal_close();
+   void maybe_closed();
+ 

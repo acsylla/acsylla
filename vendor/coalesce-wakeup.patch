@@ -1,0 +1,32 @@
+diff --git vendor/cpp-driver/src/request_processor.cpp vendor/cpp-driver/src/request_processor.cpp
+index bda526df..f57d295b 100644
+--- vendor/cpp-driver/src/request_processor.cpp
++++ vendor/cpp-driver/src/request_processor.cpp
+@@ -258,16 +258,26 @@ void RequestProcessor::notify_token_map_updated(const TokenMap::Ptr& token_map)
+   event_loop_->add(new ProcessorNotifyTokenMapUpdate(token_map, Ptr(this)));
+ }
+ 
++// Below this number of requests in progress coalescing writes costs more latency than it
++// saves system calls, see RequestProcessor::process_request()
++#define CASS_COALESCE_MIN_REQUESTS 64
++
+ void RequestProcessor::process_request(const RequestHandler::Ptr& request_handler) {
+   request_handler->inc_ref(); // Queue reference
+ 
++  bool was_empty = request_queue_->is_empty();
+   if (request_queue_->enqueue(request_handler.get())) {
+-    request_count_.fetch_add(1);
++    int requests = request_count_.fetch_add(1);
+     // Only signal the request queue if it's not already processing requests.
+     bool expected = false;
+     if (!is_processing_.load(MEMORY_ORDER_RELAXED) &&
+         is_processing_.compare_exchange_strong(expected, true)) {
+       async_.send();
++    } else if (was_empty && requests < CASS_COALESCE_MIN_REQUESTS) {
++      // The processor waits for the coalesce timer. With few requests in progress
++      // there is little to coalesce a request into an empty queue with, so it is
++      // written right away instead of waiting for the next tick.
++      async_.send();
+     }
+   } else {
+     request_handler->dec_ref();

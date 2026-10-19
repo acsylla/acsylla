@@ -34,3 +34,5 @@ cdef class Statement:
                                 )
 
     cdef inline get_value_type(self, object value)
+
+    cdef int _bind(self, int idx, object value, object value_type) except -1

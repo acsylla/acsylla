@@ -223,7 +223,8 @@ cdef extern from "cassandra.h":
     cass_uint64_t clock_seq_and_node
 
   ctypedef struct CassInet:
-    pass
+    cass_uint8_t address[16]
+    cass_uint8_t address_length
 
   ctypedef struct CassDataType:
     pass
@@ -610,6 +611,7 @@ cdef extern from "cassandra.h" nogil:
   CassError cass_collection_append_double(CassCollection* collection, cass_double_t value)
   CassError cass_collection_append_bool(CassCollection* collection, cass_bool_t value)
   CassError cass_collection_append_string(CassCollection* collection, const char* value)
+  CassError cass_collection_append_string_n(CassCollection* collection, const char* value, size_t value_length)
   CassError cass_collection_append_bytes(CassCollection* collection, const cass_byte_t* value, size_t value_size)
   CassError cass_collection_append_custom(CassCollection* collection, const char* class_name, const cass_byte_t* value, size_t value_size)
   CassError cass_collection_append_uuid(CassCollection* collection, CassUuid value)

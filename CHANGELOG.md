@@ -1,6 +1,21 @@
 Changelog
 =========
 
+1.2.0
+======
+- Route requests to the replicas and shards of their tablets, up to 38% faster reads on ScyllaDB with tablets (patch for cpp-driver `vendor/tablets-routing.patch`)
+- Fix routing of statements without a routing key, they always went to the same shard, 2x faster simple statements (patch for cpp-driver `vendor/routing-key-token.patch`)
+- Write a request right away when there is little to coalesce it with, up to 10x faster at low concurrency without changing `coalesce_delay_us` (patch for cpp-driver `vendor/coalesce-wakeup.patch`)
+- Use jemalloc 5.3.0 for the driver memory allocations, up to 23% more throughput when the event loop is saturated. It is downloaded and linked statically when building from source, allocations of Python are not affected (patch for cpp-driver `vendor/jemalloc-allocator.patch`)
+- Bind statement values without a Python call per value, up to 37% faster binding
+- Bind text, inet, uuid, date, time, collections, tuples and UDT values twice as fast, up to 12% faster inserts of rows with them
+- Open the connections to all shards of a ScyllaDB node right away once it answers instead of after the 2 second reconnect delay (patch for cpp-driver `vendor/connect-shards-now.patch`)
+- Fix a crash when a ScyllaDB node that was down when the session started comes back (patch for cpp-driver `vendor/pool-learns-shards.patch`)
+- Keep using a ScyllaDB node that comes back with another IP address instead of ignoring it, and drop its old address (patch for cpp-driver `vendor/node-address-change.patch`)
+- Support TLS 1.3, the driver was limited to TLS 1.2 and could not connect to a server that accepts only TLS 1.3 (patch for cpp-driver `vendor/tls13.patch`, from CASSCPP-16 of apache/cassandra-cpp-driver)
+- Trust all the certificates of `ssl_trusted_cert`, not only the first one of a bundle (patch for cpp-driver `vendor/trusted-cert-bundle.patch`, from apache/cassandra-cpp-driver#522)
+- Use `inspect.iscoroutinefunction`, `asyncio.iscoroutinefunction` is deprecated since Python 3.14
+
 1.1.2
 ======
 - Fix possible event loop deadlock under high load

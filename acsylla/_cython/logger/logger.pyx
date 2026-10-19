@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import socket
 
@@ -100,7 +101,7 @@ cdef class Logger:
                         function=message.function.decode(),
                         message=log_message
                     )
-                    if asyncio.iscoroutinefunction(self.logging_callback):
+                    if inspect.iscoroutinefunction(self.logging_callback):
                         asyncio.create_task(self.logging_callback(log))
                     else:
                         self.logging_callback(log)

@@ -286,8 +286,14 @@ native_types = {
     },
     "varint": {
         "value_type": ValueType.VARINT,
-        "valid": [(b"9223372036854775807", b"9223372036854775807")],
-        "invalid": [("varint_variant", ValueError), ("1234", ValueError)],
+        # The session of the tests has legacy_types=True, a varint is read as its bytes
+        "valid": [
+            (b"9223372036854775807", b"9223372036854775807"),
+            (1234, b"\x04\xd2"),
+            ("1234", b"\x04\xd2"),
+            (-1, b"\xff"),
+        ],
+        "invalid": [("varint_variant", ValueError), (1.5, ValueError), (True, ValueError)],
     },
 }
 

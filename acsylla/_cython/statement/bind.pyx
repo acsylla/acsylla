@@ -203,7 +203,21 @@ cdef inline bytes int_as_varint(object value):
     cdef long long small = PyLong_AsLongLongAndOverflow(value, &overflow)
     if overflow == 0:
         return int128_as_varint(small)
-    return value.to_bytes(((value if value >= 0 else ~value).bit_length() + 8) // 8, 'big', signed=True)
+    return acsylla_int_as_varint(value)
+
+
+cdef bytes as_cass_varint(object value):
+    """The varint of an int or of the str of one. bytes are taken as the two's complement of it, as acsylla 1.x did."""
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return int_as_varint(value)
+    if isinstance(value, str):
+        try:
+            return int_as_varint(int(value))
+        except ValueError:
+            pass
+    raise ValueError(f'Value "{value}" is not an int, the str of an int or the bytes of a varint.')
 
 
 cdef object digits_as_int(const char* text, Py_ssize_t size):
@@ -730,7 +744,7 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
-    cdef bytes decimal_varint
+    cdef bytes varint_bytes
     cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
@@ -757,12 +771,14 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
         text_owner = as_utf8(value, &text, &text_size)
         error = cass_collection_append_string_n(collection, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                             CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_collection_append_bytes(collection, as_blob(value), len(value))
+    elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+        varint_bytes = as_cass_varint(value)
+        error = cass_collection_append_bytes(collection, varint_bytes, len(varint_bytes))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
-        error = cass_collection_append_decimal(collection, decimal_varint, len(decimal_varint), decimal_scale)
+        varint_bytes = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_collection_append_decimal(collection, varint_bytes, len(varint_bytes), decimal_scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_collection_append_uuid(collection, as_cass_uuid(value))
@@ -867,7 +883,7 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
-    cdef bytes decimal_varint
+    cdef bytes varint_bytes
     cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
@@ -896,12 +912,14 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
         text_owner = as_utf8(value, &text, &text_size)
         error = cass_tuple_set_string_n(cass_tuple, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                             CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_tuple_set_bytes(cass_tuple, index, as_blob(value), len(value))
+    elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+        varint_bytes = as_cass_varint(value)
+        error = cass_tuple_set_bytes(cass_tuple, index, varint_bytes, len(varint_bytes))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
-        error = cass_tuple_set_decimal(cass_tuple, index, decimal_varint, len(decimal_varint), decimal_scale)
+        varint_bytes = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_tuple_set_decimal(cass_tuple, index, varint_bytes, len(varint_bytes), decimal_scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_tuple_set_uuid(cass_tuple, index, as_cass_uuid(value))
@@ -985,7 +1003,7 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
-    cdef bytes decimal_varint
+    cdef bytes varint_bytes
     cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
@@ -1008,8 +1026,8 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_user_type_set_double_by_name(user_type, name, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
-        error = cass_user_type_set_decimal_by_name(user_type, name, decimal_varint, len(decimal_varint), decimal_scale)
+        varint_bytes = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_user_type_set_decimal_by_name(user_type, name, varint_bytes, len(varint_bytes), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
@@ -1017,9 +1035,11 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
         text_owner = as_utf8(value, &text, &text_size)
         error = cass_user_type_set_string_by_name_n(user_type, name, len(name), text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                             CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_user_type_set_bytes_by_name(user_type, name, as_blob(value), len(value))
+    elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+        varint_bytes = as_cass_varint(value)
+        error = cass_user_type_set_bytes_by_name(user_type, name, varint_bytes, len(varint_bytes))
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_user_type_set_uuid_by_name(user_type, name, as_cass_uuid(value))
@@ -1059,7 +1079,7 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
-    cdef bytes decimal_varint
+    cdef bytes varint_bytes
     cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
@@ -1082,8 +1102,8 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_user_type_set_double(user_type, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
-        error = cass_user_type_set_decimal(user_type, index, decimal_varint, len(decimal_varint), decimal_scale)
+        varint_bytes = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_user_type_set_decimal(user_type, index, varint_bytes, len(varint_bytes), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_user_type_set_string(user_type, index, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
@@ -1091,9 +1111,11 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
         text_owner = as_utf8(value, &text, &text_size)
         error = cass_user_type_set_string_n(user_type, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                             CASS_VALUE_TYPE_VARINT,
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_user_type_set_bytes(user_type, index, as_blob(value), len(value))
+    elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+        varint_bytes = as_cass_varint(value)
+        error = cass_user_type_set_bytes(user_type, index, varint_bytes, len(varint_bytes))
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_user_type_set_uuid(user_type, index, as_cass_uuid(value))

@@ -12,6 +12,69 @@ cdef extern from *:
     ctypedef unsigned long long uint128 "acsylla_uint128"
     const unsigned long long ACSYLLA_1E19
 
+cdef extern from *:
+    """
+    /* An int of a varint of any length (two's complement, big-endian), PyLong_FromNativeBytes() is public from
+       Python 3.13 */
+    static PyObject* acsylla_varint_as_int(const unsigned char* varint, size_t size) {
+    #if PY_VERSION_HEX >= 0x030D0000
+        return PyLong_FromNativeBytes(varint, size, Py_ASNATIVEBYTES_BIG_ENDIAN);
+    #else
+        return _PyLong_FromByteArray(varint, size, 0, 1);
+    #endif
+    }
+
+    /* The shortest varint of an int, PyLong_AsNativeBytes() is public from Python 3.13 */
+    static PyObject* acsylla_int_as_varint(PyObject* value) {
+        unsigned char stack_buffer[64];
+        unsigned char* buffer = stack_buffer;
+        Py_ssize_t size, start = 0;
+        PyObject* varint;
+    #if PY_VERSION_HEX >= 0x030D0000
+        size = PyLong_AsNativeBytes(value, NULL, 0, Py_ASNATIVEBYTES_BIG_ENDIAN);
+        if (size < 0) {
+            return NULL;
+        }
+    #else
+        size_t bits = _PyLong_NumBits(value);
+        if (bits == (size_t)-1 && PyErr_Occurred()) {
+            return NULL;
+        }
+        /* With a sign bit */
+        size = (Py_ssize_t)(bits / 8 + 1);
+    #endif
+        if (size > (Py_ssize_t)sizeof(stack_buffer)) {
+            buffer = (unsigned char*)PyMem_Malloc(size);
+            if (buffer == NULL) {
+                return PyErr_NoMemory();
+            }
+        }
+    #if PY_VERSION_HEX >= 0x030D0000
+        if (PyLong_AsNativeBytes(value, buffer, size, Py_ASNATIVEBYTES_BIG_ENDIAN) < 0) {
+    #else
+        if (_PyLong_AsByteArray((PyLongObject*)value, buffer, size, 0, 1) < 0) {
+    #endif
+            if (buffer != stack_buffer) {
+                PyMem_Free(buffer);
+            }
+            return NULL;
+        }
+        /* The size may have room for a sign bit it does not need, the leading bytes that only repeat the sign of the
+           next one are dropped */
+        while (start < size - 1 && ((buffer[start] == 0x00 && buffer[start + 1] < 0x80) ||
+                                    (buffer[start] == 0xFF && buffer[start + 1] >= 0x80))) {
+            start++;
+        }
+        varint = PyBytes_FromStringAndSize((const char*)buffer + start, size - start);
+        if (buffer != stack_buffer) {
+            PyMem_Free(buffer);
+        }
+        return varint;
+    }
+    """
+    object acsylla_varint_as_int(const unsigned char* varint, size_t size)
+    bytes acsylla_int_as_varint(object value)
+
 cimport cython
 
 from cpython.datetime cimport date_new
@@ -19,6 +82,7 @@ from cpython.datetime cimport datetime_new
 from cpython.datetime cimport get_utc
 from cpython.datetime cimport import_datetime
 from cpython.datetime cimport time_new
+from cpython.long cimport PyLong_FromLongLong
 from cpython.mem cimport PyMem_Free
 from cpython.mem cimport PyMem_Malloc
 from cpython.unicode cimport PyUnicode_1BYTE_KIND
@@ -72,9 +136,10 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
                        CASS_VALUE_TYPE_VARCHAR):
         return _string(cass_value)
     elif cass_type in (CASS_VALUE_TYPE_BLOB,
-                       CASS_VALUE_TYPE_VARINT,
                        CASS_VALUE_TYPE_CUSTOM):
         return _bytes(cass_value)
+    elif cass_type == CASS_VALUE_TYPE_VARINT:
+        return _varint(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_INET:
         return _inet(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DATE:
@@ -365,7 +430,7 @@ cdef inline object _decimal(const CassValue* cass_value, int8_t flags):
         count = write_digits_128(digits, (~(<uint128>unscaled) + 1) if unscaled < 0 else <uint128>unscaled)
         return decimal_from_digits(digits, count, unscaled < 0, scale, flags)
     # More than 38 digits, Decimal makes them from an int faster than from a text
-    number = int.from_bytes(varint[:varint_size], 'big', signed=True)
+    number = acsylla_varint_as_int(varint, varint_size)
     if not flags & NATIVE_TYPES:
         return Decimal(number).scaleb(-scale, DECIMAL_EXACT)
     try:
@@ -375,6 +440,32 @@ cdef inline object _decimal(const CassValue* cass_value, int8_t flags):
         return str(Decimal(number).scaleb(-scale, DECIMAL_EXACT))
     text_digits = PyUnicode_AsUTF8AndSize(text, &count)
     return decimal_from_digits(text_digits, count, number < 0, scale, flags)
+
+
+cdef inline object _varint(const CassValue* cass_value, int8_t flags):
+    """ Returns the int of a varint column, its two's complement bytes with legacy_types as acsylla 1.x did.
+
+    Raises a derived `CassException` if the value can not be retrieved"""
+    cdef size_t size = 0
+    cdef const cass_byte_t* varint = NULL
+    cdef int128 value
+    cdef CassError error
+
+    error = cass_value_get_bytes(cass_value, &varint, &size)
+    if error == CASS_ERROR_LIB_NULL_VALUE:
+        return None
+    else:
+        raise_if_error(error)
+
+    if flags & LEGACY_TYPES:
+        return varint[:size]
+    if size == 0:
+        # An empty value
+        return None
+    if size <= 8:
+        varint_as_int128(varint, size, &value)
+        return PyLong_FromLongLong(<long long>value)
+    return acsylla_varint_as_int(varint, size)
 
 
 cdef inline object _bool(const CassValue* cass_value):

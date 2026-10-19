@@ -1,5 +1,7 @@
 cdef extern from "utils.cpp":
-    void civil_from_days(int z, int* year, unsigned* month, unsigned* day) nogil
+    # A template of C++, the type of the days is the type of the argument: it is given a long long, an unsigned one wraps
+    # the days before 1970 around and an int does not hold the days of the years before -5877641 or after 5881580
+    void civil_from_days(long long z, int* year, unsigned* month, unsigned* day) nogil
 
 cdef extern from *:
     """
@@ -547,74 +549,140 @@ cdef inline object _inet(const CassValue* cass_value):
     return address.decode()
 
 
+@cython.cdivision(True)
+cdef inline Py_ssize_t write_padded(char* buffer, uint64_t value, Py_ssize_t width):
+    """Writes the digits of `value` with leading zeros up to `width` digits. Returns their number."""
+    cdef char digits[20]
+    cdef Py_ssize_t count = write_digits(digits, value), length = 0
+    while length + count < width:
+        buffer[length] = b"0"
+        length += 1
+    memcpy(buffer + length, digits, count)
+    return length + count
+
+
+cdef inline Py_ssize_t write_date(char* buffer, int year, unsigned month, unsigned day):
+    """YYYY-MM-DD as toJson() of CQL: at least 4 digits of the year, a sign before the year 0. Returns its length."""
+    cdef Py_ssize_t length = 0
+    if year < 0:
+        buffer[0] = b"-"
+        length = 1
+    length += write_padded(buffer + length, <uint64_t>(-(<long long>year) if year < 0 else year), 4)
+    buffer[length] = b"-"
+    length += 1
+    length += write_padded(buffer + length, month, 2)
+    buffer[length] = b"-"
+    length += 1
+    length += write_padded(buffer + length, day, 2)
+    return length
+
+
+cdef inline Py_ssize_t write_clock(char* buffer, long long hour, long long minute, long long second, long long fraction,
+                                   Py_ssize_t fraction_digits):
+    """HH:MM:SS.fraction, with `fraction_digits` digits. Returns its length."""
+    cdef Py_ssize_t length = write_padded(buffer, hour, 2)
+    buffer[length] = b":"
+    length += 1
+    length += write_padded(buffer + length, minute, 2)
+    buffer[length] = b":"
+    length += 1
+    length += write_padded(buffer + length, second, 2)
+    buffer[length] = b"."
+    length += 1
+    length += write_padded(buffer + length, fraction, fraction_digits)
+    return length
+
+
 cdef inline object _date(const CassValue* cass_value, int8_t flags):
+    """ Returns the date of a date column, its YYYY-MM-DD with native_types in all the years of CQL.
+
+    Raises a derived `CassException` if the value can not be retrieved, ValueError for a year out of 1..9999"""
     cdef cass_uint32_t output
     cdef CassError error
-    cdef int y
-    cdef unsigned int m
-    cdef unsigned int d
+    cdef int year
+    cdef unsigned month, day
+    cdef char buffer[24]
 
     error = cass_value_get_uint32(cass_value, <cass_uint32_t *> &output)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
-    civil_from_days(output-2147483648U, <int*>&y, <unsigned*>&m, <unsigned*>&d)
-    if flags & NATIVE_TYPES:
-        return f'{y:04d}-{m:02d}-{d:02d}'
-    return date_new(y, m, d)
+    # The value is 2^31 + the days since 1970-01-01
+    civil_from_days(<long long>output - 2147483648LL, &year, &month, &day)
+    if flags & NATIVE_TYPES or year < 1 or year > 9999:
+        text = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, buffer, write_date(buffer, year, month, day))
+        if flags & NATIVE_TYPES:
+            return text
+        raise ValueError(f"the date {text} is out of the years 1..9999 of Python, native_types=True reads it as a str")
+    return date_new(year, month, day)
 
 
+@cython.cdivision(True)
 cdef inline object _time(const CassValue* cass_value, int8_t flags):
-    cdef cass_int64_t nanos
-    cdef CassError error
+    """ Returns the time of a time column to microseconds, HH:MM:SS.nnnnnnnnn with native_types.
 
-    error = cass_value_get_int64(cass_value, <cass_int64_t *> &nanos)
+    Raises a derived `CassException` if the value can not be retrieved"""
+    cdef cass_int64_t nanoseconds
+    cdef long long hour, minute, second, fraction
+    cdef CassError error
+    cdef char buffer[24]
+
+    error = cass_value_get_int64(cass_value, <cass_int64_t *> &nanoseconds)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
-    second, nanosecond = divmod(nanos, 1_000_000_000)
-    minute, second = divmod(second, 60)
-    hour = int(minute/60)
-    minute = minute-hour*60
-    microsecond = int(nanosecond/1_000)
+    if nanoseconds < 0 or nanoseconds >= 86400000000000LL:
+        raise ValueError(f"the time of {nanoseconds} nanoseconds is out of a day")
+    hour = nanoseconds // 3600000000000LL
+    minute = nanoseconds // 60000000000LL % 60
+    second = nanoseconds // 1000000000 % 60
+    fraction = nanoseconds % 1000000000
     if flags & NATIVE_TYPES:
-        return f'{hour:02d}:{minute:02d}:{second:02d}.{nanosecond:09d}'
-    return time_new(hour, minute, second, microsecond, None)
+        return PyUnicode_FromKindAndData(
+            PyUnicode_1BYTE_KIND, buffer, write_clock(buffer, hour, minute, second, fraction, 9))
+    return time_new(hour, minute, second, fraction // 1000, None)
 
 
 cdef inline object _timestamp(const CassValue* cass_value, int8_t flags):
-    cdef cass_int64_t milliseconds_since_epoch
-    cdef double seconds_since_epoch
-    cdef CassError error
-    cdef int y
-    cdef unsigned int m
-    cdef unsigned int d
+    """ Returns the datetime in UTC of a timestamp column, its YYYY-MM-DD HH:MM:SS.mmmZ with native_types in all the
+    years of CQL.
 
-    error = cass_value_get_int64(cass_value, <cass_int64_t *> &milliseconds_since_epoch)
+    Raises a derived `CassException` if the value can not be retrieved, ValueError for a year out of 1..9999"""
+    cdef cass_int64_t milliseconds
+    cdef long long days, of_day
+    cdef CassError error
+    cdef int year
+    cdef unsigned month, day
+    cdef char buffer[48]
+    cdef Py_ssize_t length
+
+    error = cass_value_get_int64(cass_value, <cass_int64_t *> &milliseconds)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
 
-    seconds_since_epoch = <double>(milliseconds_since_epoch) / 1000.0
-    utc_datetime = datetime.fromtimestamp(seconds_since_epoch, get_utc())
-    # there might be some rounding imprecision
-    utc_datetime = utc_datetime.replace(microsecond=utc_datetime.microsecond // 1_000 * 1_000)
-
-    y = utc_datetime.year
-    m = utc_datetime.month
-    d = utc_datetime.day
-    hour = utc_datetime.hour
-    minute = utc_datetime.minute
-    second = utc_datetime.second
-    millisecond = utc_datetime.microsecond // 1_000
-
-    if flags & NATIVE_TYPES:
-        return f'{y:04d}-{m:02d}-{d:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z'
-
-    return utc_datetime
+    # Floor division, the milliseconds before 1970 belong to the days before, in integers: a double of seconds loses
+    # the last millisecond of the year 9999
+    days = milliseconds // 86400000
+    of_day = milliseconds - days * 86400000
+    civil_from_days(days, &year, &month, &day)
+    if flags & NATIVE_TYPES or year < 1 or year > 9999:
+        length = write_date(buffer, year, month, day)
+        buffer[length] = b" "
+        length += 1
+        length += write_clock(buffer + length, of_day // 3600000, of_day // 60000 % 60, of_day // 1000 % 60,
+                              of_day % 1000, 3)
+        buffer[length] = b"Z"
+        text = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, buffer, length + 1)
+        if flags & NATIVE_TYPES:
+            return text
+        raise ValueError(
+            f"the timestamp {text} is out of the years 1..9999 of Python, native_types=True reads it as a str")
+    return datetime_new(year, month, day, of_day // 3600000, of_day // 60000 % 60, of_day // 1000 % 60,
+                        of_day % 1000 * 1000, get_utc())
 
 
 cdef inline object _duration(const CassValue* cass_value, int8_t flags):

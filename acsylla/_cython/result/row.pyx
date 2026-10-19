@@ -7,6 +7,16 @@ from cpython.tuple cimport PyTuple_New
 from cpython.tuple cimport PyTuple_SET_ITEM
 
 
+cdef inline object read_column(const CassValue* cass_value, int8_t flags, Result result, size_t index, object name):
+    """The value of a column, the error of a value it can not read names the column."""
+    try:
+        return get_cass_value(cass_value, flags)
+    except (ValueError, OverflowError) as error:
+        if name is None:
+            name = result.columns_names()[index]
+        raise ValueError(f'The column "{name}" can not be read: {error}') from error
+
+
 cdef class Row:
 
     def __cinit__(self):
@@ -47,7 +57,7 @@ cdef class Row:
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            yield get_cass_value(cass_value, self.result.flags)
+            yield read_column(cass_value, self.result.flags, self.result, index, None)
 
     def as_dict(self):
         cdef size_t count = cass_result_column_count(self.result.cass_result)
@@ -63,7 +73,7 @@ cdef class Row:
             PyDict_SetItem(
                 result,
                 <object>PyList_GET_ITEM(names, index),
-                get_cass_value(cass_value, flags),
+                read_column(cass_value, flags, self.result, index, None),
             )
         return result
 
@@ -78,7 +88,7 @@ cdef class Row:
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, flags)
+            value = read_column(cass_value, flags, self.result, index, None)
             Py_INCREF(value)
             PyList_SET_ITEM(result, index, value)
         return result
@@ -94,7 +104,7 @@ cdef class Row:
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, flags)
+            value = read_column(cass_value, flags, self.result, index, None)
             Py_INCREF(value)
             PyTuple_SET_ITEM(result, index, value)
         return result
@@ -113,7 +123,7 @@ cdef class Row:
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
             key = <object>PyList_GET_ITEM(names, index)
-            value = get_cass_value(cass_value, flags)
+            value = read_column(cass_value, flags, self.result, index, None)
             pair = PyTuple_New(2)
             Py_INCREF(key)
             PyTuple_SET_ITEM(pair, 0, key)
@@ -132,7 +142,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(f'ColumnNotFound with index {index}')
 
-        return get_cass_value(cass_value, self.result.flags)
+        return read_column(cass_value, self.result.flags, self.result, index, None)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
@@ -145,7 +155,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(column_name)
 
-        return get_cass_value(cass_value, self.result.flags)
+        return read_column(cass_value, self.result.flags, self.result, 0, column_name)
 
     def __getitem__(self, name):
         if isinstance(name, int):

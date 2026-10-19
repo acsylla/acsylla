@@ -1,5 +1,7 @@
 cdef extern from "utils.cpp":
-    int days_from_civil(int y, unsigned m, unsigned d) nogil
+    # A template of C++, the type of the days is the type of the year: it is given a long long for the years of CQL out
+    # of 1..9999
+    long long days_from_civil(long long y, unsigned m, unsigned d) nogil
 
 from cpython.bytes cimport PyBytes_AS_STRING
 from cpython.bytes cimport PyBytes_FromStringAndSize
@@ -24,6 +26,9 @@ from cpython.datetime cimport time_minute
 from cpython.datetime cimport time_second
 from cpython.datetime cimport time_tzinfo
 from cpython.datetime cimport timedelta
+from cpython.datetime cimport timedelta_days
+from cpython.datetime cimport timedelta_microseconds
+from cpython.datetime cimport timedelta_seconds
 from cpython.long cimport PyLong_AsLongLongAndOverflow
 from cpython.long cimport PyLong_AsUnsignedLongLongMask
 from cpython.long cimport PyLong_FromString
@@ -41,6 +46,9 @@ from uuid import UUID
 import warnings
 
 import_datetime()
+
+# A datetime in UTC needs no utcoffset() call
+cdef object UTC_TZ = get_utc()
 
 # The warning about a decimal written as text by a statement without a session is given once
 cdef bint legacy_decimal_warned = False
@@ -321,14 +329,14 @@ cdef bytes as_cass_decimal(object value, cass_int32_t* scale, BindOptions* optio
         i += 2
         while i < n:
             # Far beyond the 32 bits of a scale, it does not grow more
-            if exponent < 100000000000:
+            if exponent < 100000000000LL:
                 exponent = exponent * 10 + (p[i] - 48)
             i += 1
         if exponent_negative:
             exponent = -exponent
 
     value_scale = fraction - exponent
-    if value_scale < -2147483648 or value_scale > 2147483647:
+    if value_scale < -2147483648LL or value_scale > 2147483647:
         raise ValueError(f'Bad value for decimal type: "{value}", its scale does not fit in 32 bits')
     scale[0] = <cass_int32_t>value_scale
     if digits <= 38:
@@ -409,8 +417,42 @@ cdef inline time_t _timegm(int year, unsigned month, unsigned day, unsigned hour
     return 60 * (60 * (24L * days_since_epoch + hour) + minute) + second
 
 
-cdef inline int _try_parse_iso_date_days(str s, int* out) except -1:
-    """Parse 'YYYY-MM-DD' (optionally followed by T/space and time) to days
+# The days since 1970-01-01 of CQL: 2^31 + them in 32 bits for a date, their milliseconds in 64 bits for a timestamp
+cdef long long DATE_DAYS_MIN = -2147483648LL
+cdef long long DATE_DAYS_MAX = 2147483647
+cdef long long TIMESTAMP_DAYS_MAX = 106751991166
+
+
+cdef inline Py_ssize_t _parse_iso_date(const unsigned char* b, Py_ssize_t n, long long* days):
+    """Parses [-+]YYYY-MM-DD at the start of a text to the days since 1970-01-01, the years out of 1..9999 of CQL with
+    more digits and a sign, as toJson() and native_types write them. Returns the length of the date, 0 when the text
+    does not start with one."""
+    cdef Py_ssize_t i = 0, start
+    cdef long long year = 0
+    cdef unsigned month, day
+    cdef bint negative = False
+    if n > 0 and (b[0] == 0x2d or b[0] == 0x2b):
+        negative = b[0] == 0x2d
+        i = 1
+    start = i
+    while i < n and 0x30 <= b[i] <= 0x39 and i - start < 12:
+        year = year * 10 + (b[i] - 0x30)
+        i += 1
+    if i - start < 4 or i + 6 > n or b[i] != 0x2d or b[i + 3] != 0x2d:
+        return 0
+    if not (0x30 <= b[i + 1] <= 0x39 and 0x30 <= b[i + 2] <= 0x39
+            and 0x30 <= b[i + 4] <= 0x39 and 0x30 <= b[i + 5] <= 0x39):
+        return 0
+    month = (b[i + 1] - 0x30) * 10 + (b[i + 2] - 0x30)
+    day = (b[i + 4] - 0x30) * 10 + (b[i + 5] - 0x30)
+    if month < 1 or month > 12 or day < 1 or day > 31:
+        return 0
+    days[0] = days_from_civil(-year if negative else year, month, day)
+    return i + 6
+
+
+cdef inline int _try_parse_iso_date_days(str s, long long* out) except -1:
+    """Parse '[-+]YYYY-MM-DD' (optionally followed by T/space and time) to days
     since epoch. Returns 1 on success, 0 on format mismatch.
     """
     cdef bytes b
@@ -418,42 +460,32 @@ cdef inline int _try_parse_iso_date_days(str s, int* out) except -1:
         b = s.encode('ascii')
     except UnicodeEncodeError:
         return 0
+    cdef const unsigned char* p = b
     cdef Py_ssize_t n = len(b)
-    cdef int year, month, day
+    cdef Py_ssize_t end = _parse_iso_date(p, n, out)
 
-    if n < 10:
+    if end == 0:
         return 0
-    if not (0x30 <= b[0] <= 0x39 and 0x30 <= b[1] <= 0x39
-            and 0x30 <= b[2] <= 0x39 and 0x30 <= b[3] <= 0x39):
+    if end < n and p[end] != 0x54 and p[end] != 0x74 and p[end] != 0x20:
         return 0
-    if b[4] != 0x2d or b[7] != 0x2d:
-        return 0
-    if not (0x30 <= b[5] <= 0x39 and 0x30 <= b[6] <= 0x39
-            and 0x30 <= b[8] <= 0x39 and 0x30 <= b[9] <= 0x39):
-        return 0
-    if n > 10 and b[10] != 0x54 and b[10] != 0x74 and b[10] != 0x20:
-        return 0
-
-    year = (b[0] - 0x30) * 1000 + (b[1] - 0x30) * 100 + (b[2] - 0x30) * 10 + (b[3] - 0x30)
-    month = (b[5] - 0x30) * 10 + (b[6] - 0x30)
-    day = (b[8] - 0x30) * 10 + (b[9] - 0x30)
-
-    out[0] = days_from_civil(year, month, day)
     return 1
 
 
 cdef inline cass_uint32_t as_cass_date(object value) except *:
     cdef cass_uint32_t cass_date
     cdef time_t epoch_secs
-    cdef int days_out
+    cdef long long days
 
     if isinstance(value, str):
-        if _try_parse_iso_date_days(value, &days_out) == 1:
-            return <cass_uint32_t>(days_out + 2147483648)
+        if _try_parse_iso_date_days(value, &days) == 1:
+            if days < DATE_DAYS_MIN or days > DATE_DAYS_MAX:
+                raise ValueError(f'The date "{value}" is out of the dates of CQL')
+            return <cass_uint32_t>(days + 2147483648LL)
         value = datetime.fromisoformat(value)
 
     if isinstance(value, date):  # datetime is a date too
-        return <cass_uint32_t>(days_from_civil(date_year(value), date_month(value), date_day(value)) + 2147483648)
+        return <cass_uint32_t>(
+            days_from_civil(<long long>date_year(value), date_month(value), date_day(value)) + 2147483648LL)
 
     epoch_secs = value
     cass_date = cass_date_from_epoch(epoch_secs)
@@ -582,62 +614,50 @@ cdef inline int _try_parse_iso_timestamp_ms(str s, cass_int64_t* out) except -1:
         return 0
     cdef Py_ssize_t n = len(b)
     cdef Py_ssize_t i
-    cdef int year, month, day
     cdef int hour = 0, minute = 0, second = 0, microsecond = 0
     cdef int frac_digits
     cdef int tz_sign = 0
     cdef int tz_hour = 0, tz_min = 0
-    cdef int days
+    cdef long long days
     cdef cass_int64_t ms
 
-    if n < 10:
-        return 0
-    if not (0x30 <= b[0] <= 0x39 and 0x30 <= b[1] <= 0x39
-            and 0x30 <= b[2] <= 0x39 and 0x30 <= b[3] <= 0x39):
-        return 0
-    if b[4] != 0x2d or b[7] != 0x2d:  # '-'
-        return 0
-    if not (0x30 <= b[5] <= 0x39 and 0x30 <= b[6] <= 0x39
-            and 0x30 <= b[8] <= 0x39 and 0x30 <= b[9] <= 0x39):
-        return 0
+    cdef const unsigned char* p = b
 
-    year = (b[0] - 0x30) * 1000 + (b[1] - 0x30) * 100 + (b[2] - 0x30) * 10 + (b[3] - 0x30)
-    month = (b[5] - 0x30) * 10 + (b[6] - 0x30)
-    day = (b[8] - 0x30) * 10 + (b[9] - 0x30)
-
-    i = 10
+    i = _parse_iso_date(p, n, &days)
+    if i == 0:
+        return 0
 
     if i < n:
         # Date/time separator: 'T', 't' or ' '
-        if b[i] != 0x54 and b[i] != 0x74 and b[i] != 0x20:
+        if p[i] != 0x54 and p[i] != 0x74 and p[i] != 0x20:
             return 0
         i += 1
-        if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+        if i + 1 >= n or not (0x30 <= p[i] <= 0x39 and 0x30 <= p[i + 1] <= 0x39):
             return 0
-        hour = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+        hour = (p[i] - 0x30) * 10 + (p[i + 1] - 0x30)
         i += 2
 
-        if i < n and b[i] == 0x3a:  # ':'
+        if i < n and p[i] == 0x3a:  # ':'
             i += 1
-            if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+            if i + 1 >= n or not (0x30 <= p[i] <= 0x39 and 0x30 <= p[i + 1] <= 0x39):
                 return 0
-            minute = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+            minute = (p[i] - 0x30) * 10 + (p[i + 1] - 0x30)
             i += 2
 
-            if i < n and b[i] == 0x3a:
+            if i < n and p[i] == 0x3a:
                 i += 1
-                if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                if i + 1 >= n or not (0x30 <= p[i] <= 0x39 and 0x30 <= p[i + 1] <= 0x39):
                     return 0
-                second = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                second = (p[i] - 0x30) * 10 + (p[i + 1] - 0x30)
                 i += 2
 
-                if i < n and b[i] == 0x2e:  # '.'
+                if i < n and p[i] == 0x2e:  # '.'
                     i += 1
                     frac_digits = 0
                     microsecond = 0
-                    while i < n and 0x30 <= b[i] <= 0x39:
+                    while i < n and 0x30 <= p[i] <= 0x39:
                         if frac_digits < 6:
-                            microsecond = microsecond * 10 + (b[i] - 0x30)
+                            microsecond = microsecond * 10 + (p[i] - 0x30)
                             frac_digits += 1
                         i += 1
                     if frac_digits == 0:
@@ -648,19 +668,19 @@ cdef inline int _try_parse_iso_timestamp_ms(str s, cass_int64_t* out) except -1:
 
         # Optional timezone
         if i < n:
-            if b[i] == 0x5a or b[i] == 0x7a:  # 'Z' / 'z'
+            if p[i] == 0x5a or p[i] == 0x7a:  # 'Z' / 'z'
                 i += 1
-            elif b[i] == 0x2b or b[i] == 0x2d:  # '+' / '-'
-                tz_sign = 1 if b[i] == 0x2b else -1
+            elif p[i] == 0x2b or p[i] == 0x2d:  # '+' / '-'
+                tz_sign = 1 if p[i] == 0x2b else -1
                 i += 1
-                if i + 1 >= n or not (0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39):
+                if i + 1 >= n or not (0x30 <= p[i] <= 0x39 and 0x30 <= p[i + 1] <= 0x39):
                     return 0
-                tz_hour = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                tz_hour = (p[i] - 0x30) * 10 + (p[i + 1] - 0x30)
                 i += 2
-                if i < n and b[i] == 0x3a:
+                if i < n and p[i] == 0x3a:
                     i += 1
-                if i + 1 <= n and i + 1 < n and 0x30 <= b[i] <= 0x39 and 0x30 <= b[i + 1] <= 0x39:
-                    tz_min = (b[i] - 0x30) * 10 + (b[i + 1] - 0x30)
+                if i + 1 <= n and i + 1 < n and 0x30 <= p[i] <= 0x39 and 0x30 <= p[i + 1] <= 0x39:
+                    tz_min = (p[i] - 0x30) * 10 + (p[i + 1] - 0x30)
                     i += 2
             else:
                 return 0
@@ -668,7 +688,8 @@ cdef inline int _try_parse_iso_timestamp_ms(str s, cass_int64_t* out) except -1:
         if i != n:
             return 0
 
-    days = days_from_civil(year, month, day)
+    if days < -TIMESTAMP_DAYS_MAX or days > TIMESTAMP_DAYS_MAX:
+        raise ValueError(f'The timestamp "{s}" is out of the timestamps of CQL')
     ms = (<cass_int64_t>days * 86400000
           + <cass_int64_t>hour * 3600000
           + <cass_int64_t>minute * 60000
@@ -682,25 +703,22 @@ cdef inline int _try_parse_iso_timestamp_ms(str s, cass_int64_t* out) except -1:
     return 1
 
 
-cdef inline cass_int64_t _datetime_to_ms(datetime dt):
-    cdef int year = dt.year
-    cdef int month = dt.month
-    cdef int day = dt.day
-    cdef int hour = dt.hour
-    cdef int minute = dt.minute
-    cdef int second = dt.second
-    cdef int microsecond = dt.microsecond
-    cdef int days = days_from_civil(year, month, day)
-    cdef cass_int64_t ms = (<cass_int64_t>days * 86400000
-                            + <cass_int64_t>hour * 3600000
-                            + <cass_int64_t>minute * 60000
-                            + <cass_int64_t>second * 1000
-                            + <cass_int64_t>(microsecond // 1000))
+cdef inline cass_int64_t _datetime_to_ms(datetime dt) except? -1:
+    """The milliseconds since 1970-01-01 in UTC of a datetime, a naive one is in UTC. Its fields are read from its C
+    struct and its offset in integers, not by attributes and total_seconds()."""
+    cdef long long days = days_from_civil(<long long>date_year(dt), date_month(dt), date_day(dt))
+    cdef cass_int64_t ms = (days * 86400000
+                            + <cass_int64_t>datetime_hour(dt) * 3600000
+                            + <cass_int64_t>datetime_minute(dt) * 60000
+                            + <cass_int64_t>datetime_second(dt) * 1000
+                            + datetime_microsecond(dt) // 1000)
+    cdef object tzinfo = datetime_tzinfo(dt)
     cdef object offset
-    if dt.tzinfo is not None:
+    if tzinfo is not None and tzinfo is not UTC_TZ:
         offset = dt.utcoffset()
         if offset is not None:
-            ms -= <cass_int64_t>(offset.total_seconds() * 1000)
+            ms -= ((<cass_int64_t>timedelta_days(offset) * 86400 + timedelta_seconds(offset)) * 1000000
+                   + timedelta_microseconds(offset)) // 1000
     return ms
 
 

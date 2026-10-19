@@ -86,7 +86,14 @@ native_types = {
             (-62105616000.0, ("0001-12-14", date(1, 12, 14))),
             (-62105616000, ("0001-12-14", date(1, 12, 14))),
         ],
-        "invalid": [("bad_date", ValueError), ("-62105616000", ValueError)],
+        "invalid": [
+            ("bad_date", ValueError),
+            ("-62105616000", ValueError),
+            # Out of the dates of CQL
+            ("5881580-07-12", ValueError),
+            ("-5877641-06-22", ValueError),
+            ("2024-13-01", ValueError),
+        ],
     },
     "decimal": {
         "value_type": ValueType.DECIMAL,

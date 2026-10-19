@@ -38,7 +38,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-DATETIME = "stage 3: date, time, timestamp"
 UUIDS = "stage 4: uuid"
 INET = "stage 5: inet"
 UUIDS_INET = "stages 4, 5: uuid, inet"
@@ -368,7 +367,6 @@ CASES = [
         "2146764120",  # 0000-01-01
         Raises(ValueError, "value_date"),
         "0000-01-01",
-        todo={"read": DATETIME, "native": DATETIME},
     ),
     Case(
         "date-before-year-zero",
@@ -376,7 +374,6 @@ CASES = [
         "2146764119",  # -0001-12-31
         Raises(ValueError, "value_date"),
         "-0001-12-31",
-        todo={"read": DATETIME, "native": DATETIME, "write native": DATETIME},
     ),
     Case(
         "date-first-cql",
@@ -384,7 +381,6 @@ CASES = [
         "0",  # -5877641-06-23
         Raises(ValueError, "value_date"),
         "-5877641-06-23",
-        todo={"read": DATETIME, "native": DATETIME, "write native": DATETIME},
     ),
     Case(
         "date-after-python",
@@ -392,7 +388,6 @@ CASES = [
         "2150416545",  # 10000-01-01
         Raises(ValueError, "value_date"),
         "10000-01-01",
-        todo={"read": DATETIME, "write native": DATETIME},
     ),
     Case(
         "date-last-cql",
@@ -400,7 +395,6 @@ CASES = [
         "4294967295",  # 5881580-07-11
         Raises(ValueError, "value_date"),
         "5881580-07-11",
-        todo={"read": DATETIME, "write native": DATETIME},
     ),
     Case("time", "time", "'12:34:56.123456789'", time(12, 34, 56, 123456), "12:34:56.123456789", lossless=False),
     Case("time-midnight", "time", "'00:00:00'", time(0, 0), "00:00:00.000000000"),
@@ -433,8 +427,7 @@ CASES = [
         "253402300799999",
         datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=UTC),
         "9999-12-31 23:59:59.999Z",
-        # Read through a float, it gives .998
-        todo={"read": DATETIME, "native": DATETIME},
+        # acsylla 1.x read it through a float, it gave .998
     ),
     Case(
         "timestamp-before-python",
@@ -442,7 +435,13 @@ CASES = [
         "-62135596800001",
         Raises(ValueError, "value_timestamp"),
         "0000-12-31 23:59:59.999Z",
-        todo={"read": DATETIME, "native": DATETIME},
+    ),
+    Case(
+        "timestamp-before-year-zero",
+        "timestamp",
+        "-62167219200001",
+        Raises(ValueError, "value_timestamp"),
+        "-0001-12-31 23:59:59.999Z",
     ),
     Case(
         "timestamp-after-python",
@@ -450,7 +449,6 @@ CASES = [
         "253402300800000",
         Raises(ValueError, "value_timestamp"),
         "10000-01-01 00:00:00.000Z",
-        todo={"read": DATETIME, "native": DATETIME, "write native": DATETIME},
     ),
     Case(
         "duration",
@@ -721,6 +719,15 @@ WRITE_CASES = [
         datetime(2024, 6, 15, 15, 30, 0, 123000, tzinfo=timezone(timedelta(hours=3))),
         "'2024-06-15 12:30:00.123+0000'",
     ),
+    WriteCase(
+        "timestamp-negative-zone",
+        "timestamp",
+        datetime(2024, 6, 15, 7, 0, 0, 123000, tzinfo=timezone(-timedelta(hours=5, minutes=30))),
+        "'2024-06-15 12:30:00.123+0000'",
+    ),
+    # The microseconds of a datetime are cut to its milliseconds, the last microsecond of 1969 is -1 ms
+    WriteCase("timestamp-before-epoch", "timestamp", datetime(1969, 12, 31, 23, 59, 59, 999999, tzinfo=UTC), "-1"),
+    WriteCase("timestamp-str-before-year-zero", "timestamp", "-0001-12-31 23:59:59.999Z", "-62167219200001"),
     WriteCase("duration-timedelta", "duration", timedelta(days=3, hours=4), "3d4h"),
     WriteCase("duration-tuple", "duration", (14, 3, 14706007008009), "1y2mo3d4h5m6s7ms8us9ns"),
     WriteCase(

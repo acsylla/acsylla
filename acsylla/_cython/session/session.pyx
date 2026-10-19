@@ -2,7 +2,7 @@ import asyncio
 
 
 cdef class Session:
-    def __cinit__(self, Cluster cluster, object keyspace):
+    def __cinit__(self, Cluster cluster, object keyspace, bint legacy_types=True):
         self.cluster = cluster
         self.cass_cluster = cluster.cass_cluster
         self.cass_session = cass_session_new()
@@ -10,8 +10,9 @@ cdef class Session:
     def __dealloc__(self):
         cass_session_free(self.cass_session)
 
-    def __init__(self, cass_cluster, keyspace=None):
+    def __init__(self, cass_cluster, keyspace=None, legacy_types=True):
         self.keyspace = keyspace
+        self.legacy_types = legacy_types
         self.closed = 0
         self.connected = 0
 
@@ -89,8 +90,8 @@ cdef class Session:
             serial_consistency,
             execution_profile,
             native_types,
+            self,
         )
-        statement.session = self
         return statement
 
     async def close(self):
@@ -138,6 +139,8 @@ cdef class Session:
 
         if native_types is None:
             native_types = statement.native_types or False
+        if statement.bind_options.decimal_bound and statement.bind_options.legacy_types != self.legacy_types:
+            raise decimals_of_another_session(statement.bind_options.legacy_types)
 
         cass_future = cass_session_execute(self.cass_session, statement.cass_statement)
         future = cass_future_to_asyncio(cass_future, self.cluster)
@@ -149,7 +152,7 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-            result = Result.new_(cass_result, native_types)
+            result = Result.new_(cass_result, native_types, self.legacy_types)
             if statement.tracing_enabled is True:
                 error = cass_future_tracing_id(cass_future, &tracing_id)
                 raise_if_error(error)
@@ -214,6 +217,11 @@ cdef class Session:
         if self.closed == 1:
             raise RuntimeError("Session closed")
 
+        if batch.legacy_decimals and not self.legacy_types:
+            raise decimals_of_another_session(True)
+        if batch.cql_decimals and self.legacy_types:
+            raise decimals_of_another_session(False)
+
         cass_future = cass_session_execute_batch(self.cass_session, batch.cass_batch)
         future = cass_future_to_asyncio(cass_future, self.cluster)
 
@@ -224,7 +232,7 @@ cdef class Session:
                 cass_error = cass_future_error_code(cass_future)
                 cass_future_error_message(cass_future, <const char**> &error_message, <size_t*> &length)
                 raise_if_error(cass_error, error_message)
-            result = Result.new_(cass_result, native_types)
+            result = Result.new_(cass_result, native_types, self.legacy_types)
             if batch.tracing_enabled is True:
                 error = cass_future_tracing_id(cass_future, &tracing_id)
                 raise_if_error(error)

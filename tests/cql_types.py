@@ -107,7 +107,15 @@ native_types = {
             ),
             (3.141592653589793, ("3.141592653589793", Decimal("3.141592653589793"))),
         ],
-        "invalid": [("bad", ValueError), ("bad.decimal", ValueError), ("bad.123", ValueError), ("123.bad", ValueError)],
+        "invalid": [
+            ("bad", ValueError),
+            ("bad.decimal", ValueError),
+            ("bad.123", ValueError),
+            ("123.bad", ValueError),
+            ("NaN", ValueError),
+            (Decimal("Infinity"), ValueError),
+            (True, ValueError),
+        ],
     },
     "double": {
         "value_type": ValueType.DOUBLE,

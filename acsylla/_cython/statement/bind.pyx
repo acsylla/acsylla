@@ -2,6 +2,7 @@ cdef extern from "utils.cpp":
     int days_from_civil(int y, unsigned m, unsigned d) nogil
 
 from cpython.bytes cimport PyBytes_AS_STRING
+from cpython.bytes cimport PyBytes_FromStringAndSize
 from cpython.bytes cimport PyBytes_GET_SIZE
 from cpython.datetime cimport PyDateTime_Check
 from cpython.datetime cimport PyTime_Check
@@ -23,16 +24,26 @@ from cpython.datetime cimport time_minute
 from cpython.datetime cimport time_second
 from cpython.datetime cimport time_tzinfo
 from cpython.datetime cimport timedelta
+from cpython.long cimport PyLong_AsLongLongAndOverflow
 from cpython.long cimport PyLong_AsUnsignedLongLongMask
+from cpython.long cimport PyLong_FromString
+from cpython.mem cimport PyMem_Free
+from cpython.mem cimport PyMem_Malloc
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize
 from libc.string cimport memcmp
 from libc.time cimport time_t
 
+from decimal import Decimal
 from ipaddress import IPv4Address
 from ipaddress import IPv6Address
 from uuid import UUID
 
+import warnings
+
 import_datetime()
+
+# The warning about a decimal written as text by a statement without a session is given once
+cdef bint legacy_decimal_warned = False
 
 
 cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s) except *:
@@ -172,45 +183,144 @@ cdef inline cass_bool_t as_bool(object value) except *:
     raise ValueError(f'Value "{value}" is not boolean.')
 
 
-cdef inline (cass_byte_t*, cass_int32_t) as_cass_decimal(object value) except *:
-    cdef str s
-    cdef bytes b
-    cdef Py_ssize_t n, i, dot_pos, digits_start
-    cdef cass_int32_t scale
+cdef inline bytes int128_as_varint(int128 value):
+    """The shortest two's complement of `value`, big-endian."""
+    cdef unsigned char buffer[16]
+    cdef uint128 bits = <uint128>value
+    cdef int i, start = 0
+    for i in range(16):
+        buffer[15 - i] = <unsigned char>(bits >> (8 * i))
+    # The leading bytes that only repeat the sign of the next one are dropped
+    while start < 15 and ((buffer[start] == 0x00 and buffer[start + 1] < 0x80) or
+                          (buffer[start] == 0xFF and buffer[start + 1] >= 0x80)):
+        start += 1
+    return PyBytes_FromStringAndSize(<char*>buffer + start, 16 - start)
 
-    if isinstance(value, str):
-        s = <str>value
+
+cdef inline bytes int_as_varint(object value):
+    """The shortest two's complement of an int, big-endian."""
+    cdef int overflow = 0
+    cdef long long small = PyLong_AsLongLongAndOverflow(value, &overflow)
+    if overflow == 0:
+        return int128_as_varint(small)
+    return value.to_bytes(((value if value >= 0 else ~value).bit_length() + 8) // 8, 'big', signed=True)
+
+
+cdef object digits_as_int(const char* text, Py_ssize_t size):
+    """The int of the [-]digits[.digits] of a text up to its exponent, without the point."""
+    cdef char* buffer = <char*>PyMem_Malloc(size + 1)
+    cdef Py_ssize_t i, length = 0
+    if buffer == NULL:
+        raise MemoryError()
+    try:
+        for i in range(size):
+            if text[i] == b'E':
+                break
+            if text[i] != b'.':
+                buffer[length] = text[i]
+                length += 1
+        buffer[length] = 0
+        return PyLong_FromString(buffer, NULL, 10)
+    finally:
+        PyMem_Free(buffer)
+
+
+cdef bytes as_legacy_decimal(object value, cass_int32_t* scale, BindOptions* options):
+    """The text acsylla 1.x wrote in place of the unscaled varint of a decimal, its digits after the point as the scale.
+    Other drivers and cqlsh read it as another number, a session with legacy_types=True writes it for acsylla 1.x to
+    read it."""
+    cdef str text
+    cdef Py_ssize_t point
+    global legacy_decimal_warned
+    if options.without_session and not legacy_decimal_warned:
+        legacy_decimal_warned = True
+        warnings.warn(LEGACY_DECIMAL_WITHOUT_SESSION_WARNING, FutureWarning, stacklevel=1)
+    if isinstance(value, int):
+        text = str(value)
     else:
-        s = str(value)
-
-    b = s.encode('ascii')
-    n = len(b)
-    if n == 0:
-        raise ValueError(f'Bad value for decimal type: "{value}"')
-
-    digits_start = 1 if (b[0] == 0x2b or b[0] == 0x2d) else 0
-    if digits_start >= n:
-        raise ValueError(f'Bad value for decimal type: "{value}"')
-
-    dot_pos = -1
-    i = digits_start
-    while i < n:
-        if b[i] == 0x2e:  # '.'
-            if dot_pos != -1:
-                raise ValueError(f'Bad value for decimal type: "{value}"')
-            dot_pos = i
-        elif not (0x30 <= b[i] <= 0x39):
+        if not isinstance(value, Decimal):
+            try:
+                value = Decimal(value if isinstance(value, str) else str(value))
+            except ArithmeticError:
+                raise ValueError(f'Bad value for decimal type: "{value}"') from None
+        if not value.is_finite():
             raise ValueError(f'Bad value for decimal type: "{value}"')
+        text = str(value)
+        if 'E' in text:
+            # acsylla 1.x wrote no exponent, the digits are written out
+            if value.adjusted() > 1000 or value.as_tuple().exponent < -1000:
+                raise ValueError(f'Bad value for decimal type: "{value}", too many digits for the format of acsylla 1.x')
+            text = format(value, 'f')
+    point = text.find('.')
+    scale[0] = 0 if point < 0 else len(text) - point - 1
+    return text.encode('ascii')
+
+
+cdef bytes as_cass_decimal(object value, cass_int32_t* scale, BindOptions* options):
+    """The unscaled varint of a decimal given as a Decimal, an int, a str or a float. Its scale goes to `scale`."""
+    cdef str text
+    cdef const char* p
+    cdef Py_ssize_t n = 0, i = 0, digits = 0, fraction = 0
+    cdef bint negative = False, point = False, exponent_negative = False
+    cdef uint128 unscaled = 0
+    cdef int64_t exponent = 0, value_scale
+
+    # A session executes the statement only with its own legacy_types
+    options.decimal_bound = True
+    if isinstance(value, bool):
+        raise ValueError(f'Bad value for decimal type: "{value}"')
+    if options.legacy_types:
+        return as_legacy_decimal(value, scale, options)
+    if isinstance(value, int):
+        scale[0] = 0
+        return int_as_varint(value)
+    if not isinstance(value, Decimal):
+        try:
+            # A float by its shortest text, 3.14 and not 3.140000000000000124344978758017532527446746826171875
+            value = Decimal(value if isinstance(value, str) else str(value))
+        except ArithmeticError:
+            raise ValueError(f'Bad value for decimal type: "{value}"') from None
+
+    # str() of a Decimal is ASCII [-]digits[.digits][E(+|-)digits] or [-]Infinity, [-]NaN, [-]sNaN. It is made in C
+    # and parsed here in C, up to 38 digits in a 128-bit integer
+    text = str(value)
+    p = PyUnicode_AsUTF8AndSize(text, &n)
+    if p[0] == b'-':
+        negative = True
+        i = 1
+    if not (b'0' <= p[i] <= b'9'):
+        raise ValueError(f'Bad value for decimal type: "{value}"')
+    while i < n and p[i] != b'E':
+        if p[i] == b'.':
+            point = True
+        else:
+            # The leading zeros of 0.05 are not digits of the unscaled value
+            if unscaled != 0 or p[i] != b'0':
+                if digits < 38:
+                    unscaled = unscaled * 10 + <uint128>(p[i] - 48)
+                digits += 1
+            if point:
+                fraction += 1
         i += 1
+    if i < n:
+        exponent_negative = p[i + 1] == b'-'
+        i += 2
+        while i < n:
+            # Far beyond the 32 bits of a scale, it does not grow more
+            if exponent < 100000000000:
+                exponent = exponent * 10 + (p[i] - 48)
+            i += 1
+        if exponent_negative:
+            exponent = -exponent
 
-    if dot_pos == -1:
-        scale = 0
-    else:
-        if dot_pos == digits_start or dot_pos == n - 1:
-            raise ValueError(f'Bad value for decimal type: "{value}"')
-        scale = <cass_int32_t>(n - 1 - dot_pos)
-
-    return b, scale
+    value_scale = fraction - exponent
+    if value_scale < -2147483648 or value_scale > 2147483647:
+        raise ValueError(f'Bad value for decimal type: "{value}", its scale does not fit in 32 bits')
+    scale[0] = <cass_int32_t>value_scale
+    if digits <= 38:
+        return int128_as_varint(-<int128>unscaled if negative else <int128>unscaled)
+    # More than 38 digits, the unscaled value is the [-]digits without the point
+    return int_as_varint(digits_as_int(p, n))
 
 
 cdef inline CassUuid as_cass_uuid(object value) except *:
@@ -615,11 +725,13 @@ cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object v
 
 
 # CASS_VALUE_TYPE_MAP, CASS_VALUE_TYPE_SET, CASS_VALUE_TYPE_LIST
-cdef inline void bind_collection_by_value_type(CassCollection* collection, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
+cdef inline void bind_collection_by_value_type(CassCollection* collection, object value, const CassDataType* cass_data_type, CassValueType cass_value_type, BindOptions* options) except *:
     cdef CassError error = CASS_OK
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
+    cdef bytes decimal_varint
+    cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for collection value "{value}"'.encode())
@@ -649,8 +761,8 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_collection_append_bytes(collection, as_blob(value), len(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = as_cass_decimal(value)
-        error = cass_collection_append_decimal(collection, value, len(value), scale)
+        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_collection_append_decimal(collection, decimal_varint, len(decimal_varint), decimal_scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_collection_append_uuid(collection, as_cass_uuid(value))
@@ -668,15 +780,15 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
-        nested_collection = get_collection(value, cass_data_type)
+        nested_collection = get_collection(value, cass_data_type, options)
         error = cass_collection_append_collection(collection, nested_collection)
         cass_collection_free(nested_collection)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-        cass_tuple = get_tuple(value, cass_data_type)
+        cass_tuple = get_tuple(value, cass_data_type, options)
         error = cass_collection_append_tuple(collection, cass_tuple)
         cass_tuple_free(cass_tuple)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
-        user_type = get_udt(value, cass_data_type)
+        user_type = get_udt(value, cass_data_type, options)
         error = cass_collection_append_user_type(collection, user_type)
         cass_user_type_free(user_type)
 
@@ -684,7 +796,7 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
         raise_if_error(error)
 
 
-cdef inline CassCollection* get_collection(object value, const CassDataType* cass_data_type) except *:
+cdef inline CassCollection* get_collection(object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassCollection* collection = NULL
     cdef CassError error
     cdef const CassDataType* sub_data_type
@@ -704,10 +816,10 @@ cdef inline CassCollection* get_collection(object value, const CassDataType* cas
             for k, v in value:
                 sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
                 sub_value_type = cass_data_type_type(sub_data_type)
-                bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type)
+                bind_collection_by_value_type(collection, k, sub_data_type, sub_value_type, options)
                 sub_data_type = cass_data_type_sub_data_type(cass_data_type, 1)
                 sub_value_type = cass_data_type_type(sub_data_type)
-                bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+                bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type, options)
         else:
             sub_data_type = cass_data_type_sub_data_type(cass_data_type, 0)
             sub_value_type = cass_data_type_type(sub_data_type)
@@ -724,7 +836,7 @@ cdef inline CassCollection* get_collection(object value, const CassDataType* cas
                         raise_if_error(error)
             else:
                 for v in value:
-                    bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type)
+                    bind_collection_by_value_type(collection, v, sub_data_type, sub_value_type, options)
     except BaseException:
         # A value that can not be bound, the collection is not returned to be freed
         cass_collection_free(collection)
@@ -733,28 +845,30 @@ cdef inline CassCollection* get_collection(object value, const CassDataType* cas
     return collection
 
 
-cdef inline CassError bind_collection(CassStatement* statement, int index, object value, const CassDataType* cass_data_type) except *:
+cdef inline CassError bind_collection(CassStatement* statement, int index, object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassCollection* collection
     cdef CassError error
-    collection = get_collection(value, cass_data_type)
+    collection = get_collection(value, cass_data_type, options)
     error = cass_statement_bind_collection(statement, index, collection)
     cass_collection_free(collection)
     return error
 
-cdef inline  CassError bind_collection_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type) except *:
+cdef inline  CassError bind_collection_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassCollection* collection
     cdef CassError error
-    collection = get_collection(value, cass_data_type)
+    collection = get_collection(value, cass_data_type, options)
     error = cass_statement_bind_collection_by_name(statement, name, collection)
     cass_collection_free(collection)
     return error
 
 # CASS_VALUE_TYPE_TUPLE
-cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type) except *:
+cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type, BindOptions* options) except *:
     cdef CassError error = CASS_OK
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
+    cdef bytes decimal_varint
+    cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for Tuple index {index} value "{value}"'.encode())
@@ -786,8 +900,8 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
                              CASS_VALUE_TYPE_CUSTOM):
         error = cass_tuple_set_bytes(cass_tuple, index, as_blob(value), len(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = as_cass_decimal(value)
-        error = cass_tuple_set_decimal(cass_tuple, index, value, len(value), scale)
+        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_tuple_set_decimal(cass_tuple, index, decimal_varint, len(decimal_varint), decimal_scale)
     elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                              CASS_VALUE_TYPE_TIMEUUID):
         error = cass_tuple_set_uuid(cass_tuple, index, as_cass_uuid(value))
@@ -805,15 +919,15 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
-        collection = get_collection(value, cass_data_type)
+        collection = get_collection(value, cass_data_type, options)
         error = cass_tuple_set_collection(cass_tuple, index, collection)
         cass_collection_free(collection)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-        nested_tuple = get_tuple(value, cass_data_type)
+        nested_tuple = get_tuple(value, cass_data_type, options)
         error = cass_tuple_set_tuple(cass_tuple, index, nested_tuple)
         cass_tuple_free(nested_tuple)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
-        user_type = get_udt(value, cass_data_type)
+        user_type = get_udt(value, cass_data_type, options)
         error = cass_tuple_set_user_type(cass_tuple, index, user_type)
         cass_user_type_free(user_type)
 
@@ -821,7 +935,7 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
         raise_if_error(error)
 
 
-cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_type) except *:
+cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassTuple * cass_tuple = NULL
     cdef CassError error
     cdef size_t type_count
@@ -841,7 +955,7 @@ cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_typ
             if sub_data_type == NULL:
                 raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind Tuple index {i}'.encode())
             sub_value_type = cass_data_type_type(sub_data_type)
-            bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type)
+            bind_tuple_by_value_type(cass_tuple, i, v, sub_data_type, sub_value_type, options)
             i += 1
     except BaseException:
         # A value that can not be bound, the tuple is not returned to be freed
@@ -851,26 +965,28 @@ cdef inline CassTuple* get_tuple(object value, const CassDataType* cass_data_typ
     return cass_tuple
 
 
-cdef inline bind_tuple(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type):
+cdef inline bind_tuple(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type, BindOptions* options):
     cdef CassError error
-    cass_tuple = get_tuple(value, cass_data_type)
+    cass_tuple = get_tuple(value, cass_data_type, options)
     error = cass_statement_bind_tuple(statement, index, cass_tuple)
     cass_tuple_free(cass_tuple)
     return error
 
-cdef inline bind_tuple_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type):
+cdef inline bind_tuple_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type, BindOptions* options):
     cdef CassError error
-    cass_tuple = get_tuple(value, cass_data_type)
+    cass_tuple = get_tuple(value, cass_data_type, options)
     error = cass_statement_bind_tuple_by_name(statement, name, cass_tuple)
     cass_tuple_free(cass_tuple)
     return error
 
 # CASS_VALUE_TYPE_UDT
-cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
+cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object value, const CassDataType* cass_data_type, CassValueType cass_value_type, BindOptions* options):
     cdef CassError error = CASS_OK
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
+    cdef bytes decimal_varint
+    cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {name} value "{value}"'.encode())
@@ -892,8 +1008,8 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_user_type_set_double_by_name(user_type, name, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = as_cass_decimal(value)
-        error = cass_user_type_set_decimal_by_name(user_type, name, value, len(value), scale)
+        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_user_type_set_decimal_by_name(user_type, name, decimal_varint, len(decimal_varint), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
@@ -921,15 +1037,15 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
-        collection = get_collection(value, cass_data_type)
+        collection = get_collection(value, cass_data_type, options)
         error = cass_user_type_set_collection_by_name(user_type, name, collection)
         cass_collection_free(collection)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-        cass_tuple = get_tuple(value, cass_data_type)
+        cass_tuple = get_tuple(value, cass_data_type, options)
         error = cass_user_type_set_tuple_by_name(user_type, name, cass_tuple)
         cass_tuple_free(cass_tuple)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
-        nested_user_type = get_udt(value, cass_data_type)
+        nested_user_type = get_udt(value, cass_data_type, options)
         error = cass_user_type_set_user_type_by_name(user_type, name, nested_user_type)
         cass_user_type_free(nested_user_type)
 
@@ -937,12 +1053,14 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
         raise_if_error(error)
 
 
-cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type):
+cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, object value, const CassDataType* cass_data_type, CassValueType cass_value_type, BindOptions* options):
     cdef CassCollection* collection
     cdef CassError error = CASS_OK
     cdef const char* text
     cdef Py_ssize_t text_size
     cdef object text_owner
+    cdef bytes decimal_varint
+    cdef cass_int32_t decimal_scale
 
     if cass_value_type == CASS_VALUE_TYPE_UNKNOWN:
         raise_if_error(CASS_ERROR_LIB_INVALID_VALUE_TYPE, f'Unknown type for UDT column {index} value "{value}"'.encode())
@@ -964,8 +1082,8 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_user_type_set_double(user_type, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-        value, scale = as_cass_decimal(value)
-        error = cass_user_type_set_decimal(user_type, index, value, len(value), scale)
+        decimal_varint = as_cass_decimal(value, &decimal_scale, options)
+        error = cass_user_type_set_decimal(user_type, index, decimal_varint, len(decimal_varint), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
         error = cass_user_type_set_string(user_type, index, as_bytes(value, 'ascii'))
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
@@ -993,19 +1111,19 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
     elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                              CASS_VALUE_TYPE_SET,
                              CASS_VALUE_TYPE_LIST):
-        collection = get_collection(value, cass_data_type)
+        collection = get_collection(value, cass_data_type, options)
         if collection == NULL:
             raise ValueError(f'Unable to bind collection with value {value}')
         error = cass_user_type_set_collection(user_type, index, collection)
         cass_collection_free(collection)
     elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-        cass_tuple = get_tuple(value, cass_data_type)
+        cass_tuple = get_tuple(value, cass_data_type, options)
         if cass_tuple == NULL:
             raise ValueError(f'Unable to bind tuple with value "{value}"')
         error = cass_user_type_set_tuple(user_type, index, cass_tuple)
         cass_tuple_free(cass_tuple)
     elif cass_value_type == CASS_VALUE_TYPE_UDT:
-        nested_user_type = get_udt(value, cass_data_type)
+        nested_user_type = get_udt(value, cass_data_type, options)
         error = cass_user_type_set_user_type(user_type, index, nested_user_type)
         cass_user_type_free(nested_user_type)
 
@@ -1013,7 +1131,7 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
         raise_if_error(error)
 
 
-cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_type) except *:
+cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassUserType* user_type = NULL
 
     user_type = cass_user_type_new_from_data_type(cass_data_type)
@@ -1033,14 +1151,14 @@ cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_ty
                 field = udt_field_index(cass_data_type, field_count, k, i) if isinstance(k, str) else -1
                 if field >= 0:
                     sub_data_type = cass_data_type_sub_data_type(cass_data_type, field)
-                    bind_udt_value_by_index(user_type, field, v, sub_data_type, cass_data_type_type(sub_data_type))
+                    bind_udt_value_by_index(user_type, field, v, sub_data_type, cass_data_type_type(sub_data_type), options)
                 else:
                     # The driver's lookup by name, which ignores case unless the name is quoted
                     name = k.encode()
                     sub_data_type = cass_data_type_sub_data_type_by_name(cass_data_type, name)
                     if sub_data_type == NULL:
                         raise_if_error(CASS_ERROR_LIB_NAME_DOES_NOT_EXIST, f'Unable to bind UDT column "{k}" with value "{v}"'.encode())
-                    bind_udt_value_by_name(user_type, name, v, sub_data_type, cass_data_type_type(sub_data_type))
+                    bind_udt_value_by_name(user_type, name, v, sub_data_type, cass_data_type_type(sub_data_type), options)
                 i += 1
         else:
             for v in value:
@@ -1048,7 +1166,7 @@ cdef inline CassUserType* get_udt(object value, const CassDataType* cass_data_ty
                 if sub_data_type == NULL:
                     raise_if_error(CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS, f'Unable to bind UDT value "{v}" with index {i}'.encode())
                 sub_value_type = cass_data_type_type(sub_data_type)
-                bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type)
+                bind_udt_value_by_index(user_type, i, v, sub_data_type, sub_value_type, options)
                 i += 1
     except BaseException:
         # A value that can not be bound, the UDT is not returned to be freed
@@ -1080,21 +1198,21 @@ cdef inline Py_ssize_t udt_field_index(const CassDataType* cass_data_type, size_
     return -1
 
 
-cdef inline CassError bind_udt(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type)  except *:
+cdef inline CassError bind_udt(CassStatement* statement, size_t index, object value, const CassDataType* cass_data_type, BindOptions* options)  except *:
     cdef CassError error
     cdef CassUserType* user_type = NULL
 
-    user_type = get_udt(value, cass_data_type)
+    user_type = get_udt(value, cass_data_type, options)
     error = cass_statement_bind_user_type(statement, index, user_type)
     cass_user_type_free(user_type)
     return error
 
 
-cdef inline CassError bind_udt_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type) except *:
+cdef inline CassError bind_udt_by_name(CassStatement* statement, bytes name, object value, const CassDataType* cass_data_type, BindOptions* options) except *:
     cdef CassError error
     cdef CassUserType* user_type = NULL
 
-    user_type = get_udt(value, cass_data_type)
+    user_type = get_udt(value, cass_data_type, options)
     error = cass_statement_bind_user_type_by_name(statement, name, user_type)
     cass_user_type_free(user_type)
     return error

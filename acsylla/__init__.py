@@ -38,6 +38,7 @@ from .factories import create_batch_unlogged
 from .factories import create_cluster
 from .factories import create_statement
 from .factories import get_logger
+from .legacy import decode_legacy_decimal
 
 __all__ = (
     "Cluster",
@@ -80,4 +81,5 @@ __all__ = (
     "create_batch_counter",
     "errors",
     "get_logger",
+    "decode_legacy_decimal",
 )

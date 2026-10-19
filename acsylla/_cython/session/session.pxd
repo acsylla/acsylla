@@ -7,3 +7,5 @@ cdef class Session:
         bint closed
         bint connected
         public object keyspace
+        # The types of acsylla 1.x, see Cluster.create_session()
+        readonly bint legacy_types

@@ -5,8 +5,9 @@ Write: a value bound by acsylla must give the server the same bytes as the CQL l
 typeAsBlob() for a native type and with toJson() for the others. The values acsylla returns, with and without
 native_types, are bound back the same way.
 
-The cases describe acsylla 2.0. A case that is not done yet is marked xfail(strict=True) with the stage of the plan that
-does it, so the stage that makes it pass has to remove the mark.
+The cases describe a session with legacy_types=False, the only one of acsylla 2.0.0, and the types of acsylla 1.x a
+session with legacy_types=True keeps. A case that is not done yet is marked xfail(strict=True) with the stage of the
+plan that does it, so the stage that makes it pass has to remove the mark.
 """
 
 from acsylla import create_cluster
@@ -30,12 +31,13 @@ import math
 import os
 import pytest
 import re
+import struct
+import warnings
 
 pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-DECIMAL = "stage 1: decimal"
 VARINT = "stage 2: varint"
 DATETIME = "stage 3: date, time, timestamp"
 UUIDS = "stage 4: uuid"
@@ -80,17 +82,26 @@ class Raises:
     match: str
 
 
+# The value of a session with legacy_types=True is the same as with legacy_types=False
+SAME = object()
+
+
 @dataclass(frozen=True, eq=False)
 class Case:
     """A value of `cql_type` written as the CQL `literal`, acsylla reads it as `value` and with native_types as
-    `native`, and binding them must give the server the same value."""
+    `native`, a session with legacy_types=True as `legacy` and `legacy_native`, and binding them must give the server
+    the same value."""
 
     id: str
     cql_type: str
     literal: str
     value: object
     native: object
-    # What is not done yet: "read", "native", "write" or "write native" -> the stage that does it
+    legacy: object = SAME
+    legacy_native: object = SAME
+    # What is not done yet: "read", "native", "write", "write native", "legacy", "legacy native", "legacy write" or
+    # "legacy write native" -> the stage that does it. A legacy aspect of a case with the SAME value has the todo of
+    # its aspect without legacy_types
     todo: dict = field(default_factory=dict)
     # An empty value is read as None, binding None writes null instead
     round_trip: bool = True
@@ -108,6 +119,11 @@ class WriteCase:
     literal: str
     todo: str = None
     needs: str = None
+
+
+def varint_bytes(number):
+    """The two's complement of a varint, the value acsylla 1.x returns."""
+    return number.to_bytes(((number if number >= 0 else ~number).bit_length() + 8) // 8, "big", signed=True)
 
 
 def duration(months, days, nanoseconds):
@@ -147,6 +163,8 @@ CASES = [
         123456789012345678901234567890,
         123456789012345678901234567890,
         todo={"read": VARINT, "native": VARINT, "write": VARINT, "write native": VARINT},
+        legacy=varint_bytes(123456789012345678901234567890),
+        legacy_native=varint_bytes(123456789012345678901234567890),
     ),
     Case(
         "varint-negative",
@@ -155,6 +173,8 @@ CASES = [
         -123456789012345678901234567890,
         -123456789012345678901234567890,
         todo={"read": VARINT, "native": VARINT, "write": VARINT, "write native": VARINT},
+        legacy=varint_bytes(-123456789012345678901234567890),
+        legacy_native=varint_bytes(-123456789012345678901234567890),
     ),
     Case(
         "varint-minus-one",
@@ -163,6 +183,8 @@ CASES = [
         -1,
         -1,
         todo={"read": VARINT, "native": VARINT, "write": VARINT, "write native": VARINT},
+        legacy=b"\xff",
+        legacy_native=b"\xff",
     ),
     Case(
         "varint-zero",
@@ -171,30 +193,53 @@ CASES = [
         0,
         0,
         todo={"read": VARINT, "native": VARINT, "write": VARINT, "write native": VARINT},
+        legacy=b"\x00",
+        legacy_native=b"\x00",
+    ),
+    Case("decimal", "decimal", "1234.5678", Decimal("1234.5678"), "1234.5678"),
+    Case("decimal-negative", "decimal", "-0.000001", Decimal("-0.000001"), "-0.000001"),
+    Case("decimal-negative-scale", "decimal", "1E+10", Decimal("1E+10"), "1E+10"),
+    Case("decimal-big-exponent", "decimal", "1.5E+30", Decimal("1.5E+30"), "1.5E+30"),
+    Case("decimal-zero", "decimal", "0", Decimal("0"), "0"),
+    Case("decimal-leading-zeros", "decimal", "0.05", Decimal("0.05"), "0.05"),
+    Case("decimal-scientific", "decimal", "0.000000012345", Decimal("1.2345E-8"), "1.2345E-8"),
+    # Up to 38 digits a decimal is read and written through 64 and 128-bit integers, longer ones through a Python int
+    Case("decimal-18-digits", "decimal", "999999999999999999", Decimal("999999999999999999"), "999999999999999999"),
+    Case("decimal-19-digits", "decimal", "9999999999999999999", Decimal("9999999999999999999"), "9999999999999999999"),
+    Case(
+        "decimal-18-decimal-places",
+        "decimal",
+        "1234.123456789012345678",
+        Decimal("1234.123456789012345678"),
+        "1234.123456789012345678",
     ),
     Case(
+        "decimal-38-digits",
         "decimal",
-        "decimal",
-        "1234.5678",
-        Decimal("1234.5678"),
-        "1234.5678",
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
+        "-9999999999999999999999999999.9999999999",
+        Decimal("-9999999999999999999999999999.9999999999"),
+        "-9999999999999999999999999999.9999999999",
     ),
     Case(
-        "decimal-negative",
+        "decimal-39-digits",
         "decimal",
-        "-0.000001",
-        Decimal("-0.000001"),
-        "-0.000001",
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
+        "123456789012345678901234567890123456789",
+        Decimal("123456789012345678901234567890123456789"),
+        "123456789012345678901234567890123456789",
     ),
     Case(
-        "decimal-negative-scale",
+        "decimal-long-scientific",
         "decimal",
-        "1E+10",
-        Decimal("1E+10"),
-        "1E+10",
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
+        "1.23456789012345678901234567890E+40",
+        Decimal("1.23456789012345678901234567890E+40"),
+        "1.23456789012345678901234567890E+40",
+    ),
+    Case(
+        "decimal-int64-min",
+        "decimal",
+        "-9223372036854775808",
+        Decimal("-9223372036854775808"),
+        "-9223372036854775808",
     ),
     Case(
         "decimal-precision",
@@ -202,20 +247,29 @@ CASES = [
         "3.141592653589793115997963468544185161590576171875",
         Decimal("3.141592653589793115997963468544185161590576171875"),
         "3.141592653589793115997963468544185161590576171875",
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
     ),
+    # What acsylla 1.2.0 wrote for Decimal("1234.5678"): the text of it in place of the unscaled value
     Case(
-        "decimal-zero",
+        "decimal-legacy",
         "decimal",
-        "0",
-        Decimal("0"),
-        "0",
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
+        "blobAsDecimal(0x00000004313233342e35363738)",
+        Decimal("90750775191054255.4936"),
+        "90750775191054255.4936",
+        legacy=Decimal("1234.5678"),
+        legacy_native="1234.5678",
     ),
-    Case("uuid", "uuid", UUID_1, UUID(UUID_1), UUID_1, todo={"read": UUIDS}),
-    Case("timeuuid", "timeuuid", TIMEUUID_1, UUID(TIMEUUID_1), TIMEUUID_1, todo={"read": UUIDS}),
-    Case("inet", "inet", "'192.168.1.100'", IPv4Address("192.168.1.100"), "192.168.1.100", todo={"read": INET}),
-    Case("inet-ipv6", "inet", "'::1'", IPv6Address("::1"), "::1", todo={"read": INET}),
+    Case("uuid", "uuid", UUID_1, UUID(UUID_1), UUID_1, todo={"read": UUIDS}, legacy=UUID_1),
+    Case("timeuuid", "timeuuid", TIMEUUID_1, UUID(TIMEUUID_1), TIMEUUID_1, todo={"read": UUIDS}, legacy=TIMEUUID_1),
+    Case(
+        "inet",
+        "inet",
+        "'192.168.1.100'",
+        IPv4Address("192.168.1.100"),
+        "192.168.1.100",
+        todo={"read": INET},
+        legacy="192.168.1.100",
+    ),
+    Case("inet-ipv6", "inet", "'::1'", IPv6Address("::1"), "::1", todo={"read": INET}, legacy="::1"),
     Case(
         "inet-ipv6-long",
         "inet",
@@ -223,6 +277,7 @@ CASES = [
         IPv6Address("2001:db8::ff00:42:8329"),
         "2001:db8::ff00:42:8329",
         todo={"read": INET},
+        legacy="2001:db8::ff00:42:8329",
     ),
     Case("date", "date", "'2024-06-15'", date(2024, 6, 15), "2024-06-15"),
     Case("date-before-epoch", "date", "'1969-12-31'", date(1969, 12, 31), "1969-12-31"),
@@ -326,6 +381,8 @@ CASES = [
         duration(14, 3, 14706007008009),
         "1y2mo3d4h5m6s7ms8us9ns",
         todo={"read": DURATION, "native": NATIVE, "write": DURATION},
+        legacy="1y2mo3d4h5m6s7ms8us9ns",
+        legacy_native=(14, 3, 14706007008009),
     ),
     Case(
         "duration-negative",
@@ -334,6 +391,8 @@ CASES = [
         duration(0, -1, 0),
         "-1d",
         todo={"read": DURATION, "native": NATIVE, "write": DURATION},
+        legacy="-1d",
+        legacy_native=(0, -1, 0),
     ),
     Case(
         "duration-hours",
@@ -342,6 +401,8 @@ CASES = [
         duration(0, 0, 90000000000000),
         "25h",
         todo={"read": DURATION, "native": NATIVE, "write": DURATION},
+        legacy="25h",
+        legacy_native=(0, 0, 90000000000000),
     ),
     Case(
         "duration-zero",
@@ -349,7 +410,10 @@ CASES = [
         "0s",
         duration(0, 0, 0),
         "0s",
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION},
+        # acsylla 1.x read a zero duration as "" and did not take it back
+        todo={"read": DURATION, "native": NATIVE, "write": DURATION, "legacy write": DURATION},
+        legacy="",
+        legacy_native=(0, 0, 0),
     ),
     Case("list", "list<int>", "[3, 1, 2]", [3, 1, 2], [3, 1, 2]),
     Case("set", "set<int>", "{3, 1, 2}", {1, 2, 3}, {1, 2, 3}),
@@ -362,7 +426,7 @@ CASES = [
         {"street": "Main", "num": 5},
         {"street": "Main", "num": 5},
     ),
-    Case("list-uuid", "list<uuid>", f"[{UUID_1}]", [UUID(UUID_1)], [UUID_1], todo={"read": UUIDS}),
+    Case("list-uuid", "list<uuid>", f"[{UUID_1}]", [UUID(UUID_1)], [UUID_1], todo={"read": UUIDS}, legacy=[UUID_1]),
     Case(
         "map-timeuuid-inet",
         "map<timeuuid, inet>",
@@ -370,6 +434,7 @@ CASES = [
         {UUID(TIMEUUID_1): IPv4Address("10.0.0.1")},
         {TIMEUUID_1: "10.0.0.1"},
         todo={"read": UUIDS_INET},
+        legacy={TIMEUUID_1: "10.0.0.1"},
     ),
     Case(
         "list-varint",
@@ -378,6 +443,8 @@ CASES = [
         [1, -1, 123456789012345678901234567890],
         [1, -1, 123456789012345678901234567890],
         todo={"read": VARINT, "native": VARINT, "write": VARINT, "write native": VARINT},
+        legacy=[b"\x01", b"\xff", varint_bytes(123456789012345678901234567890)],
+        legacy_native=[b"\x01", b"\xff", varint_bytes(123456789012345678901234567890)],
     ),
     Case(
         "set-decimal",
@@ -385,7 +452,6 @@ CASES = [
         "{1.5, 2.25}",
         {Decimal("1.5"), Decimal("2.25")},
         {"1.5", "2.25"},
-        todo={"read": DECIMAL, "native": DECIMAL, "write": DECIMAL, "write native": DECIMAL},
     ),
     Case(
         "list-duration",
@@ -394,6 +460,8 @@ CASES = [
         [duration(0, 1, 0), duration(0, 0, 7200000000000)],
         ["1d", "2h"],
         todo={"read": DURATION, "native": NATIVE, "write": DURATION},
+        legacy=["1d", "2h"],
+        legacy_native=[(0, 1, 0), (0, 0, 7200000000000)],
     ),
     Case("list-list", "list<frozen<list<int>>>", "[[1, 2], [3]]", [[1, 2], [3]], [[1, 2], [3]]),
     Case("map-set", "map<int, frozen<set<int>>>", "{1: {2, 3}}", {1: {2, 3}}, {1: {2, 3}}),
@@ -468,6 +536,8 @@ CASES = [
         [1.5, 2.5, 3.5],
         [1.5, 2.5, 3.5],
         todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
+        legacy=struct.pack(">3f", 1.5, 2.5, 3.5),
+        legacy_native=struct.pack(">3f", 1.5, 2.5, 3.5),
     ),
     Case(
         "vector-int",
@@ -476,6 +546,8 @@ CASES = [
         [1, -2],
         [1, -2],
         todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
+        legacy=struct.pack(">2i", 1, -2),
+        legacy_native=struct.pack(">2i", 1, -2),
     ),
     Case(
         "vector-text",
@@ -484,6 +556,8 @@ CASES = [
         ["a", "bc"],
         ["a", "bc"],
         todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
+        legacy=b"\x01a\x02bc",
+        legacy_native=b"\x01a\x02bc",
     ),
 ]
 # Empty values: 0 bytes, not null
@@ -515,6 +589,8 @@ CASES += [
         None,
         todo={"read": VARINT, "native": VARINT},
         round_trip=False,
+        legacy=b"",
+        legacy_native=b"",
     ),
 ]
 CASES += [
@@ -537,10 +613,13 @@ CASES += [
 ]
 
 WRITE_CASES = [
-    WriteCase("decimal-str", "decimal", "1234.5678", "1234.5678", DECIMAL),
-    WriteCase("decimal-str-exponent", "decimal", "1E+10", "1E+10", DECIMAL),
-    WriteCase("decimal-int", "decimal", 5, "5", DECIMAL),
-    WriteCase("decimal-float", "decimal", 3.14, "3.14", DECIMAL),
+    WriteCase("decimal-str", "decimal", "1234.5678", "1234.5678"),
+    WriteCase("decimal-str-exponent", "decimal", "1E+10", "1E+10"),
+    WriteCase("decimal-str-lowercase-exponent", "decimal", "1.5e3", "1.5E+3"),
+    WriteCase("decimal-int", "decimal", 5, "5"),
+    WriteCase("decimal-big-int", "decimal", 10**30, "1000000000000000000000000000000"),
+    WriteCase("decimal-negative-zero", "decimal", Decimal("-0"), "0"),
+    WriteCase("decimal-float", "decimal", 3.14, "3.14"),
     # bytes are the two's complement of the number, as before
     WriteCase("varint-bytes", "varint", b"\x7b", "123"),
     WriteCase("varint-str", "varint", "123", "123", VARINT),
@@ -580,6 +659,10 @@ WRITE_CASES = [
 # returns with a part lost
 ROUND_TRIP_CASES = [case for case in CASES if case.round_trip and case.lossless and not isinstance(case.value, Raises)]
 ROUND_TRIP_NATIVE_CASES = [case for case in CASES if case.round_trip]
+# A session with legacy_types=True writes decimals as the text of acsylla 1.x, they are checked apart
+LEGACY_ROUND_TRIP_CASES = [case for case in ROUND_TRIP_CASES if "decimal" not in case.cql_type]
+LEGACY_ROUND_TRIP_NATIVE_CASES = [case for case in ROUND_TRIP_NATIVE_CASES if "decimal" not in case.cql_type]
+LEGACY_DECIMAL_CASES = [case for case in CASES if case.cql_type == "decimal" and isinstance(case.value, Decimal)]
 
 
 def column(cql_type):
@@ -633,15 +716,49 @@ def same(actual, expected):
     return actual == expected
 
 
+# A legacy aspect of a case with the SAME value has the todo of this aspect without legacy_types
+LEGACY_ASPECTS = {
+    "legacy": ("legacy", "read"),
+    "legacy native": ("legacy_native", "native"),
+    "legacy write": ("legacy", "write"),
+    "legacy write native": ("legacy_native", "write native"),
+}
+
+
+def todo_of(case, aspect):
+    if aspect in case.todo:
+        return case.todo[aspect]
+    if aspect in LEGACY_ASPECTS:
+        name, plain_aspect = LEGACY_ASPECTS[aspect]
+        if getattr(case, name) is SAME:
+            return case.todo.get(plain_aspect)
+    return None
+
+
 def params(cases, aspect):
-    return [
-        pytest.param(
-            case,
-            id=case.id,
-            marks=[pytest.mark.xfail(strict=True, reason=case.todo[aspect])] if aspect in case.todo else [],
-        )
-        for case in cases
-    ]
+    marked = []
+    for case in cases:
+        todo = todo_of(case, aspect)
+        marks = [pytest.mark.xfail(strict=True, reason=todo)] if todo else []
+        marked.append(pytest.param(case, id=case.id, marks=marks))
+    return marked
+
+
+def legacy_value(case, native_types=False):
+    """The value a session with legacy_types=True reads."""
+    value = case.legacy_native if native_types else case.legacy
+    if value is SAME:
+        return case.native if native_types else case.value
+    return value
+
+
+def legacy_decimal_bytes(value):
+    """decimalAsBlob() of the text acsylla 1.x wrote for a decimal, its digits after the point as the scale."""
+    text = str(value)
+    if "E" in text:
+        text = format(value, "f")
+    scale = len(text.partition(".")[2])
+    return scale.to_bytes(4, "big", signed=True) + text.encode()
 
 
 def write_params(cases):
@@ -659,6 +776,10 @@ ROUND_TRIP_ID = 10000
 ROUND_TRIP_NATIVE_ID = 20000
 WRITE_LITERAL_ID = 30000
 WRITE_ID = 40000
+LEGACY_ROUND_TRIP_ID = 50000
+LEGACY_ROUND_TRIP_NATIVE_ID = 60000
+LEGACY_DECIMAL_ID = 70000
+DECIMAL_FORMAT_ID = 80000
 
 
 def case_id(case):
@@ -690,10 +811,10 @@ async def cluster(host):
 
 
 @pytest.fixture(scope="class")
-async def session(cluster, keyspace):
+async def session(cluster, keyspace, request):
     """The tables of all the cases with their literals written, without the Java functions of conftest, so it runs on
-    ScyllaDB too."""
-    setup = await cluster.create_session()
+    ScyllaDB too. The session has the legacy_types of its test class, False by default."""
+    setup = await cluster.create_session(legacy_types=False)
     await setup.execute(create_statement(f"DROP KEYSPACE IF EXISTS {keyspace}"))
     await setup.execute(
         create_statement(
@@ -704,7 +825,7 @@ async def session(cluster, keyspace):
     )
     await setup.close()
 
-    session = await cluster.create_session(keyspace=keyspace)
+    session = await cluster.create_session(keyspace=keyspace, legacy_types=getattr(request.cls, "legacy_types", False))
     await session.execute(create_statement(ADDR))
     cql_types = sorted({case.cql_type for case in CASES} | {case.cql_type for case in WRITE_CASES})
     missing_tables = {}
@@ -755,25 +876,26 @@ async def assert_same_on_server(session, cql_type, row_id, expected_row_id):
     assert actual == expected
 
 
-class TestRead:
-    async def check(self, session, case, expected, native_types):
-        skip_unsupported(case)
-        row = await read(session, case.cql_type, READ_ID + case_id(case), native_types=native_types)
-        if isinstance(expected, Raises):
-            with pytest.raises(expected.exception, match=expected.match):
-                row.column_value(column(case.cql_type))
-            return
-        expected = resolve(expected)
-        actual = row.column_value(column(case.cql_type))
-        assert same(actual, expected), f"{actual!r} != {expected!r}"
+async def check_read(session, case, expected, native_types):
+    skip_unsupported(case)
+    row = await read(session, case.cql_type, READ_ID + case_id(case), native_types=native_types)
+    if isinstance(expected, Raises):
+        with pytest.raises(expected.exception, match=expected.match):
+            row.column_value(column(case.cql_type))
+        return
+    expected = resolve(expected)
+    actual = row.column_value(column(case.cql_type))
+    assert same(actual, expected), f"{actual!r} != {expected!r}"
 
+
+class TestRead:
     @pytest.mark.parametrize("case", params(CASES, "read"))
     async def test_default(self, session, case):
-        await self.check(session, case, case.value, native_types=False)
+        await check_read(session, case, case.value, native_types=False)
 
     @pytest.mark.parametrize("case", params(CASES, "native"))
     async def test_native(self, session, case):
-        await self.check(session, case, case.native, native_types=True)
+        await check_read(session, case, case.native, native_types=True)
 
     async def test_counter(self, session):
         await session.execute(create_statement(f"{COUNTER_UPDATE.format(5)} WHERE id = 1"))
@@ -846,3 +968,132 @@ class TestRow:
         assert value._fields == ("id", "value_int")
         assert value.value_int == -2147483648
         assert tuple(value) == (READ_ID + case_id(next(c for c in CASES if c.id == "int")), -2147483648)
+
+
+class TestLegacyDecimal:
+    async def test_read(self, session):
+        """The decimal acsylla 1.2.0 wrote for Decimal("1234.5678"), read with and without native_types."""
+        case = next(c for c in CASES if c.id == "decimal-legacy")
+        skip_unsupported(case)
+        for native_types in (False, True):
+            row = await read(session, case.cql_type, READ_ID + case_id(case), native_types=native_types)
+            assert same(acsylla.decode_legacy_decimal(row[0]), Decimal("1234.5678"))
+
+    @pytest.mark.parametrize(
+        "text",
+        ["1234.5678", "-0.000001", "+5", "007", "3.141592653589793115997963468544185161590576171875"],
+    )
+    async def test_values(self, text):
+        """The text of a decimal acsylla 1.2.0 wrote in place of its unscaled value."""
+        scale = len(text.partition(".")[2])
+        legacy = Decimal(f"{int.from_bytes(text.encode(), 'big', signed=True)}E-{scale}")
+        assert same(acsylla.decode_legacy_decimal(legacy), Decimal(text))
+        assert same(acsylla.decode_legacy_decimal(str(legacy)), Decimal(text))
+
+    @pytest.mark.parametrize("value", [Decimal("1234.5678"), Decimal("0"), Decimal("1E+10"), Decimal("NaN"), None])
+    async def test_not_legacy(self, value):
+        assert acsylla.decode_legacy_decimal(value) is None
+
+    async def test_looks_legacy(self):
+        """12594 is the text "12" with the scale 0, so only the values acsylla 1.2.0 wrote may be passed."""
+        assert same(acsylla.decode_legacy_decimal(Decimal("12594")), Decimal("12"))
+
+
+class TestLegacyRead:
+    """A session with legacy_types=True reads the types of acsylla 1.x."""
+
+    legacy_types = True
+
+    @pytest.mark.parametrize("case", params(CASES, "legacy"))
+    async def test_default(self, session, case):
+        await check_read(session, case, legacy_value(case), native_types=False)
+
+    @pytest.mark.parametrize("case", params(CASES, "legacy native"))
+    async def test_native(self, session, case):
+        await check_read(session, case, legacy_value(case, native_types=True), native_types=True)
+
+
+class TestLegacyWrite:
+    """A session with legacy_types=True binds the types of acsylla 1.x, decimals as their text."""
+
+    legacy_types = True
+
+    @pytest.mark.parametrize("case", params(LEGACY_ROUND_TRIP_CASES, "legacy write"))
+    async def test_default(self, session, case):
+        skip_unsupported(case)
+        await write(session, case.cql_type, LEGACY_ROUND_TRIP_ID + case_id(case), resolve(legacy_value(case)))
+        await assert_same_on_server(
+            session, case.cql_type, LEGACY_ROUND_TRIP_ID + case_id(case), READ_ID + case_id(case)
+        )
+
+    @pytest.mark.parametrize("case", params(LEGACY_ROUND_TRIP_NATIVE_CASES, "legacy write native"))
+    async def test_native(self, session, case):
+        skip_unsupported(case)
+        row_id = LEGACY_ROUND_TRIP_NATIVE_ID + case_id(case)
+        await write(session, case.cql_type, row_id, resolve(legacy_value(case, native_types=True)))
+        await assert_same_on_server(session, case.cql_type, row_id, READ_ID + case_id(case))
+
+    @pytest.mark.parametrize("case", params(LEGACY_DECIMAL_CASES, "legacy write"))
+    async def test_decimal(self, session, case):
+        """The text of the decimal, as acsylla 1.x wrote it, and read back as acsylla 1.x read it."""
+        row_id = LEGACY_DECIMAL_ID + case_id(case)
+        await write(session, "decimal", row_id, case.value)
+        assert (await read(session, "decimal", row_id, expression=server_value("decimal")))[0] == legacy_decimal_bytes(
+            case.value
+        )
+        assert (await read(session, "decimal", row_id))[0] == case.value
+
+
+class TestDecimalFormat:
+    """A session executes the decimals bound for its own legacy_types only."""
+
+    INSERT = "INSERT INTO cql_values (id, value_decimal) VALUES (?, ?)"
+
+    async def legacy_session(self, cluster, keyspace):
+        with pytest.warns(FutureWarning, match="acsylla 2.0.0 will only have legacy_types=False"):
+            return await cluster.create_session(keyspace=keyspace)
+
+    async def test_warning(self, cluster, keyspace):
+        legacy = await self.legacy_session(cluster, keyspace)
+        await legacy.close()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            session = await cluster.create_session(keyspace=keyspace, legacy_types=False)
+        await session.close()
+        assert legacy.legacy_types is True
+        assert session.legacy_types is False
+
+    async def test_without_session(self, cluster, keyspace, session):
+        """A statement without a session binds decimals as acsylla 1.x did."""
+        statement = create_statement(self.INSERT, parameters=2)
+        statement.bind_list([DECIMAL_FORMAT_ID, Decimal("1.5")])
+        with pytest.raises(ValueError, match="this session has legacy_types=False"):
+            await session.execute(statement)
+        legacy = await self.legacy_session(cluster, keyspace)
+        try:
+            await legacy.execute(statement)
+        finally:
+            await legacy.close()
+
+    async def test_other_session(self, cluster, keyspace, session):
+        statement = session.query(self.INSERT, parameters=[DECIMAL_FORMAT_ID + 1, Decimal("1.5")])
+        legacy = await self.legacy_session(cluster, keyspace)
+        try:
+            with pytest.raises(ValueError, match="this session has legacy_types=True"):
+                await legacy.execute(statement)
+        finally:
+            await legacy.close()
+        await session.execute(statement)
+
+    async def test_without_decimals(self, session):
+        statement = create_statement("INSERT INTO cql_values (id, value_int) VALUES (?, ?)", parameters=2)
+        statement.bind_list([DECIMAL_FORMAT_ID + 2, 5])
+        await session.execute(statement)
+
+    async def test_batch(self, session):
+        statement = create_statement(self.INSERT, parameters=2)
+        statement.bind_list([DECIMAL_FORMAT_ID + 3, Decimal("1.5")])
+        batch = acsylla.create_batch_logged()
+        batch.add_statement(statement)
+        with pytest.raises(ValueError, match="this session has legacy_types=False"):
+            await session.execute_batch(batch)

@@ -47,13 +47,13 @@ cdef class Row:
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            yield get_cass_value(cass_value, self.result.native_types)
+            yield get_cass_value(cass_value, self.result.flags)
 
     def as_dict(self):
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef list names = self.result.columns_names()
         cdef dict result = {}
         for index in range(count):
@@ -63,7 +63,7 @@ cdef class Row:
             PyDict_SetItem(
                 result,
                 <object>PyList_GET_ITEM(names, index),
-                get_cass_value(cass_value, native_types),
+                get_cass_value(cass_value, flags),
             )
         return result
 
@@ -71,14 +71,14 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef list result = PyList_New(count)
         cdef object value
         for index in range(count):
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             Py_INCREF(value)
             PyList_SET_ITEM(result, index, value)
         return result
@@ -87,14 +87,14 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef tuple result = PyTuple_New(count)
         cdef object value
         for index in range(count):
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             Py_INCREF(value)
             PyTuple_SET_ITEM(result, index, value)
         return result
@@ -103,7 +103,7 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef list names = self.result.columns_names()
         cdef tuple result = PyTuple_New(count)
         cdef tuple pair
@@ -113,7 +113,7 @@ cdef class Row:
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
             key = <object>PyList_GET_ITEM(names, index)
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             pair = PyTuple_New(2)
             Py_INCREF(key)
             PyTuple_SET_ITEM(pair, 0, key)
@@ -132,7 +132,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(f'ColumnNotFound with index {index}')
 
-        return get_cass_value(cass_value, self.result.native_types)
+        return get_cass_value(cass_value, self.result.flags)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
@@ -145,7 +145,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(column_name)
 
-        return get_cass_value(cass_value, self.result.native_types)
+        return get_cass_value(cass_value, self.result.flags)
 
     def __getitem__(self, name):
         if isinstance(name, int):

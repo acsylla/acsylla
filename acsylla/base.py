@@ -683,11 +683,18 @@ class Cluster(metaclass=ABCMeta):
         """Returns the `Logger` instance"""
 
     @abstractmethod
-    async def create_session(self, keyspace: Optional[str] = None) -> "Session":
+    async def create_session(self, keyspace: Optional[str] = None, legacy_types: bool = True) -> "Session":
         """Returns a new session by using the Cluster configuration.
 
         If Keyspace is provided, the session will be bound to the keyspace and
         any statment, unlesss says the opposite, will be using that keyspace.
+
+        `legacy_types` keeps the types of acsylla 1.x, the default of acsylla 1.3.0, and gives a FutureWarning:
+        varint is read as bytes, uuid, timeuuid and inet as str, duration as str and vector as bytes, and decimal
+        is written as a text that other drivers and cqlsh read as another number. acsylla 2.0.0 will only have
+        `legacy_types=False`. The statements of the session, `Session.query()` and `Session.create_prepared()`,
+        bind decimals by it. A statement made without a session binds them as acsylla 1.x did, a session with
+        `legacy_types=False` refuses to execute one with decimals.
 
         The coroutine will try to make a connection to the cluster hosts.
         """
@@ -829,6 +836,9 @@ class Cluster(metaclass=ABCMeta):
 class Session(metaclass=ABCMeta):
     """Provides a Session instance class. Use the the
     `Cluster.create_session` coroutine for creating a new instance"""
+
+    # The types of acsylla 1.x, see `Cluster.create_session`
+    legacy_types: bool
 
     @abstractmethod
     async def use_keyspace(self, keyspace: str) -> "Result":

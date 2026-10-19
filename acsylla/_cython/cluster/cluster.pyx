@@ -1,5 +1,6 @@
 import random
 import socket
+import warnings
 
 
 def _wakeup_socketpair():
@@ -584,8 +585,10 @@ cdef class Cluster:
     def get_logger(self):
         return self.logger
 
-    async def create_session(self, keyspace=None):
-        session = Session(self, keyspace=keyspace)
+    async def create_session(self, keyspace=None, legacy_types=True):
+        if legacy_types:
+            warnings.warn(LEGACY_TYPES_WARNING, FutureWarning, stacklevel=1)
+        session = Session(self, keyspace=keyspace, legacy_types=legacy_types)
         await session._connect()
         return session
 

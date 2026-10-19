@@ -1,18 +1,44 @@
 cdef extern from "utils.cpp":
     void civil_from_days(int z, int* year, unsigned* month, unsigned* day) nogil
 
+cdef extern from *:
+    """
+    typedef __int128 acsylla_int128;
+    typedef unsigned __int128 acsylla_uint128;
+    static const unsigned long long ACSYLLA_1E19 = 10000000000000000000ULL;
+    """
+    # The 128-bit integers of GCC and Clang, a decimal of up to 38 digits is converted in them
+    ctypedef long long int128 "acsylla_int128"
+    ctypedef unsigned long long uint128 "acsylla_uint128"
+    const unsigned long long ACSYLLA_1E19
+
+cimport cython
+
 from cpython.datetime cimport date_new
 from cpython.datetime cimport datetime_new
 from cpython.datetime cimport get_utc
 from cpython.datetime cimport import_datetime
 from cpython.datetime cimport time_new
+from cpython.mem cimport PyMem_Free
+from cpython.mem cimport PyMem_Malloc
+from cpython.unicode cimport PyUnicode_1BYTE_KIND
+from cpython.unicode cimport PyUnicode_AsUTF8AndSize
+from cpython.unicode cimport PyUnicode_FromKindAndData
+from libc.string cimport memcpy
 
+from decimal import Context
 from decimal import Decimal
+from decimal import MAX_EMAX
+from decimal import MAX_PREC
+from decimal import MIN_EMIN
 
 import_datetime()
 
+# Changes the exponent of a Decimal without rounding its digits
+cdef object DECIMAL_EXACT = Context(prec=MAX_PREC, Emax=MAX_EMAX, Emin=MIN_EMIN)
 
-cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_types):
+
+cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
     cdef CassValueType cass_type
 
     cdef cass_bool_t value_is_null = cass_value_is_null(cass_value)
@@ -38,7 +64,7 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_typ
     elif cass_type == CASS_VALUE_TYPE_DOUBLE:
         return _double(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DECIMAL:
-        return _decimal(cass_value, native_types)
+        return _decimal(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_BOOLEAN:
         return _bool(cass_value)
     elif cass_type in (CASS_VALUE_TYPE_ASCII,
@@ -52,23 +78,23 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t native_typ
     elif cass_type == CASS_VALUE_TYPE_INET:
         return _inet(cass_value)
     elif cass_type == CASS_VALUE_TYPE_DATE:
-        return _date(cass_value, native_types)
+        return _date(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_TIME:
-        return _time(cass_value, native_types)
+        return _time(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_TIMESTAMP:
-        return _timestamp(cass_value, native_types)
+        return _timestamp(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_DURATION:
-        return _duration(cass_value, native_types)
+        return _duration(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_MAP:
-        return _map(cass_value, native_types)
+        return _map(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_SET:
-        return _set(cass_value, native_types)
+        return _set(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_LIST:
-        return _list(cass_value, native_types)
+        return _list(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_TUPLE:
-        return _tuple(cass_value, native_types)
+        return _tuple(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_UDT:
-        return _udt(cass_value, native_types)
+        return _udt(cass_value, flags)
     else:
         raise ValueError(f"Type not supported {cass_type}")
 
@@ -175,29 +201,180 @@ cdef inline object _double(const CassValue* cass_value):
     return output
 
 
-cdef inline object _decimal(const CassValue* cass_value, int8_t native_types):
-    """ Returns the decimal value of a column.
+cdef inline bint varint_as_int128(const cass_byte_t* varint, size_t size, int128* output):
+    """The value of a varint (two's complement, big-endian) of up to 16 bytes, False for a longer one."""
+    cdef uint128 value
+    cdef size_t i
+    if size > 16:
+        return False
+    value = ~(<uint128>0) if size and varint[0] & 0x80 else 0
+    for i in range(size):
+        value = (value << 8) | varint[i]
+    output[0] = <int128>value
+    return True
+
+
+@cython.cdivision(True)
+cdef inline Py_ssize_t write_digits(char* buffer, uint64_t value):
+    """Writes the decimal digits of `value`, snprintf costs several times more. Returns their number."""
+    cdef char reversed_[20]
+    cdef Py_ssize_t count = 0, i
+    while True:
+        reversed_[count] = <char>(48 + value % 10)
+        count += 1
+        value //= 10
+        if value == 0:
+            break
+    for i in range(count):
+        buffer[i] = reversed_[count - 1 - i]
+    return count
+
+
+@cython.cdivision(True)
+cdef inline Py_ssize_t write_digits_128(char* buffer, uint128 value):
+    """Writes the decimal digits of `value` up to 2^127, one 128-bit division splits it into 64-bit halves."""
+    cdef uint64_t high, low
+    cdef Py_ssize_t count, i
+    if value >> 64 == 0:
+        return write_digits(buffer, <uint64_t>value)
+    high = <uint64_t>(value // ACSYLLA_1E19)
+    low = <uint64_t>(value - <uint128>high * ACSYLLA_1E19)
+    count = write_digits(buffer, high)
+    # The low half has 19 digits with its leading zeros
+    for i in range(count + 18, count - 1, -1):
+        buffer[i] = <char>(48 + low % 10)
+        low //= 10
+    return count + 19
+
+
+cdef Py_ssize_t write_decimal_text(char* buffer, const char* digits, Py_ssize_t count, bint negative,
+                                   cass_int32_t scale):
+    """str() of the Decimal: the to-scientific-string of the decimal arithmetic specification. Returns its length."""
+    cdef Py_ssize_t length = 0, point
+    cdef int64_t exponent = -(<int64_t>scale)
+    cdef int64_t adjusted = exponent + count - 1
+    if negative:
+        buffer[0] = b"-"
+        length = 1
+    if exponent <= 0 and adjusted >= -6:
+        # Without an exponent: 1234.5678, 0.000001
+        point = count + exponent
+        if point > 0:
+            memcpy(buffer + length, digits, point)
+            length += point
+            if exponent < 0:
+                buffer[length] = b"."
+                memcpy(buffer + length + 1, digits + point, count - point)
+                length += 1 + count - point
+        else:
+            buffer[length] = b"0"
+            buffer[length + 1] = b"."
+            length += 2
+            while point < 0:
+                buffer[length] = b"0"
+                length += 1
+                point += 1
+            memcpy(buffer + length, digits, count)
+            length += count
+    else:
+        # With an exponent: 1E+10, 1.23E-7
+        buffer[length] = digits[0]
+        length += 1
+        if count > 1:
+            buffer[length] = b"."
+            memcpy(buffer + length + 1, digits + 1, count - 1)
+            length += count
+        buffer[length] = b"E"
+        buffer[length + 1] = b"+" if adjusted >= 0 else b"-"
+        length += 2
+        length += write_digits(buffer + length, <uint64_t>(adjusted if adjusted >= 0 else -adjusted))
+    return length
+
+
+cdef object decimal_from_digits(const char* digits, Py_ssize_t count, bint negative, cass_int32_t scale,
+                                int8_t flags):
+    """The Decimal of [-]digits * 10 ** -scale, its str() with native_types. The str() is made in C, Decimal parses it
+    back to the same digits and exponent, a text with a point the fastest."""
+    cdef char stack_buffer[96]
+    cdef char* buffer
+    cdef Py_ssize_t length
+    # Room for the digits, a sign, a point, "0." with five zeros and an exponent with its sign
+    if count + 48 <= 96:
+        length = write_decimal_text(stack_buffer, digits, count, negative, scale)
+        text = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, stack_buffer, length)
+    else:
+        buffer = <char*>PyMem_Malloc(count + 48)
+        if buffer == NULL:
+            raise MemoryError()
+        try:
+            length = write_decimal_text(buffer, digits, count, negative, scale)
+            text = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, buffer, length)
+        finally:
+            PyMem_Free(buffer)
+    return text if flags & NATIVE_TYPES else Decimal(text)
+
+
+cdef inline bint is_legacy_decimal(const cass_byte_t* varint, size_t size, cass_int32_t scale):
+    """True when the varint is the text acsylla 1.x wrote in place of it: [+-]digits[.digits] with as many digits after
+    the point as the scale."""
+    cdef size_t i = 0, start
+    if size and (varint[0] == 43 or varint[0] == 45):
+        i = 1
+    start = i
+    while i < size and 48 <= varint[i] <= 57:
+        i += 1
+    if i == start:
+        return False
+    if i == size:
+        return scale == 0
+    if varint[i] != 46:
+        return False
+    i += 1
+    start = i
+    while i < size and 48 <= varint[i] <= 57:
+        i += 1
+    return i == size and i > start and <Py_ssize_t>(size - start) == scale
+
+
+cdef inline object _decimal(const CassValue* cass_value, int8_t flags):
+    """ Returns the decimal value of a column, its str() with native_types.
 
     Raises a derived `CassException` if the value can not be retrieved"""
-    cdef Py_ssize_t varint_size = 0
-    cdef cass_byte_t* varint = NULL
+    cdef size_t varint_size = 0
+    cdef const cass_byte_t* varint = NULL
     cdef cass_int32_t scale
+    cdef int128 unscaled
+    cdef char digits[40]
+    cdef const char* text_digits
+    cdef Py_ssize_t count
     cdef CassError error
-    cdef bytes decimal_
 
-    error = cass_value_get_decimal(cass_value, <const cass_byte_t**> &varint, <size_t*> &varint_size, &scale)
+    error = cass_value_get_decimal(cass_value, &varint, &varint_size, &scale)
     if error == CASS_ERROR_LIB_NULL_VALUE:
         return None
     else:
         raise_if_error(error)
 
-    # This pointer does not need to be free up since its an
-    # slice of the buffer kept by the Cassandra driver and related to
-    # the result. When the result is free up all the space will be free up.
-    decimal_ = varint[:varint_size]
-    if native_types:
-        return decimal_.decode()
-    return Decimal(decimal_.decode())
+    # The varint points into the buffer of the result, it lives as long as the result
+    if flags & LEGACY_TYPES and is_legacy_decimal(varint, varint_size, scale):
+        # A session with legacy_types=True reads the text acsylla 1.x wrote as acsylla 1.x did, the other decimals as
+        # they are
+        text = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, varint, varint_size)
+        return text if flags & NATIVE_TYPES else Decimal(text)
+    if varint_as_int128(varint, varint_size, &unscaled):
+        count = write_digits_128(digits, (~(<uint128>unscaled) + 1) if unscaled < 0 else <uint128>unscaled)
+        return decimal_from_digits(digits, count, unscaled < 0, scale, flags)
+    # More than 38 digits, Decimal makes them from an int faster than from a text
+    number = int.from_bytes(varint[:varint_size], 'big', signed=True)
+    if not flags & NATIVE_TYPES:
+        return Decimal(number).scaleb(-scale, DECIMAL_EXACT)
+    try:
+        text = str(-number if number < 0 else number)
+    except ValueError:
+        # More digits than str() of an int makes, sys.get_int_max_str_digits()
+        return str(Decimal(number).scaleb(-scale, DECIMAL_EXACT))
+    text_digits = PyUnicode_AsUTF8AndSize(text, &count)
+    return decimal_from_digits(text_digits, count, number < 0, scale, flags)
 
 
 cdef inline object _bool(const CassValue* cass_value):
@@ -279,7 +456,7 @@ cdef inline object _inet(const CassValue* cass_value):
     return address.decode()
 
 
-cdef inline object _date(const CassValue* cass_value, int8_t native_types):
+cdef inline object _date(const CassValue* cass_value, int8_t flags):
     cdef cass_uint32_t output
     cdef CassError error
     cdef int y
@@ -292,12 +469,12 @@ cdef inline object _date(const CassValue* cass_value, int8_t native_types):
     else:
         raise_if_error(error)
     civil_from_days(output-2147483648U, <int*>&y, <unsigned*>&m, <unsigned*>&d)
-    if native_types:
+    if flags & NATIVE_TYPES:
         return f'{y:04d}-{m:02d}-{d:02d}'
     return date_new(y, m, d)
 
 
-cdef inline object _time(const CassValue* cass_value, int8_t native_types):
+cdef inline object _time(const CassValue* cass_value, int8_t flags):
     cdef cass_int64_t nanos
     cdef CassError error
 
@@ -311,12 +488,12 @@ cdef inline object _time(const CassValue* cass_value, int8_t native_types):
     hour = int(minute/60)
     minute = minute-hour*60
     microsecond = int(nanosecond/1_000)
-    if native_types:
+    if flags & NATIVE_TYPES:
         return f'{hour:02d}:{minute:02d}:{second:02d}.{nanosecond:09d}'
     return time_new(hour, minute, second, microsecond, None)
 
 
-cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
+cdef inline object _timestamp(const CassValue* cass_value, int8_t flags):
     cdef cass_int64_t milliseconds_since_epoch
     cdef double seconds_since_epoch
     cdef CassError error
@@ -343,13 +520,13 @@ cdef inline object _timestamp(const CassValue* cass_value, int8_t native_types):
     second = utc_datetime.second
     millisecond = utc_datetime.microsecond // 1_000
 
-    if native_types:
+    if flags & NATIVE_TYPES:
         return f'{y:04d}-{m:02d}-{d:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z'
 
     return utc_datetime
 
 
-cdef inline object _duration(const CassValue* cass_value, int8_t native_types):
+cdef inline object _duration(const CassValue* cass_value, int8_t flags):
     cdef cass_int32_t months
     cdef cass_int32_t days
     cdef cass_int64_t nanos
@@ -361,7 +538,7 @@ cdef inline object _duration(const CassValue* cass_value, int8_t native_types):
     else:
         raise_if_error(error)
 
-    if native_types:
+    if flags & NATIVE_TYPES:
         return months, days, nanos
 
     out = ''
@@ -394,7 +571,7 @@ cdef inline object _duration(const CassValue* cass_value, int8_t native_types):
     return out
 
 
-cdef inline object _map(const CassValue* cass_value, int8_t native_types):
+cdef inline object _map(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* key
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_map(cass_value);
@@ -404,12 +581,12 @@ cdef inline object _map(const CassValue* cass_value, int8_t native_types):
     while cass_iterator_next(iterator) == cass_true:
         key = cass_iterator_get_map_key(iterator)
         value = cass_iterator_get_map_value(iterator)
-        data[get_cass_value(key, native_types)] = get_cass_value(value, native_types)
+        data[get_cass_value(key, flags)] = get_cass_value(value, flags)
     cass_iterator_free(iterator)
     return data
 
 
-cdef inline object _set(const CassValue* cass_value, int8_t native_types):
+cdef inline object _set(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
     data = set()
@@ -417,12 +594,12 @@ cdef inline object _set(const CassValue* cass_value, int8_t native_types):
         return None
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.add(get_cass_value(value, native_types))
+        data.add(get_cass_value(value, flags))
     cass_iterator_free(iterator)
     return data
 
 
-cdef inline object _list(const CassValue* cass_value, int8_t native_types):
+cdef inline object _list(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
     data = list()
@@ -431,12 +608,12 @@ cdef inline object _list(const CassValue* cass_value, int8_t native_types):
 
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value, native_types))
+        data.append(get_cass_value(value, flags))
     cass_iterator_free(iterator)
     return data
 
 
-cdef inline object _tuple(const CassValue* cass_value, int8_t native_types):
+cdef inline object _tuple(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* value
     cdef CassIterator* iterator = cass_iterator_from_tuple(cass_value);
     data = list()
@@ -444,12 +621,12 @@ cdef inline object _tuple(const CassValue* cass_value, int8_t native_types):
         return None
     while cass_iterator_next(iterator) == cass_true:
         value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value, native_types))
+        data.append(get_cass_value(value, flags))
     cass_iterator_free(iterator)
     return tuple(data)
 
 
-cdef inline object _udt(const CassValue* cass_value, int8_t native_types):
+cdef inline object _udt(const CassValue* cass_value, int8_t flags):
     cdef const char* field_name
     cdef size_t field_name_length
     cdef const CassValue* field_value
@@ -458,6 +635,6 @@ cdef inline object _udt(const CassValue* cass_value, int8_t native_types):
     while cass_iterator_next(iterator) == cass_true:
         cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
         field_value = cass_iterator_get_user_type_field_value(iterator)
-        data[field_name[:field_name_length].decode()] = get_cass_value(field_value, native_types)
+        data[field_name[:field_name_length].decode()] = get_cass_value(field_value, flags)
     cass_iterator_free(iterator)
     return data

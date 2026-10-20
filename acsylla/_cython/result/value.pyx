@@ -949,70 +949,120 @@ cdef inline object _duration(const CassValue* cass_value, int8_t flags):
     return Duration.new_(months, days, nanos)
 
 
+cdef bint unhashable_type(const CassDataType* data_type, int8_t flags):
+    """True for a type acsylla reads as a list, a set or a dict, or as a tuple of one: Python takes it neither as an
+    item of a set nor as a key of a dict."""
+    cdef CassValueType value_type
+    cdef size_t i
+    if data_type == NULL:
+        return False
+    value_type = cass_data_type_type(data_type)
+    if value_type in (CASS_VALUE_TYPE_LIST, CASS_VALUE_TYPE_SET, CASS_VALUE_TYPE_MAP, CASS_VALUE_TYPE_UDT):
+        return True
+    if value_type == CASS_VALUE_TYPE_TUPLE:
+        for i in range(cass_data_type_sub_type_count(data_type)):
+            if unhashable_type(cass_data_type_sub_data_type(data_type, i), flags):
+                return True
+        return False
+    if value_type == CASS_VALUE_TYPE_CUSTOM:
+        # A vector is read as a list, as bytes with legacy_types
+        return not flags & LEGACY_TYPES and vector_type(data_type) is not None
+    return False
+
+
 cdef inline object _map(const CassValue* cass_value, int8_t flags):
+    """ Returns the dict of a map column, the list of its (key, value) pairs in the order of the server when its keys
+    are of a type Python does not take as keys of a dict."""
     cdef const CassValue* key
     cdef const CassValue* value
-    cdef CassIterator* iterator = cass_iterator_from_map(cass_value);
-    data = {}
+    cdef CassIterator* iterator = cass_iterator_from_map(cass_value)
     if iterator == NULL:
         return None
-    while cass_iterator_next(iterator) == cass_true:
-        key = cass_iterator_get_map_key(iterator)
-        value = cass_iterator_get_map_value(iterator)
-        data[get_cass_value(key, flags)] = get_cass_value(value, flags)
-    cass_iterator_free(iterator)
-    return data
+    try:
+        if unhashable_type(cass_data_type_sub_data_type(cass_value_data_type(cass_value), 0), flags):
+            pairs = []
+            while cass_iterator_next(iterator) == cass_true:
+                key = cass_iterator_get_map_key(iterator)
+                value = cass_iterator_get_map_value(iterator)
+                pairs.append((get_cass_value(key, flags), get_cass_value(value, flags)))
+            return pairs
+        data = {}
+        while cass_iterator_next(iterator) == cass_true:
+            key = cass_iterator_get_map_key(iterator)
+            value = cass_iterator_get_map_value(iterator)
+            data[get_cass_value(key, flags)] = get_cass_value(value, flags)
+        return data
+    finally:
+        cass_iterator_free(iterator)
 
 
 cdef inline object _set(const CassValue* cass_value, int8_t flags):
+    """ Returns the set of a set column, the list of its items in the order of the server when they are of a type
+    Python does not take as items of a set."""
     cdef const CassValue* value
-    cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
-    data = set()
+    cdef CassIterator* iterator = cass_iterator_from_collection(cass_value)
     if iterator == NULL:
         return None
-    while cass_iterator_next(iterator) == cass_true:
-        value = cass_iterator_get_value(iterator)
-        data.add(get_cass_value(value, flags))
-    cass_iterator_free(iterator)
-    return data
+    try:
+        if unhashable_type(cass_data_type_sub_data_type(cass_value_data_type(cass_value), 0), flags):
+            items = []
+            while cass_iterator_next(iterator) == cass_true:
+                value = cass_iterator_get_value(iterator)
+                items.append(get_cass_value(value, flags))
+            return items
+        data = set()
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.add(get_cass_value(value, flags))
+        return data
+    finally:
+        cass_iterator_free(iterator)
 
 
 cdef inline object _list(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* value
-    cdef CassIterator* iterator = cass_iterator_from_collection(cass_value);
-    data = list()
+    cdef CassIterator* iterator = cass_iterator_from_collection(cass_value)
     if iterator == NULL:
         return None
-
-    while cass_iterator_next(iterator) == cass_true:
-        value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value, flags))
-    cass_iterator_free(iterator)
-    return data
+    # The iterator is freed when an item can not be read too
+    try:
+        data = []
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.append(get_cass_value(value, flags))
+        return data
+    finally:
+        cass_iterator_free(iterator)
 
 
 cdef inline object _tuple(const CassValue* cass_value, int8_t flags):
     cdef const CassValue* value
-    cdef CassIterator* iterator = cass_iterator_from_tuple(cass_value);
-    data = list()
+    cdef CassIterator* iterator = cass_iterator_from_tuple(cass_value)
     if iterator == NULL:
         return None
-    while cass_iterator_next(iterator) == cass_true:
-        value = cass_iterator_get_value(iterator)
-        data.append(get_cass_value(value, flags))
-    cass_iterator_free(iterator)
-    return tuple(data)
+    try:
+        data = []
+        while cass_iterator_next(iterator) == cass_true:
+            value = cass_iterator_get_value(iterator)
+            data.append(get_cass_value(value, flags))
+        return tuple(data)
+    finally:
+        cass_iterator_free(iterator)
 
 
 cdef inline object _udt(const CassValue* cass_value, int8_t flags):
     cdef const char* field_name
     cdef size_t field_name_length
     cdef const CassValue* field_value
-    cdef CassIterator* iterator = cass_iterator_fields_from_user_type(cass_value);
-    data = {}
-    while cass_iterator_next(iterator) == cass_true:
-        cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
-        field_value = cass_iterator_get_user_type_field_value(iterator)
-        data[field_name[:field_name_length].decode()] = get_cass_value(field_value, flags)
-    cass_iterator_free(iterator)
-    return data
+    cdef CassIterator* iterator = cass_iterator_fields_from_user_type(cass_value)
+    if iterator == NULL:
+        return None
+    try:
+        data = {}
+        while cass_iterator_next(iterator) == cass_true:
+            cass_iterator_get_user_type_field_name(iterator, &field_name, &field_name_length)
+            field_value = cass_iterator_get_user_type_field_value(iterator)
+            data[field_name[:field_name_length].decode()] = get_cass_value(field_value, flags)
+        return data
+    finally:
+        cass_iterator_free(iterator)

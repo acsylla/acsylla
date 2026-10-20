@@ -46,7 +46,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-UNHASHABLE = "stage 8: unhashable set elements and map keys"
 ROW = "stage 9: Row"
 
 NATIVE_TYPES = {
@@ -542,13 +541,21 @@ CASES = [
         (1, [2, 3], {"street": "c", "num": 3}),
     ),
     Case("set-tuple", "set<frozen<tuple<int, text>>>", "{(1, 'x')}", {(1, "x")}, {(1, "x")}),
+    Case("map-tuple-key", "map<frozen<tuple<int, text>>, int>", "{(1, 'x'): 10}", {(1, "x"): 10}, {(1, "x"): 10}),
+    # A value of a collection out of the years of Python names the column too
+    Case(
+        "list-date-after-python",
+        "list<date>",
+        "[2150416545]",  # 10000-01-01
+        Raises(ValueError, "value_list_date"),
+        ["10000-01-01"],
+    ),
     Case(
         "set-list",
         "set<frozen<list<int>>>",
         "{[1, 2], [3]}",
         [[1, 2], [3]],
         [[1, 2], [3]],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "set-set",
@@ -556,7 +563,6 @@ CASES = [
         "{{1, 2}}",
         [{1, 2}],
         [{1, 2}],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "set-map",
@@ -564,7 +570,6 @@ CASES = [
         "{{1: 2}}",
         [{1: 2}],
         [{1: 2}],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "set-udt",
@@ -572,7 +577,6 @@ CASES = [
         "{{street: 'a', num: 1}}",
         [{"street": "a", "num": 1}],
         [{"street": "a", "num": 1}],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "set-tuple-list",
@@ -580,7 +584,6 @@ CASES = [
         "{(1, [2])}",
         [(1, [2])],
         [(1, [2])],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "map-list-key",
@@ -588,7 +591,6 @@ CASES = [
         "{[1, 2]: 10}",
         [([1, 2], 10)],
         [([1, 2], 10)],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "map-udt-key",
@@ -596,7 +598,6 @@ CASES = [
         "{{street: 'b', num: 2}: 20}",
         [({"street": "b", "num": 2}, 20)],
         [({"street": "b", "num": 2}, 20)],
-        todo={"read": UNHASHABLE, "native": UNHASHABLE},
     ),
     Case(
         "vector-float",

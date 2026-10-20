@@ -375,7 +375,8 @@ cdef class Statement:
             error = cass_statement_bind_decimal(
                 self.cass_statement, idx, value_bytes, len(value_bytes), decimal_scale)
         elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-            error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value, 'ascii'))
+            text_owner = as_ascii(value, &text, &text_size)
+            error = cass_statement_bind_string_n(self.cass_statement, idx, text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
             text_owner = as_utf8(value, &text, &text_size)
@@ -482,7 +483,9 @@ cdef class Statement:
             error = cass_statement_bind_decimal_by_name(
                 self.cass_statement, name.encode(), value_bytes, len(value_bytes), decimal_scale)
         elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-            error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value, 'ascii'))
+            text_owner = as_ascii(value, &text, &text_size)
+            name_bytes = name.encode()
+            error = cass_statement_bind_string_by_name_n(self.cass_statement, name_bytes, len(name_bytes), text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
             text_owner = as_utf8(value, &text, &text_size)

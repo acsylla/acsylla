@@ -124,6 +124,13 @@ def varint_bytes(number):
     return number.to_bytes(((number if number >= 0 else ~number).bit_length() + 8) // 8, "big", signed=True)
 
 
+def decimal_blob(text):
+    """The blobAsDecimal() literal of a decimal: the server parses a long decimal literal through a double."""
+    sign, digits, exponent = Decimal(text).as_tuple()
+    unscaled = int("".join(map(str, digits))) * (-1 if sign else 1)
+    return f"blobAsDecimal(0x{(-exponent).to_bytes(4, 'big', signed=True).hex()}{varint_bytes(unscaled).hex()})"
+
+
 def duration(months, days, nanoseconds):
     # acsylla.Duration does not exist yet, the value is made when the test runs
     return lambda: acsylla.Duration(months, days, nanoseconds)
@@ -790,6 +797,28 @@ WRITE_CASES = [
     WriteCase("decimal-2-128", "decimal", Decimal(2**128), str(2**128)),
     WriteCase("decimal-minus-2-128", "decimal", Decimal(-(2**128)), str(-(2**128))),
     WriteCase("decimal-minus-2-128-plus-1", "decimal", Decimal(-(2**128) + 1), str(-(2**128) + 1)),
+    WriteCase(
+        "decimal-1000-digits",
+        "decimal",
+        Decimal("9" * 500 + "." + "9" * 500),
+        decimal_blob("9" * 500 + "." + "9" * 500),
+    ),
+    WriteCase("decimal-1000-digits-negative", "decimal", "-" + "1" * 999 + "7", "-" + "1" * 999 + "7"),
+    # More digits than the buffers on the stack take
+    WriteCase("decimal-1300-digits", "decimal", "1" * 650 + "." + "3" * 650, decimal_blob("1" * 650 + "." + "3" * 650)),
+    # More than 38 digits after leading zeros, a point among them, a sign and an exponent
+    WriteCase(
+        "decimal-long-leading-zeros",
+        "decimal",
+        "0" * 10 + "1" * 50 + "." + "2" * 13,
+        decimal_blob("0" * 10 + "1" * 50 + "." + "2" * 13),
+    ),
+    WriteCase("decimal-long-plus-exponent", "decimal", "+" + "9" * 60 + "e-5", decimal_blob("9" * 60 + "e-5")),
+    # An ascii str is bound as it is with its length, a NUL in it too
+    WriteCase("ascii-nul", "ascii", "a\x00b", "blobAsAscii(0x610062)"),
+    WriteCase("ascii-bytes", "ascii", b"ab", "'ab'"),
+    WriteCase("list-ascii", "list<ascii>", ["ab", "cd"], "['ab', 'cd']"),
+    WriteCase("tuple-ascii", "tuple<ascii, int>", ("ab", 1), "('ab', 1)"),
     # bytes are the two's complement of the number, as before
     WriteCase("varint-bytes", "varint", b"\x7b", "123"),
     WriteCase("varint-str", "varint", "123", "123"),

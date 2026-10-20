@@ -35,6 +35,7 @@ from cpython.mem cimport PyMem_Free
 from cpython.mem cimport PyMem_Malloc
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize
 from libc.string cimport memcmp
+from libc.string cimport memcpy
 from libc.time cimport time_t
 
 from decimal import Decimal
@@ -165,6 +166,24 @@ cdef inline as_bytes(object value, str encoding='utf-8'):
     return value.encode(encoding) if isinstance(value, str) else str(value).encode(encoding)
 
 
+cdef extern from "Python.h":
+    bint PyUnicode_IS_ASCII(object value)
+
+
+cdef inline object as_ascii(object value, const char** data, Py_ssize_t* size):
+    """The bytes of an ascii value without a copy: an ASCII str is its own ASCII, with its length, a NUL in it is
+    bound too. Another str raises the UnicodeEncodeError of its encode('ascii'), bytes are bound as they are. Returns
+    the object that owns the buffer, the caller keeps it alive while the buffer is used."""
+    cdef object owner = value
+    if isinstance(owner, str) and PyUnicode_IS_ASCII(owner):
+        data[0] = PyUnicode_AsUTF8AndSize(owner, size)
+        return owner
+    owner = as_bytes(owner, 'ascii')
+    data[0] = PyBytes_AS_STRING(owner)
+    size[0] = PyBytes_GET_SIZE(owner)
+    return owner
+
+
 cdef inline object as_utf8(object value, const char** data, Py_ssize_t* size):
     """The UTF-8 bytes of a text value without a copy into a new bytes object: the UTF-8 buffer of
     a str is cached in the str (an ASCII str is its own UTF-8). Returns the object that owns the
@@ -258,9 +277,18 @@ cdef extern from *:
         return (uint32_t)value;
     #endif
     }
+
+    /* Whether 8 chars are ASCII digits, as simdjson checks them: a byte of '0'..'9' is 0x3?, it stays so plus 6 */
+    static inline int acsylla_eight_are_digits(const char* chars) {
+        uint64_t value;
+        memcpy(&value, chars, 8);
+        return ((value & 0xF0F0F0F0F0F0F0F0ULL) | (((value + 0x0606060606060606ULL) & 0xF0F0F0F0F0F0F0F0ULL) >> 4))
+               == 0x3333333333333333ULL;
+    }
     """
     const uint64_t* acsylla_pow10
     uint32_t acsylla_eight_digits(const char* digits) noexcept
+    bint acsylla_eight_are_digits(const char* chars) noexcept
 
 
 cdef struct DecimalText:
@@ -269,6 +297,10 @@ cdef struct DecimalText:
     Py_ssize_t digits
     int64_t scale
     bint negative
+    # Where the digits start, the point (-1 without one) and the end of the digits, for more than 38 of them
+    Py_ssize_t start
+    Py_ssize_t point
+    Py_ssize_t end
 
 
 cdef bint parse_decimal(const char* p, Py_ssize_t n, DecimalText* parsed) noexcept:
@@ -284,9 +316,11 @@ cdef bint parse_decimal(const char* p, Py_ssize_t n, DecimalText* parsed) noexce
     parsed.unscaled = 0
     parsed.digits = 0
     parsed.negative = False
+    parsed.point = -1
     if i < n and (p[i] == b'-' or p[i] == b'+'):
         parsed.negative = p[i] == b'-'
         i += 1
+    parsed.start = i
     while i < n:
         c = p[i]
         if b'0' <= c <= b'9':
@@ -303,11 +337,23 @@ cdef bint parse_decimal(const char* p, Py_ssize_t n, DecimalText* parsed) noexce
                         parsed.unscaled = parsed.unscaled * <uint128>acsylla_pow10[19] + chunk
                         chunk = 0
                         chunk_digits = 0
+                else:
+                    # digits_as_varint() makes the unscaled value of more digits, they are counted 8 at a time
+                    i += 1
+                    while i + 8 <= n and acsylla_eight_are_digits(p + i):
+                        i += 8
+                        mantissa += 8
+                        parsed.digits += 8
+                        if point:
+                            fraction += 8
+                    continue
         elif c == b'.' and not point:
             point = True
+            parsed.point = i
         else:
             break
         i += 1
+    parsed.end = i
     if mantissa == 0:
         return False
     if chunk_digits:
@@ -334,70 +380,71 @@ cdef bint parse_decimal(const char* p, Py_ssize_t n, DecimalText* parsed) noexce
     return True
 
 
-cdef inline void multiply_add(uint32_t* limbs, Py_ssize_t* size, uint32_t multiplier, uint32_t addend) noexcept:
-    """limbs = limbs * multiplier + addend, limbs of 32 bits from the lowest."""
-    cdef uint64_t carry = addend, product
+cdef inline void multiply_add(uint64_t* limbs, Py_ssize_t* size, uint64_t multiplier, uint64_t addend) noexcept:
+    """limbs = limbs * multiplier + addend, limbs of 64 bits from the lowest."""
+    cdef uint128 carry = addend, product
     cdef Py_ssize_t i
     for i in range(size[0]):
-        product = <uint64_t>limbs[i] * multiplier + carry
-        limbs[i] = <uint32_t>product
-        carry = product >> 32
+        product = <uint128>limbs[i] * multiplier + carry
+        limbs[i] = <uint64_t>product
+        carry = product >> 64
     if carry:
-        limbs[size[0]] = <uint32_t>carry
+        limbs[size[0]] = <uint64_t>carry
         size[0] += 1
 
 
-cdef bytes digits_as_varint(const char* p, Py_ssize_t n, bint negative):
-    """The shortest two's complement, big-endian, of the digits of a decimal text up to its exponent, without the sign
-    and the point: the unscaled value of more digits than 128 bits take. Limbs of 32 bits take 8 digits at a time,
-    without the Python int and its limit of digits."""
-    # A limb grows by at most one for each 8 digits, times 10 ** 8 < 2 ** 27. Up to 1200 digits the digits, the limbs
+cdef bytes digits_as_varint(const char* p, DecimalText* parsed):
+    """The shortest two's complement, big-endian, of the digits of a decimal text that parse_decimal() took, without the
+    sign and the point: the unscaled value of more digits than 128 bits take. Limbs of 64 bits take 16 digits at a time,
+    two times 8 of them parsed at once, without the Python int and its limit of digits."""
+    cdef Py_ssize_t n = parsed.end - parsed.start
+    # A limb grows by at most one for each 16 digits, times 10 ** 16 < 2 ** 54. Up to 1200 digits the digits, the limbs
     # and the bytes are on the stack
-    cdef Py_ssize_t capacity = n // 8 + 2, size = 0, count = 0, length, i, j, start = 0
+    cdef Py_ssize_t capacity = n // 16 + 2, size = 0, count = 0, length, i, j, start = 0
     cdef char stack_digits[1200]
-    cdef uint32_t stack_limbs[152]
-    cdef unsigned char stack_buffer[609]
+    cdef uint64_t stack_limbs[77]
+    cdef unsigned char stack_buffer[617]
     cdef char* digits = stack_digits
-    cdef uint32_t* limbs = stack_limbs
+    cdef uint64_t* limbs = stack_limbs
     cdef unsigned char* buffer = stack_buffer
     cdef void* heap = NULL
-    cdef uint32_t chunk = 0
-    cdef uint32_t limb
+    cdef uint64_t chunk = 0
+    cdef uint64_t limb
     cdef unsigned int carry = 1
     if n > 1200:
-        heap = PyMem_Malloc(capacity * sizeof(uint32_t) * 2 + 1 + n)
+        heap = PyMem_Malloc(capacity * sizeof(uint64_t) * 2 + 1 + n)
         if heap == NULL:
             raise MemoryError()
-        limbs = <uint32_t*>heap
+        limbs = <uint64_t*>heap
         buffer = <unsigned char*>(limbs + capacity)
-        digits = <char*>(buffer + capacity * 4 + 1)
+        digits = <char*>(buffer + capacity * 8 + 1)
     try:
-        # The digits without the sign and the point, parse_decimal() took the text
-        for i in range(n):
-            if p[i] == b'e' or p[i] == b'E':
-                break
-            if b'0' <= p[i] <= b'9':
-                digits[count] = p[i]
-                count += 1
-        # The first count % 8 digits, then 8 at a time
-        i = count % 8
+        # The digits without the point
+        if parsed.point < 0:
+            memcpy(digits, p + parsed.start, n)
+            count = n
+        else:
+            memcpy(digits, p + parsed.start, parsed.point - parsed.start)
+            memcpy(digits + parsed.point - parsed.start, p + parsed.point + 1, parsed.end - parsed.point - 1)
+            count = n - 1
+        # The first count % 16 digits, then 16 at a time
+        i = count % 16
         if i:
             for j in range(i):
-                chunk = chunk * 10 + <uint32_t>(digits[j] - 48)
-            multiply_add(limbs, &size, <uint32_t>acsylla_pow10[i], chunk)
+                chunk = chunk * 10 + <uint64_t>(digits[j] - 48)
+            multiply_add(limbs, &size, acsylla_pow10[i], chunk)
         while i < count:
-            multiply_add(limbs, &size, 100000000, acsylla_eight_digits(digits + i))
-            i += 8
+            chunk = <uint64_t>acsylla_eight_digits(digits + i) * 100000000 + acsylla_eight_digits(digits + i + 8)
+            multiply_add(limbs, &size, 10000000000000000ULL, chunk)
+            i += 16
         # Big-endian, with a byte for the sign
-        length = size * 4 + 1
+        length = size * 8 + 1
         buffer[0] = 0
         for i in range(size):
             limb = limbs[size - 1 - i]
-            buffer[1 + 4 * i] = <unsigned char>(limb >> 24)
-            buffer[2 + 4 * i] = <unsigned char>(limb >> 16)
-            buffer[3 + 4 * i] = <unsigned char>(limb >> 8)
-            buffer[4 + 4 * i] = <unsigned char>limb
-        if negative:
+            for j in range(8):
+                buffer[1 + 8 * i + j] = <unsigned char>(limb >> (56 - 8 * j))
+        if parsed.negative:
             # The two's complement: the bits inverted, plus one
             for i in range(length - 1, -1, -1):
                 carry += <unsigned char>~buffer[i]
@@ -513,7 +560,7 @@ cdef bytes as_cass_decimal(object value, cass_int32_t* scale, BindOptions* optio
     scale[0] = <cass_int32_t>parsed.scale
     if parsed.digits <= 38:
         return int128_as_varint(-<int128>parsed.unscaled if parsed.negative else <int128>parsed.unscaled)
-    return digits_as_varint(p, n, parsed.negative)
+    return digits_as_varint(p, &parsed)
 
 
 cdef inline CassUuid as_cass_uuid(object value) except *:
@@ -968,7 +1015,8 @@ cdef inline void bind_collection_by_value_type(CassCollection* collection, objec
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_collection_append_double(collection, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_collection_append_string(collection, as_bytes(value, 'ascii'))
+        text_owner = as_ascii(value, &text, &text_size)
+        error = cass_collection_append_string_n(collection, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
         text_owner = as_utf8(value, &text, &text_size)
@@ -1111,7 +1159,8 @@ cdef inline void bind_tuple_by_value_type(CassTuple* cass_tuple, size_t index, o
     elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
         error = cass_tuple_set_double(cass_tuple, index, float(value))
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_tuple_set_string(cass_tuple, index, as_bytes(value, 'ascii'))
+        text_owner = as_ascii(value, &text, &text_size)
+        error = cass_tuple_set_string_n(cass_tuple, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
         text_owner = as_utf8(value, &text, &text_size)
@@ -1236,7 +1285,8 @@ cdef inline bind_udt_value_by_name(CassUserType* user_type, bytes name, object v
         value_bytes = as_cass_decimal(value, &decimal_scale, options)
         error = cass_user_type_set_decimal_by_name(user_type, name, value_bytes, len(value_bytes), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_user_type_set_string_by_name(user_type, name, as_bytes(value, 'ascii'))
+        text_owner = as_ascii(value, &text, &text_size)
+        error = cass_user_type_set_string_by_name_n(user_type, name, len(name), text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
         text_owner = as_utf8(value, &text, &text_size)
@@ -1314,7 +1364,8 @@ cdef inline bind_udt_value_by_index(CassUserType* user_type, size_t index, objec
         value_bytes = as_cass_decimal(value, &decimal_scale, options)
         error = cass_user_type_set_decimal(user_type, index, value_bytes, len(value_bytes), decimal_scale)
     elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-        error = cass_user_type_set_string(user_type, index, as_bytes(value, 'ascii'))
+        text_owner = as_ascii(value, &text, &text_size)
+        error = cass_user_type_set_string_n(user_type, index, text, text_size)
     elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                              CASS_VALUE_TYPE_VARCHAR):
         text_owner = as_utf8(value, &text, &text_size)

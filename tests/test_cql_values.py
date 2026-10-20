@@ -759,6 +759,37 @@ WRITE_CASES = [
     WriteCase("decimal-big-int", "decimal", 10**30, "1000000000000000000000000000000"),
     WriteCase("decimal-negative-zero", "decimal", Decimal("-0"), "0"),
     WriteCase("decimal-float", "decimal", 3.14, "3.14"),
+    # A str is parsed as it is, Decimal() parses the texts with spaces or underscores
+    WriteCase("decimal-str-plus", "decimal", "+5", "5"),
+    WriteCase("decimal-str-leading-point", "decimal", ".5", "0.5"),
+    WriteCase("decimal-str-trailing-point", "decimal", "5.", "5"),
+    WriteCase("decimal-str-leading-zeros", "decimal", "007.50", "7.50"),
+    WriteCase("decimal-str-negative-exponent", "decimal", "-1.5e-3", "-0.0015"),
+    WriteCase("decimal-str-zero-exponent", "decimal", "0E+3", "0E+3"),
+    WriteCase("decimal-str-spaces", "decimal", " 1.5 ", "1.5"),
+    WriteCase("decimal-str-underscores", "decimal", "1_000.5", "1000.5"),
+    # More than 38 digits, their two's complement is made of limbs of 32 bits
+    WriteCase(
+        "decimal-str-long-negative",
+        "decimal",
+        "-1234567890123456789012345678901234567890.5",
+        "-1234567890123456789012345678901234567890.5",
+    ),
+    WriteCase(
+        "decimal-long-negative",
+        "decimal",
+        Decimal("-1234567890123456789012345678901234567890.5"),
+        "-1234567890123456789012345678901234567890.5",
+    ),
+    WriteCase(
+        "decimal-long-exponent",
+        "decimal",
+        "1234567890123456789012345678901234567890E-45",
+        "1.234567890123456789012345678901234567890E-6",
+    ),
+    WriteCase("decimal-2-128", "decimal", Decimal(2**128), str(2**128)),
+    WriteCase("decimal-minus-2-128", "decimal", Decimal(-(2**128)), str(-(2**128))),
+    WriteCase("decimal-minus-2-128-plus-1", "decimal", Decimal(-(2**128) + 1), str(-(2**128) + 1)),
     # bytes are the two's complement of the number, as before
     WriteCase("varint-bytes", "varint", b"\x7b", "123"),
     WriteCase("varint-str", "varint", "123", "123"),
@@ -966,6 +997,44 @@ LEGACY_ROUND_TRIP_ID = 50000
 LEGACY_ROUND_TRIP_NATIVE_ID = 60000
 LEGACY_DECIMAL_ID = 70000
 DECIMAL_FORMAT_ID = 80000
+LEGACY_DECIMAL_STR_ID = 90000
+
+# Values of a decimal column that are not decimals of CQL
+DECIMAL_ERRORS = [
+    "",
+    ".",
+    "-",
+    "1e",
+    "1e+",
+    "1.2.3",
+    "--1",
+    "1e5x",
+    "bad",
+    "NaN",
+    "Infinity",
+    "1E+99999999999",
+    Decimal("NaN"),
+    Decimal("-Infinity"),
+    float("nan"),
+    float("inf"),
+    True,
+]
+# A session with legacy_types=True writes these str as the text of their Decimal
+LEGACY_DECIMAL_STRS = [
+    "1234.5678",
+    "-0.000001",
+    "0",
+    "-0",
+    "0.0000001",
+    "-0.50",
+    "007.5",
+    "+5",
+    "1e5",
+    "-1.5E-3",
+    " 1.5 ",
+]
+# and these float as the text of the Decimal of their str()
+LEGACY_DECIMAL_FLOATS = [3.14, -0.5, 100.0, 1e-07, 1e16]
 
 
 def case_id(case):
@@ -1187,6 +1256,11 @@ class TestWrite:
         with pytest.raises(error):
             await write(session, "vector<float, 3>", WRITE_ID - 1, value)
 
+    @pytest.mark.parametrize("value", DECIMAL_ERRORS, ids=repr)
+    async def test_decimal_errors(self, session, value):
+        with pytest.raises(ValueError):
+            await write(session, "decimal", WRITE_ID - 1, value)
+
     async def test_counter(self, session):
         await session.execute(create_statement(f"{COUNTER_UPDATE.format(5)} WHERE id = 2"))
         prepared = await session.create_prepared(f"{COUNTER_UPDATE.format('?')} WHERE id = ?")
@@ -1331,6 +1405,28 @@ class TestLegacyWrite:
             case.value
         )
         assert (await read(session, "decimal", row_id))[0] == case.value
+
+    @pytest.mark.parametrize("text", LEGACY_DECIMAL_STRS)
+    async def test_decimal_str(self, session, text):
+        """The text of the Decimal of a str, a plain one as it is without making its Decimal."""
+        row_id = LEGACY_DECIMAL_STR_ID + LEGACY_DECIMAL_STRS.index(text)
+        await write(session, "decimal", row_id, text)
+        assert (await read(session, "decimal", row_id, expression=server_value("decimal")))[0] == legacy_decimal_bytes(
+            Decimal(text)
+        )
+
+    @pytest.mark.parametrize("value", LEGACY_DECIMAL_FLOATS)
+    async def test_decimal_float(self, session, value):
+        row_id = LEGACY_DECIMAL_STR_ID + len(LEGACY_DECIMAL_STRS) + LEGACY_DECIMAL_FLOATS.index(value)
+        await write(session, "decimal", row_id, value)
+        assert (await read(session, "decimal", row_id, expression=server_value("decimal")))[0] == legacy_decimal_bytes(
+            Decimal(str(value))
+        )
+
+    @pytest.mark.parametrize("value", DECIMAL_ERRORS, ids=repr)
+    async def test_decimal_errors(self, session, value):
+        with pytest.raises(ValueError):
+            await write(session, "decimal", LEGACY_DECIMAL_STR_ID - 1, value)
 
 
 class TestDecimalFormat:

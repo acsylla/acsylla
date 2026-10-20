@@ -31,7 +31,6 @@ from cpython.datetime cimport timedelta_microseconds
 from cpython.datetime cimport timedelta_seconds
 from cpython.long cimport PyLong_AsLongLongAndOverflow
 from cpython.long cimport PyLong_AsUnsignedLongLongMask
-from cpython.long cimport PyLong_FromString
 from cpython.mem cimport PyMem_Free
 from cpython.mem cimport PyMem_Malloc
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize
@@ -230,23 +229,210 @@ cdef bytes as_cass_varint(object value):
     raise ValueError(f'Value "{value}" is not an int, the str of an int or the bytes of a varint.')
 
 
-cdef object digits_as_int(const char* text, Py_ssize_t size):
-    """The int of the [-]digits[.digits] of a text up to its exponent, without the point."""
-    cdef char* buffer = <char*>PyMem_Malloc(size + 1)
-    cdef Py_ssize_t i, length = 0
-    if buffer == NULL:
-        raise MemoryError()
+cdef extern from *:
+    """
+    #include <string.h>
+
+    static const uint64_t acsylla_pow10[20] = {
+        1ULL, 10ULL, 100ULL, 1000ULL, 10000ULL, 100000ULL, 1000000ULL, 10000000ULL, 100000000ULL, 1000000000ULL,
+        10000000000ULL, 100000000000ULL, 1000000000000ULL, 10000000000000ULL, 100000000000000ULL,
+        1000000000000000ULL, 10000000000000000ULL, 100000000000000000ULL, 1000000000000000000ULL,
+        10000000000000000000ULL,
+    };
+
+    /* The number of 8 ASCII digits, in one 64-bit load and three multiplications as simdjson parses them */
+    static inline uint32_t acsylla_eight_digits(const char* digits) {
+    #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        uint32_t value = 0;
+        for (int i = 0; i < 8; i++) {
+            value = value * 10 + (uint32_t)(digits[i] - '0');
+        }
+        return value;
+    #else
+        uint64_t value;
+        memcpy(&value, digits, 8);
+        value -= 0x3030303030303030ULL;
+        value = value * 10 + (value >> 8);
+        value = ((value & 0x000000FF000000FFULL) * 0x000F424000000064ULL
+                 + ((value >> 16) & 0x000000FF000000FFULL) * 0x0000271000000001ULL) >> 32;
+        return (uint32_t)value;
+    #endif
+    }
+    """
+    const uint64_t* acsylla_pow10
+    uint32_t acsylla_eight_digits(const char* digits) noexcept
+
+
+cdef struct DecimalText:
+    # The digits after the leading zeros, up to 38 of them in `unscaled`
+    uint128 unscaled
+    Py_ssize_t digits
+    int64_t scale
+    bint negative
+
+
+cdef bint parse_decimal(const char* p, Py_ssize_t n, DecimalText* parsed) noexcept:
+    """Parses the ASCII [+-]digits[.digits][(e|E)[+-]digits] of a decimal in C, as str() of a Decimal or a float writes
+    it. False for another text, as [-]Infinity, [-]NaN, spaces, underscores or digits of other scripts."""
+    cdef Py_ssize_t i = 0, mantissa = 0, fraction = 0
+    cdef bint point = False, exponent_negative = False
+    cdef int64_t exponent = 0
+    # Up to 19 digits in a 64-bit integer, 128-bit multiplications are for each 19 of them
+    cdef uint64_t chunk = 0
+    cdef int chunk_digits = 0
+    cdef char c
+    parsed.unscaled = 0
+    parsed.digits = 0
+    parsed.negative = False
+    if i < n and (p[i] == b'-' or p[i] == b'+'):
+        parsed.negative = p[i] == b'-'
+        i += 1
+    while i < n:
+        c = p[i]
+        if b'0' <= c <= b'9':
+            mantissa += 1
+            if point:
+                fraction += 1
+            # The leading zeros of 0.05 are not digits of the unscaled value
+            if parsed.digits != 0 or c != b'0':
+                parsed.digits += 1
+                if parsed.digits <= 38:
+                    chunk = chunk * 10 + <uint64_t>(c - 48)
+                    chunk_digits += 1
+                    if chunk_digits == 19:
+                        parsed.unscaled = parsed.unscaled * <uint128>acsylla_pow10[19] + chunk
+                        chunk = 0
+                        chunk_digits = 0
+        elif c == b'.' and not point:
+            point = True
+        else:
+            break
+        i += 1
+    if mantissa == 0:
+        return False
+    if chunk_digits:
+        parsed.unscaled = parsed.unscaled * <uint128>acsylla_pow10[chunk_digits] + chunk
+    if i < n:
+        if p[i] != b'e' and p[i] != b'E':
+            return False
+        i += 1
+        if i < n and (p[i] == b'-' or p[i] == b'+'):
+            exponent_negative = p[i] == b'-'
+            i += 1
+        if i == n:
+            return False
+        while i < n:
+            if not (b'0' <= p[i] <= b'9'):
+                return False
+            # Far beyond the 32 bits of a scale, it does not grow more
+            if exponent < 100000000000LL:
+                exponent = exponent * 10 + (p[i] - 48)
+            i += 1
+        if exponent_negative:
+            exponent = -exponent
+    parsed.scale = fraction - exponent
+    return True
+
+
+cdef inline void multiply_add(uint32_t* limbs, Py_ssize_t* size, uint32_t multiplier, uint32_t addend) noexcept:
+    """limbs = limbs * multiplier + addend, limbs of 32 bits from the lowest."""
+    cdef uint64_t carry = addend, product
+    cdef Py_ssize_t i
+    for i in range(size[0]):
+        product = <uint64_t>limbs[i] * multiplier + carry
+        limbs[i] = <uint32_t>product
+        carry = product >> 32
+    if carry:
+        limbs[size[0]] = <uint32_t>carry
+        size[0] += 1
+
+
+cdef bytes digits_as_varint(const char* p, Py_ssize_t n, bint negative):
+    """The shortest two's complement, big-endian, of the digits of a decimal text up to its exponent, without the sign
+    and the point: the unscaled value of more digits than 128 bits take. Limbs of 32 bits take 8 digits at a time,
+    without the Python int and its limit of digits."""
+    # A limb grows by at most one for each 8 digits, times 10 ** 8 < 2 ** 27. Up to 1200 digits the digits, the limbs
+    # and the bytes are on the stack
+    cdef Py_ssize_t capacity = n // 8 + 2, size = 0, count = 0, length, i, j, start = 0
+    cdef char stack_digits[1200]
+    cdef uint32_t stack_limbs[152]
+    cdef unsigned char stack_buffer[609]
+    cdef char* digits = stack_digits
+    cdef uint32_t* limbs = stack_limbs
+    cdef unsigned char* buffer = stack_buffer
+    cdef void* heap = NULL
+    cdef uint32_t chunk = 0
+    cdef uint32_t limb
+    cdef unsigned int carry = 1
+    if n > 1200:
+        heap = PyMem_Malloc(capacity * sizeof(uint32_t) * 2 + 1 + n)
+        if heap == NULL:
+            raise MemoryError()
+        limbs = <uint32_t*>heap
+        buffer = <unsigned char*>(limbs + capacity)
+        digits = <char*>(buffer + capacity * 4 + 1)
     try:
-        for i in range(size):
-            if text[i] == b'E':
+        # The digits without the sign and the point, parse_decimal() took the text
+        for i in range(n):
+            if p[i] == b'e' or p[i] == b'E':
                 break
-            if text[i] != b'.':
-                buffer[length] = text[i]
-                length += 1
-        buffer[length] = 0
-        return PyLong_FromString(buffer, NULL, 10)
+            if b'0' <= p[i] <= b'9':
+                digits[count] = p[i]
+                count += 1
+        # The first count % 8 digits, then 8 at a time
+        i = count % 8
+        if i:
+            for j in range(i):
+                chunk = chunk * 10 + <uint32_t>(digits[j] - 48)
+            multiply_add(limbs, &size, <uint32_t>acsylla_pow10[i], chunk)
+        while i < count:
+            multiply_add(limbs, &size, 100000000, acsylla_eight_digits(digits + i))
+            i += 8
+        # Big-endian, with a byte for the sign
+        length = size * 4 + 1
+        buffer[0] = 0
+        for i in range(size):
+            limb = limbs[size - 1 - i]
+            buffer[1 + 4 * i] = <unsigned char>(limb >> 24)
+            buffer[2 + 4 * i] = <unsigned char>(limb >> 16)
+            buffer[3 + 4 * i] = <unsigned char>(limb >> 8)
+            buffer[4 + 4 * i] = <unsigned char>limb
+        if negative:
+            # The two's complement: the bits inverted, plus one
+            for i in range(length - 1, -1, -1):
+                carry += <unsigned char>~buffer[i]
+                buffer[i] = <unsigned char>carry
+                carry >>= 8
+        # The leading bytes that only repeat the sign of the next one are dropped
+        while start < length - 1 and ((buffer[start] == 0x00 and buffer[start + 1] < 0x80) or
+                                      (buffer[start] == 0xFF and buffer[start + 1] >= 0x80)):
+            start += 1
+        return PyBytes_FromStringAndSize(<char*>buffer + start, length - start)
     finally:
-        PyMem_Free(buffer)
+        PyMem_Free(heap)
+
+
+cdef bint is_plain_decimal(const char* p, Py_ssize_t n) noexcept:
+    """[-](0|[1-9]digits)[.digits]: str() of the Decimal of such a text is the text, or a text with an exponent whose
+    digits written out are the text."""
+    cdef Py_ssize_t i = 0, start
+    if i < n and p[i] == b'-':
+        i += 1
+    start = i
+    while i < n and b'0' <= p[i] <= b'9':
+        i += 1
+    if i == start or (p[start] == b'0' and i - start > 1):
+        return False
+    if i < n:
+        if p[i] != b'.':
+            return False
+        i += 1
+        start = i
+        while i < n and b'0' <= p[i] <= b'9':
+            i += 1
+        if i == start or i < n:
+            return False
+    return True
 
 
 cdef bytes as_legacy_decimal(object value, cass_int32_t* scale, BindOptions* options):
@@ -254,11 +440,20 @@ cdef bytes as_legacy_decimal(object value, cass_int32_t* scale, BindOptions* opt
     Other drivers and cqlsh read it as another number, a session with legacy_types=True writes it for acsylla 1.x to
     read it."""
     cdef str text
-    cdef Py_ssize_t point
+    cdef const char* p
+    cdef Py_ssize_t point, n = 0
     global legacy_decimal_warned
     if options.without_session and not legacy_decimal_warned:
         legacy_decimal_warned = True
         warnings.warn(LEGACY_DECIMAL_WITHOUT_SESSION_WARNING, FutureWarning, stacklevel=1)
+    if isinstance(value, (str, float)):
+        text = value if isinstance(value, str) else str(value)
+        p = PyUnicode_AsUTF8AndSize(text, &n)
+        if is_plain_decimal(p, n):
+            # As acsylla 1.x wrote a str and the str() of a float, without making the Decimal of it
+            point = text.find('.')
+            scale[0] = 0 if point < 0 else n - point - 1
+            return PyBytes_FromStringAndSize(p, n)
     if isinstance(value, int):
         text = str(value)
     else:
@@ -282,12 +477,10 @@ cdef bytes as_legacy_decimal(object value, cass_int32_t* scale, BindOptions* opt
 
 cdef bytes as_cass_decimal(object value, cass_int32_t* scale, BindOptions* options):
     """The unscaled varint of a decimal given as a Decimal, an int, a str or a float. Its scale goes to `scale`."""
-    cdef str text
+    cdef object text
     cdef const char* p
-    cdef Py_ssize_t n = 0, i = 0, digits = 0, fraction = 0
-    cdef bint negative = False, point = False, exponent_negative = False
-    cdef uint128 unscaled = 0
-    cdef int64_t exponent = 0, value_scale
+    cdef Py_ssize_t n = 0
+    cdef DecimalText parsed
 
     # A session executes the statement only with its own legacy_types
     options.decimal_bound = True
@@ -298,53 +491,29 @@ cdef bytes as_cass_decimal(object value, cass_int32_t* scale, BindOptions* optio
     if isinstance(value, int):
         scale[0] = 0
         return int_as_varint(value)
-    if not isinstance(value, Decimal):
+
+    # str() of a Decimal is [-]digits[.digits][E(+|-)digits] or [-]Infinity, [-]NaN, [-]sNaN, str() of a float its
+    # shortest text, 3.14 and not 3.140000000000000124344978758017532527446746826171875. A str is parsed as it is
+    # without making its Decimal, Decimal() parses what parse_decimal() does not take
+    text = value if isinstance(value, str) else str(value)
+    p = PyUnicode_AsUTF8AndSize(text, &n)
+    if not parse_decimal(p, n, &parsed):
+        if isinstance(value, Decimal):
+            raise ValueError(f'Bad value for decimal type: "{value}"')
         try:
-            # A float by its shortest text, 3.14 and not 3.140000000000000124344978758017532527446746826171875
-            value = Decimal(value if isinstance(value, str) else str(value))
+            text = str(Decimal(text))
         except ArithmeticError:
             raise ValueError(f'Bad value for decimal type: "{value}"') from None
+        p = PyUnicode_AsUTF8AndSize(text, &n)
+        if not parse_decimal(p, n, &parsed):
+            raise ValueError(f'Bad value for decimal type: "{value}"')
 
-    # str() of a Decimal is ASCII [-]digits[.digits][E(+|-)digits] or [-]Infinity, [-]NaN, [-]sNaN. It is made in C
-    # and parsed here in C, up to 38 digits in a 128-bit integer
-    text = str(value)
-    p = PyUnicode_AsUTF8AndSize(text, &n)
-    if p[0] == b'-':
-        negative = True
-        i = 1
-    if not (b'0' <= p[i] <= b'9'):
-        raise ValueError(f'Bad value for decimal type: "{value}"')
-    while i < n and p[i] != b'E':
-        if p[i] == b'.':
-            point = True
-        else:
-            # The leading zeros of 0.05 are not digits of the unscaled value
-            if unscaled != 0 or p[i] != b'0':
-                if digits < 38:
-                    unscaled = unscaled * 10 + <uint128>(p[i] - 48)
-                digits += 1
-            if point:
-                fraction += 1
-        i += 1
-    if i < n:
-        exponent_negative = p[i + 1] == b'-'
-        i += 2
-        while i < n:
-            # Far beyond the 32 bits of a scale, it does not grow more
-            if exponent < 100000000000LL:
-                exponent = exponent * 10 + (p[i] - 48)
-            i += 1
-        if exponent_negative:
-            exponent = -exponent
-
-    value_scale = fraction - exponent
-    if value_scale < -2147483648LL or value_scale > 2147483647:
+    if parsed.scale < -2147483648LL or parsed.scale > 2147483647:
         raise ValueError(f'Bad value for decimal type: "{value}", its scale does not fit in 32 bits')
-    scale[0] = <cass_int32_t>value_scale
-    if digits <= 38:
-        return int128_as_varint(-<int128>unscaled if negative else <int128>unscaled)
-    # More than 38 digits, the unscaled value is the [-]digits without the point
-    return int_as_varint(digits_as_int(p, n))
+    scale[0] = <cass_int32_t>parsed.scale
+    if parsed.digits <= 38:
+        return int128_as_varint(-<int128>parsed.unscaled if parsed.negative else <int128>parsed.unscaled)
+    return digits_as_varint(p, n, parsed.negative)
 
 
 cdef inline CassUuid as_cass_uuid(object value) except *:

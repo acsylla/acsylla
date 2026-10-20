@@ -31,8 +31,6 @@ from uuid import UUID
 
 import json
 
-ValueType = TypeVar("ValueType")
-
 SupportedType = Union[
     None,
     int,
@@ -868,7 +866,7 @@ class Session(metaclass=ABCMeta):
         self,
         statement: str,
         parameters: Union[int, List, Tuple, Dict] = None,
-        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        value_types: "Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]]" = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
         timeout: Optional[float] = None,
@@ -895,7 +893,12 @@ class Session(metaclass=ABCMeta):
 
         `execution_profile` Assign the execution profile to the statement
 
-        `native_types` Returns values as native types. Default: False
+        `native_types` Returns the values of these types as str, read and bound back without a loss and without an
+        error for any value of CQL: decimal, uuid, timeuuid and inet as their text; date, time and timestamp as
+        YYYY-MM-DD, HH:MM:SS.nnnnnnnnn and YYYY-MM-DD HH:MM:SS.mmmZ in all the years of CQL; duration as its CQL
+        literal, as 1y2mo3d4h5m6s7ms8us9ns. The items of collections, tuples, UDTs and vectors are read in the same
+        way, the values of the other types are the same. A session with `legacy_types` reads them as acsylla 1.x
+        did. Default: False
         """
 
     @abstractmethod
@@ -1033,7 +1036,7 @@ class Statement(metaclass=ABCMeta):
     def __call__(
         self,
         parameters: Union[int, List, Tuple, Dict] = None,
-        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        value_types: "Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]]" = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
         timeout=None,

@@ -46,7 +46,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-ROW = "stage 9: Row"
 
 NATIVE_TYPES = {
     "ascii",
@@ -364,35 +363,35 @@ CASES = [
         "date-year-zero",
         "date",
         "2146764120",  # 0000-01-01
-        Raises(ValueError, "value_date"),
+        Raises(ValueError, "the date 0000-01-01 is out of the years 1..9999"),
         "0000-01-01",
     ),
     Case(
         "date-before-year-zero",
         "date",
         "2146764119",  # -0001-12-31
-        Raises(ValueError, "value_date"),
+        Raises(ValueError, "the date -0001-12-31 is out of the years 1..9999"),
         "-0001-12-31",
     ),
     Case(
         "date-first-cql",
         "date",
         "0",  # -5877641-06-23
-        Raises(ValueError, "value_date"),
+        Raises(ValueError, "the date -5877641-06-23 is out of the years 1..9999"),
         "-5877641-06-23",
     ),
     Case(
         "date-after-python",
         "date",
         "2150416545",  # 10000-01-01
-        Raises(ValueError, "value_date"),
+        Raises(ValueError, "the date 10000-01-01 is out of the years 1..9999"),
         "10000-01-01",
     ),
     Case(
         "date-last-cql",
         "date",
         "4294967295",  # 5881580-07-11
-        Raises(ValueError, "value_date"),
+        Raises(ValueError, "the date 5881580-07-11 is out of the years 1..9999"),
         "5881580-07-11",
     ),
     Case("time", "time", "'12:34:56.123456789'", time(12, 34, 56, 123456), "12:34:56.123456789", lossless=False),
@@ -432,21 +431,21 @@ CASES = [
         "timestamp-before-python",
         "timestamp",
         "-62135596800001",
-        Raises(ValueError, "value_timestamp"),
+        Raises(ValueError, "the timestamp 0000-12-31 23:59:59.999Z is out of the years 1..9999"),
         "0000-12-31 23:59:59.999Z",
     ),
     Case(
         "timestamp-before-year-zero",
         "timestamp",
         "-62167219200001",
-        Raises(ValueError, "value_timestamp"),
+        Raises(ValueError, "the timestamp -0001-12-31 23:59:59.999Z is out of the years 1..9999"),
         "-0001-12-31 23:59:59.999Z",
     ),
     Case(
         "timestamp-after-python",
         "timestamp",
         "253402300800000",
-        Raises(ValueError, "value_timestamp"),
+        Raises(ValueError, "the timestamp 10000-01-01 00:00:00.000Z is out of the years 1..9999"),
         "10000-01-01 00:00:00.000Z",
     ),
     Case(
@@ -542,12 +541,12 @@ CASES = [
     ),
     Case("set-tuple", "set<frozen<tuple<int, text>>>", "{(1, 'x')}", {(1, "x")}, {(1, "x")}),
     Case("map-tuple-key", "map<frozen<tuple<int, text>>, int>", "{(1, 'x'): 10}", {(1, "x"): 10}, {(1, "x"): 10}),
-    # A value of a collection out of the years of Python names the column too
+    # A value of a collection out of the years of Python raises too
     Case(
         "list-date-after-python",
         "list<date>",
         "[2150416545]",  # 10000-01-01
-        Raises(ValueError, "value_list_date"),
+        Raises(ValueError, "the date 10000-01-01 is out of the years 1..9999"),
         ["10000-01-01"],
     ),
     Case(
@@ -1207,7 +1206,6 @@ class TestRow:
         statement = create_statement(f"SELECT id, value_int FROM cql_values WHERE id = {READ_ID + case_id(case)}")
         return (await session.execute(statement)).first()
 
-    @pytest.mark.xfail(strict=True, reason=ROW)
     async def test_missing_attribute(self, session):
         row = await self.row(session)
         assert not hasattr(row, "missing")
@@ -1217,13 +1215,42 @@ class TestRow:
         with pytest.raises(errors.ColumnNotFound):
             row.missing
 
-    @pytest.mark.xfail(strict=True, reason=ROW)
     async def test_as_named_tuple(self, session):
+        """The tuple of (name, value) pairs of the columns, a dict is made of it."""
         row = await self.row(session)
-        value = row.as_named_tuple()
-        assert value._fields == ("id", "value_int")
-        assert value.value_int == -2147483648
-        assert tuple(value) == (READ_ID + case_id(next(c for c in CASES if c.id == "int")), -2147483648)
+        row_id = READ_ID + case_id(next(c for c in CASES if c.id == "int"))
+        assert row.as_named_tuple() == (("id", row_id), ("value_int", -2147483648))
+        assert dict(row.as_named_tuple()) == row.as_dict()
+
+    async def test_as_named_tuple_gc(self, session):
+        """The GC does not track the pairs of values it does not track, it tracks a pair of a list and the row."""
+        row = await self.row(session)
+        assert not gc.is_tracked(row.as_named_tuple())
+        assert not any(gc.is_tracked(pair) for pair in row.as_named_tuple())
+        row_id = READ_ID + case_id(next(c for c in CASES if c.id == "list"))
+        statement = create_statement(f"SELECT id, value_list_int FROM cql_values WHERE id = {row_id}")
+        value = (await session.execute(statement)).first().as_named_tuple()
+        assert value == (("id", row_id), ("value_list_int", [3, 1, 2]))
+        assert gc.is_tracked(value) and [gc.is_tracked(pair) for pair in value] == [False, True]
+
+    async def test_value_error(self, session):
+        """A value a row can not read raises its ValueError, read in any way."""
+        case = next(c for c in CASES if c.id == "date-year-zero")
+        skip_unsupported(case)
+        statement = create_statement(f"SELECT id, value_date FROM cql_values WHERE id = {READ_ID + case_id(case)}")
+        row = (await session.execute(statement)).first()
+        reads = [
+            row.as_tuple,
+            row.as_list,
+            row.as_dict,
+            row.as_named_tuple,
+            lambda: row[1],
+            lambda: row["value_date"],
+            lambda: list(row.values()),
+        ]
+        for read_row in reads:
+            with pytest.raises(ValueError, match="the date 0000-01-01 is out of the years 1..9999"):
+                read_row()
 
 
 class TestLegacyDecimal:
@@ -1267,6 +1294,12 @@ class TestLegacyRead:
     @pytest.mark.parametrize("case", params(CASES, "legacy native"))
     async def test_native(self, session, case):
         await check_read(session, case, legacy_value(case, native_types=True), native_types=True)
+
+
+class TestLegacyRow(TestRow):
+    """A row of a session with legacy_types=True is read in the same way."""
+
+    legacy_types = True
 
 
 class TestLegacyWrite:

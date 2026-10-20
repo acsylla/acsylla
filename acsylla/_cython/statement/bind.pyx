@@ -387,13 +387,13 @@ cdef inline CassInet as_cass_inet(object value) except *:
     cdef CassInet cass_inet
     cdef CassError error
     cdef cass_uint32_t ipv4
-    cdef bytes packed
-    cdef int i
 
     if not isinstance(value, (str, bytes)):
-        # str() of an ipaddress object is several times slower than the whole bind of it
+        # str() of an ipaddress object is several times slower than the whole bind of it, its int is read from its
+        # slot _ip
         if isinstance(value, IPv4Address):
-            ipv4 = <cass_uint32_t>PyLong_AsUnsignedLongLongMask(int(value))
+            ipv4 = <cass_uint32_t>PyLong_AsUnsignedLongLongMask(
+                acsylla_slot(value, IPV4_IP_OFFSET) if IPV4_IP_OFFSET >= 0 else int(value))
             cass_inet.address[0] = (ipv4 >> 24) & 0xFF
             cass_inet.address[1] = (ipv4 >> 16) & 0xFF
             cass_inet.address[2] = (ipv4 >> 8) & 0xFF
@@ -401,9 +401,8 @@ cdef inline CassInet as_cass_inet(object value) except *:
             cass_inet.address_length = 4
             return cass_inet
         if isinstance(value, IPv6Address):
-            packed = value.packed
-            for i in range(16):
-                cass_inet.address[i] = <cass_uint8_t>packed[i]
+            acsylla_int_as_16_bytes(acsylla_slot(value, IPV6_IP_OFFSET) if IPV6_IP_OFFSET >= 0 else int(value),
+                                    cass_inet.address)
             cass_inet.address_length = 16
             return cass_inet
     error = cass_inet_from_string(as_bytes(value), &cass_inet)

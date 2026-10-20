@@ -29,6 +29,7 @@ from uuid import UUID
 import acsylla
 import copy
 import gc
+import ipaddress
 import math
 import os
 import pickle
@@ -43,7 +44,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-INET = "stage 5: inet"
 DURATION = "stage 6: Duration"
 VECTOR = "stage 7: vector"
 UNHASHABLE = "stage 8: unhashable set elements and map keys"
@@ -346,17 +346,15 @@ CASES = [
         "'192.168.1.100'",
         IPv4Address("192.168.1.100"),
         "192.168.1.100",
-        todo={"read": INET},
         legacy="192.168.1.100",
     ),
-    Case("inet-ipv6", "inet", "'::1'", IPv6Address("::1"), "::1", todo={"read": INET}, legacy="::1"),
+    Case("inet-ipv6", "inet", "'::1'", IPv6Address("::1"), "::1", legacy="::1"),
     Case(
         "inet-ipv6-long",
         "inet",
         "'2001:db8::ff00:42:8329'",
         IPv6Address("2001:db8::ff00:42:8329"),
         "2001:db8::ff00:42:8329",
-        todo={"read": INET},
         legacy="2001:db8::ff00:42:8329",
     ),
     Case("date", "date", "'2024-06-15'", date(2024, 6, 15), "2024-06-15"),
@@ -512,7 +510,6 @@ CASES = [
         f"{{{TIMEUUID_1}: '10.0.0.1'}}",
         {UUID(TIMEUUID_1): IPv4Address("10.0.0.1")},
         {TIMEUUID_1: "10.0.0.1"},
-        todo={"read": INET},
         legacy={TIMEUUID_1: "10.0.0.1"},
     ),
     Case(
@@ -1016,6 +1013,34 @@ class TestUUID:
         assert copy.copy(value) == expected and copy.deepcopy(value) == expected
         assert {value: 1}[expected] == 1
         # Freed with its last reference
+        reference = weakref.ref(value)
+        del value
+        gc.collect()
+        assert reference() is None
+
+
+class TestInet:
+    """An IPv4Address or IPv6Address made from its slots is the one of its constructor."""
+
+    @pytest.mark.parametrize("case_name", ["inet", "inet-ipv6", "inet-ipv6-long"])
+    async def test_object(self, session, case_name):
+        case = next(c for c in CASES if c.id == case_name)
+        value = (await read(session, case.cql_type, READ_ID + case_id(case)))[0]
+        expected = case.value
+        assert type(value) is type(expected)
+        assert value == expected and hash(value) == hash(expected) and int(value) == int(expected)
+        assert str(value) == str(expected) and repr(value) == repr(expected)
+        assert value.packed == expected.packed and value.version == expected.version
+        assert value.is_private == expected.is_private and value.is_loopback == expected.is_loopback
+        assert value.reverse_pointer == expected.reverse_pointer
+        if value.version == 6:
+            assert value.scope_id is None
+        assert pickle.loads(pickle.dumps(value)) == expected
+        assert copy.copy(value) == expected and copy.deepcopy(value) == expected
+        assert {value: 1}[expected] == 1 and value in ipaddress.ip_network(f"{expected}/{expected.max_prefixlen}")
+        # Freed with its last reference. A value of its own, the lru_cache of is_private and is_loopback keeps the one
+        # above
+        value = (await read(session, case.cql_type, READ_ID + case_id(case)))[0]
         reference = weakref.ref(value)
         del value
         gc.collect()

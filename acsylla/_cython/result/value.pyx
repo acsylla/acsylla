@@ -89,33 +89,68 @@ cdef extern from *:
         return ((PyMemberDescrObject*)descriptor)->d_member->offset;
     }
 
-    /* A uuid.UUID of 16 bytes as UUID._from_int() of Python 3.14 makes it: the int of the bytes in its slot int and
-       SafeUUID.unknown in its slot is_safe */
-    static PyObject* acsylla_new_uuid(PyObject* type, const unsigned char* data, PyObject* is_safe,
-                                      Py_ssize_t int_offset, Py_ssize_t is_safe_offset) {
-    #if PY_VERSION_HEX >= 0x030D0000
-        PyObject* value = PyLong_FromUnsignedNativeBytes(data, 16, Py_ASNATIVEBYTES_BIG_ENDIAN);
-    #else
-        PyObject* value = _PyLong_FromByteArray(data, 16, 0, 0);
-    #endif
-        PyObject* uuid;
+    /* An object of a class of __slots__ as object.__new__() makes it, with first in its slot at first_offset and
+       second in the one at second_offset when it is not -1. The slots take new references to the values */
+    static PyObject* acsylla_new_with_slots(PyObject* type, PyObject* first, Py_ssize_t first_offset,
+                                            PyObject* second, Py_ssize_t second_offset) {
+        PyObject* object = ((PyTypeObject*)type)->tp_alloc((PyTypeObject*)type, 0);
+        if (object == NULL) {
+            return NULL;
+        }
+        Py_INCREF(first);
+        *(PyObject**)((char*)object + first_offset) = first;
+        if (second_offset >= 0) {
+            Py_INCREF(second);
+            *(PyObject**)((char*)object + second_offset) = second;
+        }
+        return object;
+    }
+
+    /* A new reference to the object in the slot at offset, an AttributeError for an empty slot */
+    static PyObject* acsylla_slot(PyObject* object, Py_ssize_t offset) {
+        PyObject* value = *(PyObject**)((char*)object + offset);
         if (value == NULL) {
+            PyErr_SetString(PyExc_AttributeError, "an empty slot");
             return NULL;
         }
-        uuid = ((PyTypeObject*)type)->tp_alloc((PyTypeObject*)type, 0);
-        if (uuid == NULL) {
-            Py_DECREF(value);
-            return NULL;
+        Py_INCREF(value);
+        return value;
+    }
+
+    /* The 16 unsigned big-endian bytes of an int, -1 with an exception for an int that does not fit in them */
+    static int acsylla_int_as_16_bytes(PyObject* value, unsigned char* output) {
+    #if PY_VERSION_HEX >= 0x030D0000
+        Py_ssize_t size = PyLong_AsNativeBytes(value, output, 16,
+                                               Py_ASNATIVEBYTES_BIG_ENDIAN | Py_ASNATIVEBYTES_UNSIGNED_BUFFER |
+                                               Py_ASNATIVEBYTES_REJECT_NEGATIVE);
+        if (size < 0) {
+            return -1;
         }
-        *(PyObject**)((char*)uuid + int_offset) = value;
-        Py_INCREF(is_safe);
-        *(PyObject**)((char*)uuid + is_safe_offset) = is_safe;
-        return uuid;
+        if (size > 16) {
+            PyErr_SetString(PyExc_OverflowError, "an int of more than 16 bytes");
+            return -1;
+        }
+        return 0;
+    #else
+        return _PyLong_AsByteArray((PyLongObject*)value, output, 16, 0, 0);
+    #endif
+    }
+
+    /* The int of unsigned big-endian bytes */
+    static PyObject* acsylla_unsigned_int(const unsigned char* data, size_t size) {
+    #if PY_VERSION_HEX >= 0x030D0000
+        return PyLong_FromUnsignedNativeBytes(data, size, Py_ASNATIVEBYTES_BIG_ENDIAN);
+    #else
+        return _PyLong_FromByteArray(data, size, 0, 0);
+    #endif
     }
     """
     Py_ssize_t acsylla_member_offset(object descriptor)
-    object acsylla_new_uuid(object type, const unsigned char* data, object is_safe, Py_ssize_t int_offset,
-                            Py_ssize_t is_safe_offset)
+    object acsylla_new_with_slots(object type, object first, Py_ssize_t first_offset, object second,
+                                  Py_ssize_t second_offset)
+    object acsylla_unsigned_int(const unsigned char* data, size_t size)
+    object acsylla_slot(object obj, Py_ssize_t offset)
+    int acsylla_int_as_16_bytes(object value, unsigned char* output) except -1
 
 cimport cython
 
@@ -125,6 +160,7 @@ from cpython.datetime cimport get_utc
 from cpython.datetime cimport import_datetime
 from cpython.datetime cimport time_new
 from cpython.long cimport PyLong_FromLongLong
+from cpython.long cimport PyLong_FromUnsignedLong
 from cpython.mem cimport PyMem_Free
 from cpython.mem cimport PyMem_Malloc
 from cpython.unicode cimport PyUnicode_1BYTE_KIND
@@ -137,6 +173,8 @@ from decimal import Decimal
 from decimal import MAX_EMAX
 from decimal import MAX_PREC
 from decimal import MIN_EMIN
+from ipaddress import IPv4Address
+from ipaddress import IPv6Address
 from types import MemberDescriptorType
 from uuid import SafeUUID
 from uuid import UUID
@@ -146,29 +184,60 @@ import_datetime()
 # Changes the exponent of a Decimal without rounding its digits
 cdef object DECIMAL_EXACT = Context(prec=MAX_PREC, Emax=MAX_EMAX, Emin=MIN_EMIN)
 
-# A uuid.UUID is made as UUID._from_int() makes it, its slots written at their offsets: 10 times faster than
-# UUID(bytes=...). When uuid.UUID is not the class of these two slots any more, its constructor makes it
+cdef object slot_offsets(object cls, tuple names):
+    """The offsets of the slots `names` in the objects of `cls`, None when these slots are not all the fields of its
+    objects as object.__new__() makes them: another slot, a __dict__ or a __new__ of its own."""
+    cdef list offsets = []
+    expected = set(names) | {"__weakref__"}
+    if cls.__new__ is not object.__new__:
+        return None
+    for base in cls.__mro__[:-1]:
+        if "__slots__" not in base.__dict__:
+            return None
+        slots = base.__dict__["__slots__"]
+        if not set((slots,) if isinstance(slots, str) else slots) <= expected:
+            return None
+    for name in names:
+        descriptor = next((base.__dict__[name] for base in cls.__mro__ if name in base.__dict__), None)
+        if not isinstance(descriptor, MemberDescriptorType):
+            return None
+        offsets.append(acsylla_member_offset(descriptor))
+    return tuple(offsets)
+
+
+# uuid.UUID, IPv4Address and IPv6Address are made with their slots written at their offsets, as UUID._from_int() of
+# Python 3.14 makes a UUID: several times faster than their constructors. A class that is not made of these slots any
+# more, or that is not equal then to the one of its constructor, is made by its constructor
 cdef object UUID_UNKNOWN = SafeUUID.unknown
 cdef Py_ssize_t UUID_INT_OFFSET = -1
 cdef Py_ssize_t UUID_IS_SAFE_OFFSET = -1
+cdef Py_ssize_t IPV4_IP_OFFSET = -1
+cdef Py_ssize_t IPV6_IP_OFFSET = -1
+cdef Py_ssize_t IPV6_SCOPE_ID_OFFSET = -1
 
 
-cdef void find_uuid_slots() except *:
-    global UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET
-    if (UUID.__new__ is not object.__new__ or set(UUID.__slots__) != {"int", "is_safe", "__weakref__"}
-            or not isinstance(UUID.__dict__.get("int"), MemberDescriptorType)
-            or not isinstance(UUID.__dict__.get("is_safe"), MemberDescriptorType)):
-        return
-    int_offset = acsylla_member_offset(UUID.__dict__["int"])
-    is_safe_offset = acsylla_member_offset(UUID.__dict__["is_safe"])
-    data = bytes(range(16))
-    made = acsylla_new_uuid(UUID, data, UUID_UNKNOWN, int_offset, is_safe_offset)
-    if made == UUID(bytes=data) and made.int == UUID(bytes=data).int and made.is_safe is UUID_UNKNOWN:
-        UUID_INT_OFFSET = int_offset
-        UUID_IS_SAFE_OFFSET = is_safe_offset
+cdef void find_slots() except *:
+    global UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET, IPV4_IP_OFFSET, IPV6_IP_OFFSET, IPV6_SCOPE_ID_OFFSET
+    offsets = slot_offsets(UUID, ("int", "is_safe"))
+    if offsets is not None:
+        number = int.from_bytes(bytes(range(16)), "big")
+        made = acsylla_new_with_slots(UUID, number, offsets[0], UUID_UNKNOWN, offsets[1])
+        if made == UUID(int=number) and made.int == number and made.is_safe is UUID_UNKNOWN:
+            UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET = offsets
+    offsets = slot_offsets(IPv4Address, ("_ip",))
+    if offsets is not None:
+        made = acsylla_new_with_slots(IPv4Address, 3232235876, offsets[0], None, -1)
+        if made == IPv4Address(3232235876) and str(made) == "192.168.1.100":
+            IPV4_IP_OFFSET = offsets[0]
+    offsets = slot_offsets(IPv6Address, ("_ip", "_scope_id"))
+    if offsets is not None:
+        number = int.from_bytes(bytes(range(16)), "big")
+        made = acsylla_new_with_slots(IPv6Address, number, offsets[0], None, offsets[1])
+        if made == IPv6Address(number) and str(made) == str(IPv6Address(number)) and made.scope_id is None:
+            IPV6_IP_OFFSET, IPV6_SCOPE_ID_OFFSET = offsets
 
 
-find_uuid_slots()
+find_slots()
 
 
 cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
@@ -210,7 +279,7 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
     elif cass_type == CASS_VALUE_TYPE_VARINT:
         return _varint(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_INET:
-        return _inet(cass_value)
+        return _inet(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_DATE:
         return _date(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_TIME:
@@ -325,7 +394,8 @@ cdef inline object _uuid(const CassValue* cass_value, int8_t flags):
     if flags & (NATIVE_TYPES | LEGACY_TYPES):
         return uuid_text(data)
     if UUID_INT_OFFSET >= 0:
-        return acsylla_new_uuid(UUID, data, UUID_UNKNOWN, UUID_INT_OFFSET, UUID_IS_SAFE_OFFSET)
+        return acsylla_new_with_slots(UUID, acsylla_unsigned_int(data, 16), UUID_INT_OFFSET, UUID_UNKNOWN,
+                                      UUID_IS_SAFE_OFFSET)
     return UUID(bytes=data[:16])
 
 
@@ -626,8 +696,8 @@ cdef inline object _bytes(const CassValue* cass_value):
     return bytes_
 
 
-cdef inline object _inet(const CassValue* cass_value):
-    """ Returns the inet value of a column.
+cdef inline object _inet(const CassValue* cass_value, int8_t flags):
+    """ Returns the IPv4Address or IPv6Address of an inet column, its str with native_types or legacy_types.
 
     Raises a derived `CassException` if the value can not be retrieved"""
     cdef CassInet output
@@ -638,8 +708,19 @@ cdef inline object _inet(const CassValue* cass_value):
         return None
     else:
         raise_if_error(error)
-    cass_inet_string(output, <char*>&address)
-    return address.decode()
+    if flags & (NATIVE_TYPES | LEGACY_TYPES):
+        cass_inet_string(output, <char*>&address)
+        return address.decode()
+    if output.address_length == 4:
+        number = PyLong_FromUnsignedLong((<unsigned long>output.address[0] << 24) | (output.address[1] << 16)
+                                         | (output.address[2] << 8) | output.address[3])
+        if IPV4_IP_OFFSET >= 0:
+            return acsylla_new_with_slots(IPv4Address, number, IPV4_IP_OFFSET, None, -1)
+        return IPv4Address(number)
+    number = acsylla_unsigned_int(output.address, 16)
+    if IPV6_IP_OFFSET >= 0:
+        return acsylla_new_with_slots(IPv6Address, number, IPV6_IP_OFFSET, None, IPV6_SCOPE_ID_OFFSET)
+    return IPv6Address(number)
 
 
 @cython.cdivision(True)

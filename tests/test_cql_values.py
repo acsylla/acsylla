@@ -44,11 +44,9 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-DURATION = "stage 6: Duration"
 VECTOR = "stage 7: vector"
 UNHASHABLE = "stage 8: unhashable set elements and map keys"
 ROW = "stage 9: Row"
-NATIVE = "stage 10: native_types"
 
 NATIVE_TYPES = {
     "ascii",
@@ -457,7 +455,6 @@ CASES = [
         "1y2mo3d4h5m6s7ms8us9ns",
         duration(14, 3, 14706007008009),
         "1y2mo3d4h5m6s7ms8us9ns",
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION},
         legacy="1y2mo3d4h5m6s7ms8us9ns",
         legacy_native=(14, 3, 14706007008009),
     ),
@@ -467,7 +464,6 @@ CASES = [
         "-1d",
         duration(0, -1, 0),
         "-1d",
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION},
         legacy="-1d",
         legacy_native=(0, -1, 0),
     ),
@@ -477,7 +473,6 @@ CASES = [
         "25h",
         duration(0, 0, 90000000000000),
         "25h",
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION},
         legacy="25h",
         legacy_native=(0, 0, 90000000000000),
     ),
@@ -487,8 +482,7 @@ CASES = [
         "0s",
         duration(0, 0, 0),
         "0s",
-        # acsylla 1.x read a zero duration as "" and did not take it back
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION, "legacy write": DURATION},
+        # acsylla 1.x read a zero duration as "" and did not take it back, it is taken back as 0s
         legacy="",
         legacy_native=(0, 0, 0),
     ),
@@ -534,7 +528,6 @@ CASES = [
         "[1d, 2h]",
         [duration(0, 1, 0), duration(0, 0, 7200000000000)],
         ["1d", "2h"],
-        todo={"read": DURATION, "native": NATIVE, "write": DURATION},
         legacy=["1d", "2h"],
         legacy_native=[(0, 1, 0), (0, 0, 7200000000000)],
     ),
@@ -730,12 +723,15 @@ WRITE_CASES = [
     WriteCase("timestamp-str-before-year-zero", "timestamp", "-0001-12-31 23:59:59.999Z", "-62167219200001"),
     WriteCase("duration-timedelta", "duration", timedelta(days=3, hours=4), "3d4h"),
     WriteCase("duration-tuple", "duration", (14, 3, 14706007008009), "1y2mo3d4h5m6s7ms8us9ns"),
+    WriteCase("duration-object", "duration", duration(-14, -3, -14706007008009), "-1y2mo3d4h5m6s7ms8us9ns"),
+    # The days of a negative timedelta are negative and its seconds positive, a duration has one sign
+    WriteCase("duration-negative-timedelta", "duration", -timedelta(days=1, hours=1), "-1d1h"),
+    WriteCase("duration-empty-str", "duration", "", "0s"),
     WriteCase(
         "duration-relativedelta",
         "duration",
         relativedelta(years=1, months=2, days=3, hours=4, minutes=5, seconds=6, microseconds=7008),
         "1y2mo3d4h5m6s7ms8us",
-        DURATION,
         needs="dateutil",
     ),
     WriteCase("set-list", "set<int>", [3, 1, 2], "{1, 2, 3}"),

@@ -859,7 +859,50 @@ cdef inline object _timestamp(const CassValue* cass_value, int8_t flags):
                         of_day % 1000 * 1000, get_utc())
 
 
+cdef inline Py_ssize_t write_unit(char* buffer, Py_ssize_t length, uint64_t value, const char* unit):
+    """Writes <value><unit> after `length` when the value is not 0. Returns the new length."""
+    cdef Py_ssize_t i = 0
+    if value == 0:
+        return length
+    length += write_digits(buffer + length, value)
+    while unit[i]:
+        buffer[length] = unit[i]
+        length += 1
+        i += 1
+    return length
+
+
+@cython.cdivision(True)
+cdef object duration_literal(long long months, long long days, long long nanoseconds, bint legacy):
+    """The CQL literal of a duration, as '-1y2mo3d4h5m6s7ms8us9ns'. A zero duration is '0s', '' with legacy as
+    acsylla 1.x wrote it."""
+    cdef char buffer[160]
+    cdef Py_ssize_t length = 0
+    cdef uint64_t month_count = (~(<uint64_t>months) + 1) if months < 0 else <uint64_t>months
+    cdef uint64_t day_count = (~(<uint64_t>days) + 1) if days < 0 else <uint64_t>days
+    cdef uint64_t n = (~(<uint64_t>nanoseconds) + 1) if nanoseconds < 0 else <uint64_t>nanoseconds
+    if months < 0 or days < 0 or nanoseconds < 0:
+        buffer[0] = b"-"
+        length = 1
+    length = write_unit(buffer, length, month_count / 12, "y")
+    length = write_unit(buffer, length, month_count % 12, "mo")
+    length = write_unit(buffer, length, day_count, "d")
+    length = write_unit(buffer, length, n / 3600000000000ULL, "h")
+    length = write_unit(buffer, length, n / 60000000000ULL % 60, "m")
+    length = write_unit(buffer, length, n / 1000000000ULL % 60, "s")
+    length = write_unit(buffer, length, n / 1000000 % 1000, "ms")
+    length = write_unit(buffer, length, n / 1000 % 1000, "us")
+    length = write_unit(buffer, length, n % 1000, "ns")
+    if length == 0:
+        return "" if legacy else "0s"
+    return PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, buffer, length)
+
+
 cdef inline object _duration(const CassValue* cass_value, int8_t flags):
+    """ Returns the Duration of a duration column, its CQL literal with native_types. With legacy_types its CQL literal
+    and the tuple (months, days, nanoseconds) with native_types, as acsylla 1.x did.
+
+    Raises a derived `CassException` if the value can not be retrieved"""
     cdef cass_int32_t months
     cdef cass_int32_t days
     cdef cass_int64_t nanos
@@ -871,37 +914,13 @@ cdef inline object _duration(const CassValue* cass_value, int8_t flags):
     else:
         raise_if_error(error)
 
+    if flags & LEGACY_TYPES:
+        if flags & NATIVE_TYPES:
+            return months, days, nanos
+        return duration_literal(months, days, nanos, True)
     if flags & NATIVE_TYPES:
-        return months, days, nanos
-
-    out = ''
-    if months < 0:
-        months = -months
-        out = '-'
-    y, mo = divmod(months, 12)
-    if y != 0: out+= f'{y}y'
-    if mo != 0: out+= f'{mo}mo'
-    if days < 0:
-        if not out: out = '-'
-        days = -days
-    if days != 0: out += f'{days}d'
-    if nanos < 0:
-        if not out: out = '-'
-        nanos = -nanos
-    if nanos != 0:
-        s, n = divmod(nanos, 1_000_000_000)
-        h, m = divmod(s, 3600)
-        m, s = divmod(m, 60)
-        if h !=0: out += f'{h}h'
-        if m !=0: out += f'{m}m'
-        if s !=0: out += f'{s}s'
-        ms, us = divmod(n, 1_000_000)
-        us, ns = divmod(us, 1_000)
-        if ms !=0: out += f'{ms}ms'
-        if us !=0: out += f'{us}us'
-        if ns !=0: out += f'{ns}ns'
-
-    return out
+        return duration_literal(months, days, nanos, False)
+    return Duration.new_(months, days, nanos)
 
 
 cdef inline object _map(const CassValue* cass_value, int8_t flags):

@@ -1,4 +1,5 @@
 from . import errors
+from ._cython.cyacsylla import Duration
 from .base import AggregateMeta
 from .base import Batch
 from .base import Cluster
@@ -82,4 +83,5 @@ __all__ = (
     "errors",
     "get_logger",
     "decode_legacy_decimal",
+    "Duration",
 )

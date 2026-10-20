@@ -49,6 +49,7 @@ import_datetime()
 
 # A datetime in UTC needs no utcoffset() call
 cdef object UTC_TZ = get_utc()
+cdef object ZERO_TIMEDELTA = timedelta(0)
 
 # The warning about a decimal written as text by a statement without a session is given once
 cdef bint legacy_decimal_warned = False
@@ -75,7 +76,8 @@ cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s
     cdef int unit_len
 
     if n == 0:
-        raise ValueError(f'Unknown duration format for value: "{s}"')
+        # acsylla 1.x read a zero duration as ""
+        return 0, 0, 0
 
     if b[0] == 0x2d:  # '-'
         negative = True
@@ -126,7 +128,7 @@ cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s
                 days += value
                 unit_len = 1
             elif c == 0x68:                                # 'h'
-                nanos += value * <cass_int64_t>3600000000000
+                nanos += value * 3600000000000LL
                 unit_len = 1
             elif c == 0x6d and c2 == 0x73:                 # 'ms'
                 nanos += value * 1000000
@@ -138,10 +140,10 @@ cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) _parse_duration_str(str s
                 nanos += value
                 unit_len = 2
             elif c == 0x6d:                                # 'm' (minutes)
-                nanos += value * <cass_int64_t>60000000000
+                nanos += value * 60000000000LL
                 unit_len = 1
             elif c == 0x73:                                # 's'
-                nanos += value * <cass_int64_t>1000000000
+                nanos += value * 1000000000LL
                 unit_len = 1
 
         if unit_len > 0:
@@ -738,17 +740,32 @@ cdef inline cass_int64_t as_cass_timestamp(object value) except *:
 
 
 cdef inline (cass_int32_t, cass_int32_t, cass_int64_t) as_cass_duration(object value) except *:
+    """The months, days and nanoseconds of a Duration, its CQL literal, a timedelta, a dateutil.relativedelta or the
+    tuple (months, days, nanoseconds)."""
     cdef cass_int32_t months = 0
     cdef cass_int32_t days = 0
     cdef cass_int64_t nanos = 0
+    cdef Duration duration
 
+    if isinstance(value, Duration):
+        duration = <Duration>value
+        return duration.months, duration.days, duration.nanoseconds
     if isinstance(value, tuple) and len(value) == 3:
         months, days, nanos = value
     elif isinstance(value, str):
         months, days, nanos = _parse_duration_str(value)
     elif isinstance(value, timedelta):
-        days = value.days
-        nanos = value.seconds * 1000 * 1000 * 1000 + value.microseconds * 1000
+        if value < ZERO_TIMEDELTA:
+            # The days of a negative timedelta are negative and its seconds positive, a duration has one sign
+            value = -value
+            days = -(<timedelta>value).days
+            nanos = -((<cass_int64_t>(<timedelta>value).seconds * 1000000 + (<timedelta>value).microseconds) * 1000)
+        else:
+            days = value.days
+            nanos = (<cass_int64_t>value.seconds * 1000000 + value.microseconds) * 1000
+    elif type(value).__module__ == "dateutil.relativedelta":
+        duration = Duration.from_relativedelta(value)
+        return duration.months, duration.days, duration.nanoseconds
     else:
         raise ValueError(f'Unknown duration format for value: "{value}"')
 

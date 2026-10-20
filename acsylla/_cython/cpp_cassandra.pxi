@@ -657,6 +657,7 @@ cdef extern from "cassandra.h" nogil:
   CassError cass_data_type_keyspace(const CassDataType* data_type, const char** keyspace, size_t* keyspace_length)
   CassError cass_data_type_sub_type_name(const CassDataType* data_type, size_t index, const char** name, size_t* name_length)
   CassError cass_data_type_class_name(const CassDataType* data_type, const char** class_name, size_t* class_name_length)
+  const CassDataType* cass_value_data_type(const CassValue* value)
   cass_bool_t cass_data_type_is_frozen(const CassDataType* data_type)
 
   CassUserType* cass_user_type_new_from_data_type(const CassDataType * data_type)

@@ -273,9 +273,10 @@ cdef inline object get_cass_value(const CassValue* cass_value, int8_t flags):
                        CASS_VALUE_TYPE_TEXT,
                        CASS_VALUE_TYPE_VARCHAR):
         return _string(cass_value)
-    elif cass_type in (CASS_VALUE_TYPE_BLOB,
-                       CASS_VALUE_TYPE_CUSTOM):
+    elif cass_type == CASS_VALUE_TYPE_BLOB:
         return _bytes(cass_value)
+    elif cass_type == CASS_VALUE_TYPE_CUSTOM:
+        return _custom(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_VARINT:
         return _varint(cass_value, flags)
     elif cass_type == CASS_VALUE_TYPE_INET:
@@ -605,6 +606,31 @@ cdef inline object _decimal(const CassValue* cass_value, int8_t flags):
         return str(Decimal(number).scaleb(-scale, DECIMAL_EXACT))
     text_digits = PyUnicode_AsUTF8AndSize(text, &count)
     return decimal_from_digits(text_digits, count, number < 0, scale, flags)
+
+
+cdef inline object _custom(const CassValue* cass_value, int8_t flags):
+    """ Returns the list of the items of a vector column, the bytes of the value of another custom type and the bytes
+    of a vector with legacy_types, as acsylla 1.x did.
+
+    Raises a derived `CassException` if the value can not be retrieved"""
+    cdef size_t size = 0
+    cdef const cass_byte_t* data = NULL
+    cdef CassError error
+
+    error = cass_value_get_bytes(cass_value, &data, &size)
+    if error == CASS_ERROR_LIB_NULL_VALUE:
+        return None
+    else:
+        raise_if_error(error)
+    if flags & LEGACY_TYPES:
+        return data[:size]
+    vector = vector_type(cass_value_data_type(cass_value))
+    if vector is None:
+        return data[:size]
+    if size == 0:
+        # An empty value
+        return None
+    return read_vector(data, size, vector, flags)
 
 
 cdef inline object _varint(const CassValue* cass_value, int8_t flags):

@@ -27,7 +27,9 @@ from types import FunctionType
 from uuid import UUID
 
 import acsylla
+import array
 import copy
+import ctypes
 import gc
 import ipaddress
 import math
@@ -44,7 +46,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="class")
 
 UTC = timezone.utc
 
-VECTOR = "stage 7: vector"
 UNHASHABLE = "stage 8: unhashable set elements and map keys"
 ROW = "stage 9: Row"
 
@@ -603,7 +604,6 @@ CASES = [
         "[1.5, 2.5, 3.5]",
         [1.5, 2.5, 3.5],
         [1.5, 2.5, 3.5],
-        todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
         legacy=struct.pack(">3f", 1.5, 2.5, 3.5),
         legacy_native=struct.pack(">3f", 1.5, 2.5, 3.5),
     ),
@@ -613,7 +613,6 @@ CASES = [
         "[1, -2]",
         [1, -2],
         [1, -2],
-        todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
         legacy=struct.pack(">2i", 1, -2),
         legacy_native=struct.pack(">2i", 1, -2),
     ),
@@ -623,9 +622,82 @@ CASES = [
         "['a', 'bc']",
         ["a", "bc"],
         ["a", "bc"],
-        todo={"read": VECTOR, "native": VECTOR, "write": VECTOR, "write native": VECTOR},
         legacy=b"\x01a\x02bc",
         legacy_native=b"\x01a\x02bc",
+    ),
+    Case(
+        "vector-double",
+        "vector<double, 2>",
+        "[1.5, -2.25]",
+        [1.5, -2.25],
+        [1.5, -2.25],
+        legacy=struct.pack(">2d", 1.5, -2.25),
+        legacy_native=struct.pack(">2d", 1.5, -2.25),
+    ),
+    Case(
+        "vector-bigint",
+        "vector<bigint, 2>",
+        f"[{2**62}, -1]",
+        [2**62, -1],
+        [2**62, -1],
+        legacy=struct.pack(">2q", 2**62, -1),
+        legacy_native=struct.pack(">2q", 2**62, -1),
+    ),
+    Case(
+        "vector-smallint",
+        "vector<smallint, 2>",
+        "[-32768, 32767]",
+        [-32768, 32767],
+        [-32768, 32767],
+        # Each smallint and tinyint of a vector after its size
+        legacy=b"\x02\x80\x00\x02\x7f\xff",
+        legacy_native=b"\x02\x80\x00\x02\x7f\xff",
+    ),
+    Case(
+        "vector-tinyint",
+        "vector<tinyint, 2>",
+        "[-128, 127]",
+        [-128, 127],
+        [-128, 127],
+        legacy=b"\x01\x80\x01\x7f",
+        legacy_native=b"\x01\x80\x01\x7f",
+    ),
+    Case(
+        "vector-boolean",
+        "vector<boolean, 2>",
+        "[true, false]",
+        [True, False],
+        [True, False],
+        legacy=b"\x01\x00",
+        legacy_native=b"\x01\x00",
+    ),
+    Case(
+        "vector-uuid",
+        "vector<uuid, 1>",
+        f"[{UUID_1}]",
+        [UUID(UUID_1)],
+        [UUID_1],
+        legacy=UUID(UUID_1).bytes,
+        legacy_native=UUID(UUID_1).bytes,
+    ),
+    Case(
+        "vector-varint",
+        "vector<varint, 2>",
+        f"[1, {-(2**70)}]",
+        [1, -(2**70)],
+        [1, -(2**70)],
+        legacy=b"\x01\x01" + bytes([len(varint_bytes(-(2**70)))]) + varint_bytes(-(2**70)),
+        legacy_native=b"\x01\x01" + bytes([len(varint_bytes(-(2**70)))]) + varint_bytes(-(2**70)),
+    ),
+    # The size of the vectors of embeddings
+    Case(
+        "vector-float-768",
+        "vector<float, 768>",
+        "[" + ", ".join(f"{i}.5" for i in range(768)) + "]",
+        [i + 0.5 for i in range(768)],
+        [i + 0.5 for i in range(768)],
+        legacy=struct.pack(">768f", *(i + 0.5 for i in range(768))),
+        legacy_native=struct.pack(">768f", *(i + 0.5 for i in range(768))),
     ),
 ]
 # Empty values: 0 bytes, not null
@@ -736,7 +808,36 @@ WRITE_CASES = [
     ),
     WriteCase("set-list", "set<int>", [3, 1, 2], "{1, 2, 3}"),
     WriteCase("map-pairs", "map<text, int>", [("a", 1), ("b", 2)], "{'a': 1, 'b': 2}"),
-    WriteCase("vector-tuple", "vector<float, 3>", (1.5, 2.5, 3.5), "[1.5, 2.5, 3.5]", VECTOR),
+    WriteCase("vector-tuple", "vector<float, 3>", (1.5, 2.5, 3.5), "[1.5, 2.5, 3.5]"),
+    # A buffer of numbers is copied, its items are not made one by one
+    WriteCase("vector-array", "vector<float, 3>", array.array("f", [1.5, 2.5, 3.5]), "[1.5, 2.5, 3.5]"),
+    WriteCase("vector-array-double", "vector<double, 2>", array.array("d", [1.5, -2.25]), "[1.5, -2.25]"),
+    WriteCase("vector-array-int", "vector<int, 2>", array.array("i", [1, -2]), "[1, -2]"),
+    WriteCase("vector-array-bigint", "vector<bigint, 2>", array.array("q", [2**62, -1]), f"[{2**62}, -1]"),
+    WriteCase(
+        "vector-memoryview", "vector<float, 3>", memoryview(array.array("f", [1.5, 2.5, 3.5])), "[1.5, 2.5, 3.5]"
+    ),
+    WriteCase(
+        "vector-big-endian-buffer",
+        "vector<float, 3>",
+        (ctypes.c_float.__ctype_be__ * 3)(1.5, 2.5, 3.5),
+        "[1.5, 2.5, 3.5]",
+    ),
+    WriteCase(
+        "vector-little-endian-buffer",
+        "vector<float, 3>",
+        (ctypes.c_float.__ctype_le__ * 3)(1.5, 2.5, 3.5),
+        "[1.5, 2.5, 3.5]",
+    ),
+    # A buffer of another format or with a step is read item by item
+    WriteCase("vector-array-other-format", "vector<float, 3>", array.array("d", [1.5, 2.5, 3.5]), "[1.5, 2.5, 3.5]"),
+    WriteCase(
+        "vector-strided-buffer",
+        "vector<float, 3>",
+        memoryview(array.array("f", [1.5, 0, 2.5, 0, 3.5, 0]))[::2],
+        "[1.5, 2.5, 3.5]",
+    ),
+    WriteCase("vector-uuid-str", "vector<uuid, 1>", [UUID_1], f"[{UUID_1}]"),
 ]
 
 
@@ -1069,6 +1170,22 @@ class TestWrite:
         i = WRITE_CASES.index(case)
         await write(session, case.cql_type, WRITE_ID + i, resolve(case.value))
         await assert_same_on_server(session, case.cql_type, WRITE_ID + i, WRITE_LITERAL_ID + i)
+
+    @pytest.mark.parametrize(
+        "value, error",
+        [
+            ([1.5, 2.5], ValueError),
+            ([1.5, 2.5, 3.5, 4.5], ValueError),
+            ("abc", ValueError),
+            ([1.5, "x", 3.5], TypeError),
+            (array.array("f", [1.5, 2.5]), ValueError),
+        ],
+    )
+    async def test_vector_errors(self, session, value, error):
+        if "cql_vectors" not in {table(c.cql_type) for c in CASES if c not in UNSUPPORTED}:
+            pytest.skip("The server has no vectors")
+        with pytest.raises(error):
+            await write(session, "vector<float, 3>", WRITE_ID - 1, value)
 
     async def test_counter(self, session):
         await session.execute(create_statement(f"{COUNTER_UPDATE.format(5)} WHERE id = 2"))

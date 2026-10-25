@@ -2,9 +2,16 @@ from cpython.dict cimport PyDict_SetItem
 from cpython.list cimport PyList_GET_ITEM
 from cpython.list cimport PyList_New
 from cpython.list cimport PyList_SET_ITEM
+from cpython.object cimport Py_TYPE
+from cpython.object cimport PyTypeObject
 from cpython.ref cimport Py_INCREF
 from cpython.tuple cimport PyTuple_New
 from cpython.tuple cimport PyTuple_SET_ITEM
+
+
+cdef extern from "Python.h":
+    bint PyType_IS_GC(PyTypeObject* type)
+    void PyObject_GC_UnTrack(object value)
 
 
 cdef class Row:
@@ -47,13 +54,13 @@ cdef class Row:
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            yield get_cass_value(cass_value, self.result.native_types)
+            yield get_cass_value(cass_value, self.result.flags)
 
     def as_dict(self):
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef list names = self.result.columns_names()
         cdef dict result = {}
         for index in range(count):
@@ -63,7 +70,7 @@ cdef class Row:
             PyDict_SetItem(
                 result,
                 <object>PyList_GET_ITEM(names, index),
-                get_cass_value(cass_value, native_types),
+                get_cass_value(cass_value, flags),
             )
         return result
 
@@ -71,14 +78,14 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef list result = PyList_New(count)
         cdef object value
         for index in range(count):
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             Py_INCREF(value)
             PyList_SET_ITEM(result, index, value)
         return result
@@ -87,14 +94,14 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
+        cdef int8_t flags = self.result.flags
         cdef tuple result = PyTuple_New(count)
         cdef object value
         for index in range(count):
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             Py_INCREF(value)
             PyTuple_SET_ITEM(result, index, value)
         return result
@@ -103,24 +110,37 @@ cdef class Row:
         cdef size_t count = cass_result_column_count(self.result.cass_result)
         cdef const CassValue* cass_value
         cdef size_t index
-        cdef int8_t native_types = self.result.native_types
-        cdef list names = self.result.columns_names()
+        cdef int8_t flags = self.result.flags
+        # The names a result keeps, without calling its Python method for each row
+        cdef list names = self.result._columns_names_cache
         cdef tuple result = PyTuple_New(count)
         cdef tuple pair
         cdef object key, value
+        cdef bint untracked = True
+        if names is None:
+            names = self.result.columns_names()
         for index in range(count):
             cass_value = cass_row_get_column(self.cass_row, index)
             if cass_value == NULL:
                 raise ColumnNotFound(f'ColumnNotFound with index {index}')
             key = <object>PyList_GET_ITEM(names, index)
-            value = get_cass_value(cass_value, native_types)
+            value = get_cass_value(cass_value, flags)
             pair = PyTuple_New(2)
             Py_INCREF(key)
             PyTuple_SET_ITEM(pair, 0, key)
             Py_INCREF(value)
             PyTuple_SET_ITEM(pair, 1, value)
+            # A pair of a name and a value of a type the GC does not track can not be in a cycle, it is untracked at
+            # once: CPython untracks such a tuple only when a collection looks at it. The flag of the type is read
+            # without a call, a value of a GC type the GC no longer tracks leaves its pair tracked
+            if PyType_IS_GC(Py_TYPE(value)):
+                untracked = False
+            else:
+                PyObject_GC_UnTrack(pair)
             Py_INCREF(pair)
             PyTuple_SET_ITEM(result, index, pair)
+        if untracked:
+            PyObject_GC_UnTrack(result)
         return result
 
     def column_value_by_index(self, size_t index):
@@ -132,7 +152,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(f'ColumnNotFound with index {index}')
 
-        return get_cass_value(cass_value, self.result.native_types)
+        return get_cass_value(cass_value, self.result.flags)
 
     def column_value(self, str column_name):
         """ Returns the column value called `column_name`.
@@ -145,7 +165,7 @@ cdef class Row:
         if cass_value == NULL:
             raise ColumnNotFound(column_name)
 
-        return get_cass_value(cass_value, self.result.native_types)
+        return get_cass_value(cass_value, self.result.flags)
 
     def __getitem__(self, name):
         if isinstance(name, int):

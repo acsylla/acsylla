@@ -12,6 +12,9 @@ A composition of ***async*** + ***cassandra*** + ***scylla*** words.
 Under the hood **_acsylla_** has modern, feature-rich and shard-aware [C/C++ client](https://github.com/scylladb/cpp-driver) library for [Cassandra](https://cassandra.apache.org) and [ScyllaDB](https://www.scylladb.com).
 
 ## Table of Contents
+  * [Data types](#data-types)
+    * [Breaking change in acsylla 2.0.0](#breaking-change-in-acsylla-200)
+    * [Types](#types)
   * [Features](#features)
   * [Compatibility](#compatibility)
   * [Install](#install)
@@ -42,6 +45,120 @@ Under the hood **_acsylla_** has modern, feature-rich and shard-aware [C/C++ cli
     * [Host State Changes](#host-state-changes)
   * [Developing](#developing)
   
+
+## Data types
+
+> **acsylla 2.0.0 breaks the data types of acsylla 1.x.** It reads varint, uuid, timeuuid, inet, duration and
+> vector values as other Python types and writes decimals as CQL defines them. acsylla 1.3.0 has both: the types
+> of acsylla 1.x by default, with a `FutureWarning`, and the types of 2.0.0 in a session made with
+> `legacy_types=False`. Move to them on 1.3.0, before upgrading to 2.0.0.
+
+### Breaking change in acsylla 2.0.0
+
+#### Why
+
+- **acsylla 1.x writes decimals wrong.** It sends the ASCII text of the digits in place of the unscaled value
+  CQL defines: `Decimal("1234.5678")` reaches the server as `90750775191054255.4936`, and cqlsh and other
+  drivers read that number. acsylla 1.x reads its own text back, so the error shows only when another client
+  reads the data, and it reads a decimal written by another client as another number or fails on it.
+- **acsylla 1.x reads several types as raw values.** varint comes as the bytes of its two's complement, uuid,
+  timeuuid and inet as `str`, duration as a `str` and vector as `bytes`: the code converts them itself, and a
+  `UUID` bound comes back as a `str`.
+- **acsylla 2.0.0 reads them as the Python types they are bound from:** `int`, `uuid.UUID`,
+  `ipaddress.IPv4Address` and `IPv6Address`, `list`, and `acsylla.Duration` for a duration, which has months
+  that `timedelta` does not have.
+
+The errors of acsylla 1.x that change no type are fixed in both modes, for example a set of lists or a map
+with list keys is read instead of failing with a `TypeError`.
+
+#### When
+
+| Version | Data types |
+|---|---|
+| 1.2.0 and older | the types of acsylla 1.x |
+| 1.3.0 | the types of acsylla 1.x with `legacy_types=True`, the default, which gives a `FutureWarning`; the types of 2.0.0 with `legacy_types=False` |
+| 2.0.0 | the types of 2.0.0 only, `legacy_types=True` is removed |
+
+#### What changes
+
+Only the values of these types differ, the others are read the same in both modes, and both modes bind the
+same Python values, see [Types](#types).
+
+| CQL | acsylla 1.x and `legacy_types=True` | `legacy_types=False` and acsylla 2.0.0 |
+|---|---|---|
+| decimal, written | the ASCII text of its digits, other clients read another number | its unscaled value and scale, as CQL defines them |
+| decimal, read | `decimal.Decimal`; acsylla 1.3.0 reads the text of acsylla 1.x as acsylla 1.x did and other decimals as they are | `decimal.Decimal` of the value on the server, also for the text of acsylla 1.x |
+| varint | `bytes` of its two's complement, `b''` when empty | `int`, `None` when empty |
+| uuid, timeuuid | `str` | `uuid.UUID` |
+| inet | `str` | `ipaddress.IPv4Address`, `IPv6Address` |
+| duration | `str`, the CQL literal | `acsylla.Duration` |
+| duration with `native_types` | `(months, days, nanoseconds)` | `str`, the CQL literal |
+| vector | `bytes` | `list` for most item types, see [Types](#types) |
+
+#### Moving to the new types
+
+1. Make the sessions with `legacy_types=False` and run your tests, the `FutureWarning` goes away:
+
+   ```python
+   session = await cluster.create_session(keyspace="acsylla", legacy_types=False)
+   ```
+2. Drop the conversions of the values read: `int.from_bytes()` of a varint, `UUID()` of a uuid,
+   `ipaddress.ip_address()` of an inet, the parsing of a duration or a vector. Code that wants strings reads
+   decimal, uuid, timeuuid, inet, date, time, timestamp and duration as `str` with `native_types=True` in both
+   modes, only a duration is then its CQL literal in place of a tuple.
+3. Bind decimals in statements of the session, `session.query()` and `session.create_prepared()`. A statement
+   of `acsylla.create_statement()` has no session: it writes decimals as acsylla 1.x did with a
+   `FutureWarning`, and a session with `legacy_types=False` raises a `ValueError` on it. A session raises it
+   too on a statement or a batch whose decimals were bound by a session of the other mode.
+4. Switch all the clients that write decimals together: the decimals written by acsylla 1.x and by
+   `legacy_types=True` are other numbers for `legacy_types=False`, cqlsh and other drivers.
+   `acsylla.decode_legacy_decimal()` returns the decimal acsylla 1.x meant to write from the value read with
+   `legacy_types=False`, rewrite the data with it. Pass it only values known to be written by acsylla 1.x:
+   `12594` is also the text `"12"`.
+
+### Types
+
+The Python types of each CQL type in acsylla 2.0.0 and with `legacy_types=False`. A statement with
+`native_types=True` reads decimal, uuid, timeuuid, inet, date, time, timestamp and duration as `str` for every
+value of CQL: it never fails and every value it reads is bound back.
+
+```python
+statement = acsylla.create_statement("SELECT id, value FROM test", native_types=True)
+```
+
+| CQL | Read | Read with `native_types` | Bound from |
+|---|---|---|---|
+| ascii, text, varchar | `str` | `str` | `str` |
+| boolean | `bool` | `bool` | `bool` |
+| tinyint, smallint, int, bigint, counter | `int` | `int` | `int` |
+| float, double | `float` | `float` | `float` |
+| blob | `bytes` | `bytes` | `bytes` |
+| varint | `int` | `int` | `int`, the `str` of an int, `bytes` of its two's complement |
+| decimal | `decimal.Decimal` | `str` | `Decimal`, `int`, `str`, `float` |
+| uuid, timeuuid | `uuid.UUID` | `str` | `UUID`, `str` |
+| inet | `ipaddress.IPv4Address`, `IPv6Address` | `str` | `IPv4Address`, `IPv6Address`, `str` |
+| date | `datetime.date` ¹ | `str` `YYYY-MM-DD` | `date`, `datetime`, `str` `YYYY-MM-DD` |
+| time | `datetime.time`, the nanoseconds cut to microseconds | `str` `HH:MM:SS.nnnnnnnnn` | `time`, `str` `HH:MM:SS[.fraction]`, seconds as `int` or `float` |
+| timestamp | `datetime.datetime` in UTC, with `tzinfo=timezone.utc` ¹ | `str` `YYYY-MM-DD HH:MM:SS.mmmZ` | `datetime` (a naive one is in UTC), ISO `str`, seconds since 1970 as `int` or `float` |
+| duration | `acsylla.Duration` | `str`, the CQL literal `1y2mo3d4h5m6s7ms8us9ns` | `Duration`, the CQL literal, `(months, days, nanoseconds)`, `timedelta`, `dateutil.relativedelta` |
+| list | `list` | `list` | `list`, `tuple`, `set` |
+| set | `set`; `list` of items Python can not hash ² | as without `native_types` | `set`, `frozenset`, `list`, `tuple` |
+| map | `dict`; `list` of `(key, value)` for keys Python can not hash ² | as without `native_types` | `dict`, a sequence of `(key, value)` |
+| tuple | `tuple` | `tuple` | `tuple`, `list` |
+| user defined type | `dict` | `dict` | `dict`, a sequence of its fields |
+| vector | `list` ³ | `list` | `list`, `tuple`, `array.array`, a numpy array, `bytes` |
+| other custom types | `bytes` | `bytes` | `bytes` |
+| an empty value | `None` | `None` | |
+| null | `None` | `None` | `None` |
+
+The items of collections, tuples, user defined types and vectors are read in the same way as columns.
+`Duration` is added to and subtracted from a `date` or a `datetime` as `dateutil.relativedelta` does it,
+`to_timedelta()`, `to_relativedelta()` and `Duration.from_relativedelta()` convert it.
+
+¹ A value out of the years 1..9999 of Python raises a `ValueError`, `native_types` reads it as a `str`.  
+² A set of lists, sets, maps, user defined types or vectors, by the schema.  
+³ A vector of float, double, int, bigint, smallint, tinyint, boolean, uuid, timeuuid, text, ascii, blob or
+varint. A vector of another type is read as `bytes`.
 
 ## Features
 

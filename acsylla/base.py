@@ -31,8 +31,6 @@ from uuid import UUID
 
 import json
 
-ValueType = TypeVar("ValueType")
-
 SupportedType = Union[
     None,
     int,
@@ -683,11 +681,18 @@ class Cluster(metaclass=ABCMeta):
         """Returns the `Logger` instance"""
 
     @abstractmethod
-    async def create_session(self, keyspace: Optional[str] = None) -> "Session":
+    async def create_session(self, keyspace: Optional[str] = None, legacy_types: bool = True) -> "Session":
         """Returns a new session by using the Cluster configuration.
 
         If Keyspace is provided, the session will be bound to the keyspace and
         any statment, unlesss says the opposite, will be using that keyspace.
+
+        `legacy_types` keeps the types of acsylla 1.x, the default of acsylla 1.3.0, and gives a FutureWarning:
+        varint is read as bytes, uuid, timeuuid and inet as str, duration as str and vector as bytes, and decimal
+        is written as a text that other drivers and cqlsh read as another number. acsylla 2.0.0 will only have
+        `legacy_types=False`. The statements of the session, `Session.query()` and `Session.create_prepared()`,
+        bind decimals by it. A statement made without a session binds them as acsylla 1.x did, a session with
+        `legacy_types=False` refuses to execute one with decimals.
 
         The coroutine will try to make a connection to the cluster hosts.
         """
@@ -830,6 +835,9 @@ class Session(metaclass=ABCMeta):
     """Provides a Session instance class. Use the the
     `Cluster.create_session` coroutine for creating a new instance"""
 
+    # The types of acsylla 1.x, see `Cluster.create_session`
+    legacy_types: bool
+
     @abstractmethod
     async def use_keyspace(self, keyspace: str) -> "Result":
         """Alias for set_keyspace Sets the keyspace for session"""
@@ -858,7 +866,7 @@ class Session(metaclass=ABCMeta):
         self,
         statement: str,
         parameters: Union[int, List, Tuple, Dict] = None,
-        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        value_types: "Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]]" = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
         timeout: Optional[float] = None,
@@ -885,7 +893,12 @@ class Session(metaclass=ABCMeta):
 
         `execution_profile` Assign the execution profile to the statement
 
-        `native_types` Returns values as native types. Default: False
+        `native_types` Returns the values of these types as str, read and bound back without a loss and without an
+        error for any value of CQL: decimal, uuid, timeuuid and inet as their text; date, time and timestamp as
+        YYYY-MM-DD, HH:MM:SS.nnnnnnnnn and YYYY-MM-DD HH:MM:SS.mmmZ in all the years of CQL; duration as its CQL
+        literal, as 1y2mo3d4h5m6s7ms8us9ns. The items of collections, tuples, UDTs and vectors are read in the same
+        way, the values of the other types are the same. A session with `legacy_types` reads them as acsylla 1.x
+        did. Default: False
         """
 
     @abstractmethod
@@ -1023,7 +1036,7 @@ class Statement(metaclass=ABCMeta):
     def __call__(
         self,
         parameters: Union[int, List, Tuple, Dict] = None,
-        value_types: Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]] = None,
+        value_types: "Optional[Union[Tuple[ValueType, ...], List[ValueType], Dict[str, ValueType]]]" = None,
         page_size: Optional[int] = None,
         page_state: Optional[bytes] = None,
         timeout=None,

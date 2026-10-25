@@ -81,6 +81,11 @@ cdef class Batch:
     def add_statement(self, Statement statement):
         cdef CassError error
         error = cass_batch_add_statement(self.cass_batch, statement.cass_statement)
+        if statement.bind_options.decimal_bound:
+            if statement.bind_options.legacy_types:
+                self.legacy_decimals = True
+            else:
+                self.cql_decimals = True
         raise_if_error(error)
 
     def set_execution_profile(self, name: object) -> None:

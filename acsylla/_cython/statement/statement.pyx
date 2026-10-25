@@ -8,6 +8,34 @@ from ipaddress import IPv6Address
 from uuid import UUID
 
 import asyncio
+import warnings
+
+LEGACY_TYPES_WARNING = (
+    "The session keeps the types of acsylla 1.x (legacy_types=True, the default of acsylla 1.3.0): varint is read as "
+    "bytes, uuid, timeuuid and inet as str, duration as str and vector as bytes, and decimal is written as a text that "
+    "other drivers and cqlsh read as another number. acsylla 2.0.0 will only have legacy_types=False, create the "
+    "session with cluster.create_session(legacy_types=False) to use its types now."
+)
+LEGACY_DECIMAL_WITHOUT_SESSION_WARNING = (
+    "A decimal bound to a statement made without a session is written as a text the way acsylla 1.x did, other drivers "
+    "and cqlsh read it as another number. Make the statement with session.query() or session.create_prepared() of a "
+    "session with legacy_types=False to write it as CQL defines it, acsylla 2.0.0 will only write it so."
+)
+
+
+def decimals_of_another_session(bint legacy_types):
+    """The error of a session executing decimals bound for the other value of legacy_types."""
+    if legacy_types:
+        return ValueError(
+            "The decimals of the statement are bound as the text acsylla 1.x wrote, it was made without a session or by "
+            "a session with legacy_types=True, and this session has legacy_types=False. Make the statement with "
+            "session.query() or session.create_prepared() of this session."
+        )
+    return ValueError(
+        "The decimals of the statement are bound as CQL defines them by a session with legacy_types=False, and this "
+        "session has legacy_types=True. Make the statement with session.query() or session.create_prepared() of this "
+        "session."
+    )
 
 
 cdef class Statement:
@@ -79,6 +107,7 @@ cdef class Statement:
         object serial_consistency,
         object execution_profile,
         object native_types,
+        Session session,
     ):
 
         cdef Statement statement
@@ -89,6 +118,13 @@ cdef class Statement:
 
         statement = Statement.__new__(Statement)
         statement.prepared = 0
+        if session is None:
+            # Without a session the decimals are written as the text of acsylla 1.x, legacy_types=True of acsylla 1.3.0
+            statement.bind_options.legacy_types = True
+            statement.bind_options.without_session = True
+        else:
+            statement.session = session
+            statement.bind_options.legacy_types = session.legacy_types
 
         if parameters is None:
             parameter_count = 0
@@ -144,6 +180,7 @@ cdef class Statement:
         statement.cass_statement = cass_statement
         statement.cass_prepared = cass_prepared
         statement.prepared = 1
+        statement.bind_options.legacy_types = session.legacy_types
         statement.native_types = native_types
         if page_size is not None:
             statement.set_page_size(page_size)
@@ -288,11 +325,13 @@ cdef class Statement:
 
     cdef int _bind(self, int idx, object value, object value_type) except -1:
         cdef CassError error = CASS_OK
-        cdef const CassDataType* cass_data_type
+        cdef const CassDataType* cass_data_type = NULL
         cdef CassValueType cass_value_type
         cdef const char* text
         cdef Py_ssize_t text_size
         cdef object text_owner
+        cdef bytes value_bytes
+        cdef cass_int32_t decimal_scale
 
         if self.cass_prepared:
             cass_data_type = cass_prepared_parameter_data_type(self.cass_prepared, idx)
@@ -332,18 +371,24 @@ cdef class Statement:
         elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
             error = cass_statement_bind_double(self.cass_statement, idx, float(value))
         elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-            value, scale = as_cass_decimal(value)
-            error = cass_statement_bind_decimal(self.cass_statement, idx, value, len(value), scale)
+            value_bytes = as_cass_decimal(value, &decimal_scale, &self.bind_options)
+            error = cass_statement_bind_decimal(
+                self.cass_statement, idx, value_bytes, len(value_bytes), decimal_scale)
         elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-            error = cass_statement_bind_string(self.cass_statement, idx, as_bytes(value, 'ascii'))
+            text_owner = as_ascii(value, &text, &text_size)
+            error = cass_statement_bind_string_n(self.cass_statement, idx, text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
             text_owner = as_utf8(value, &text, &text_size)
             error = cass_statement_bind_string_n(self.cass_statement, idx, text, text_size)
-        elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                                 CASS_VALUE_TYPE_VARINT,
-                                 CASS_VALUE_TYPE_CUSTOM):
+        elif cass_value_type == CASS_VALUE_TYPE_BLOB:
             error = cass_statement_bind_bytes(self.cass_statement, idx, as_blob(value), len(value))
+        elif cass_value_type == CASS_VALUE_TYPE_CUSTOM:
+            value_bytes = as_cass_custom(value, cass_data_type)
+            error = cass_statement_bind_bytes(self.cass_statement, idx, value_bytes, len(value_bytes))
+        elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+            value_bytes = as_cass_varint(value)
+            error = cass_statement_bind_bytes(self.cass_statement, idx, value_bytes, len(value_bytes))
         elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                                  CASS_VALUE_TYPE_TIMEUUID):
             error = cass_statement_bind_uuid(self.cass_statement, idx, as_cass_uuid(value))
@@ -361,11 +406,11 @@ cdef class Statement:
         elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                                  CASS_VALUE_TYPE_SET,
                                  CASS_VALUE_TYPE_LIST):
-            error = bind_collection(self.cass_statement, idx, value, cass_data_type)
+            error = bind_collection(self.cass_statement, idx, value, cass_data_type, &self.bind_options)
         elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-            error = bind_tuple(self.cass_statement, idx, value, cass_data_type)
+            error = bind_tuple(self.cass_statement, idx, value, cass_data_type, &self.bind_options)
         elif cass_value_type == CASS_VALUE_TYPE_UDT:
-            error = bind_udt(self.cass_statement, idx, value, cass_data_type)
+            error = bind_udt(self.cass_statement, idx, value, cass_data_type, &self.bind_options)
         if error:
             raise_if_error(error)
         return 0
@@ -394,11 +439,13 @@ cdef class Statement:
             idx += 1
 
     def bind_by_name(self, str name, object value, object value_type = None):
-        cdef const CassDataType* cass_data_type
+        cdef const CassDataType* cass_data_type = NULL
         cdef CassValueType cass_value_type
         cdef const char* text
         cdef Py_ssize_t text_size
         cdef object text_owner
+        cdef bytes value_bytes
+        cdef cass_int32_t decimal_scale
         cdef bytes name_bytes
 
         if self.prepared == 0:
@@ -432,19 +479,28 @@ cdef class Statement:
         elif cass_value_type == CASS_VALUE_TYPE_DOUBLE:
             error = cass_statement_bind_double_by_name(self.cass_statement, name.encode(), float(value))
         elif cass_value_type == CASS_VALUE_TYPE_DECIMAL:
-            value, scale = as_cass_decimal(value)
-            error = cass_statement_bind_decimal_by_name(self.cass_statement, name.encode(), value, len(value), scale)
+            value_bytes = as_cass_decimal(value, &decimal_scale, &self.bind_options)
+            error = cass_statement_bind_decimal_by_name(
+                self.cass_statement, name.encode(), value_bytes, len(value_bytes), decimal_scale)
         elif cass_value_type == CASS_VALUE_TYPE_ASCII:
-            error = cass_statement_bind_string_by_name(self.cass_statement, name.encode(), as_bytes(value, 'ascii'))
+            text_owner = as_ascii(value, &text, &text_size)
+            name_bytes = name.encode()
+            error = cass_statement_bind_string_by_name_n(self.cass_statement, name_bytes, len(name_bytes), text, text_size)
         elif cass_value_type in (CASS_VALUE_TYPE_TEXT,
                                  CASS_VALUE_TYPE_VARCHAR):
             text_owner = as_utf8(value, &text, &text_size)
             name_bytes = name.encode()
             error = cass_statement_bind_string_by_name_n(self.cass_statement, name_bytes, len(name_bytes), text, text_size)
-        elif cass_value_type in (CASS_VALUE_TYPE_BLOB,
-                                 CASS_VALUE_TYPE_VARINT,
-                                 CASS_VALUE_TYPE_CUSTOM):
+        elif cass_value_type == CASS_VALUE_TYPE_BLOB:
             error = cass_statement_bind_bytes_by_name(self.cass_statement, name.encode(), as_blob(value), len(value))
+        elif cass_value_type == CASS_VALUE_TYPE_CUSTOM:
+            value_bytes = as_cass_custom(value, cass_data_type)
+            error = cass_statement_bind_bytes_by_name(
+                self.cass_statement, name.encode(), value_bytes, len(value_bytes))
+        elif cass_value_type == CASS_VALUE_TYPE_VARINT:
+            value_bytes = as_cass_varint(value)
+            error = cass_statement_bind_bytes_by_name(
+                self.cass_statement, name.encode(), value_bytes, len(value_bytes))
         elif cass_value_type in (CASS_VALUE_TYPE_UUID,
                                  CASS_VALUE_TYPE_TIMEUUID):
             error = cass_statement_bind_uuid_by_name(self.cass_statement, name.encode(), as_cass_uuid(value))
@@ -462,11 +518,11 @@ cdef class Statement:
         elif cass_value_type in (CASS_VALUE_TYPE_MAP,
                                  CASS_VALUE_TYPE_SET,
                                  CASS_VALUE_TYPE_LIST):
-            error = bind_collection_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+            error = bind_collection_by_name(self.cass_statement, name.encode(), value, cass_data_type, &self.bind_options)
         elif cass_value_type == CASS_VALUE_TYPE_TUPLE:
-            error = bind_tuple_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+            error = bind_tuple_by_name(self.cass_statement, name.encode(), value, cass_data_type, &self.bind_options)
         elif cass_value_type == CASS_VALUE_TYPE_UDT:
-            error = bind_udt_by_name(self.cass_statement, name.encode(), value, cass_data_type)
+            error = bind_udt_by_name(self.cass_statement, name.encode(), value, cass_data_type, &self.bind_options)
         if error:
             raise_if_error(error)
 
@@ -504,5 +560,6 @@ def create_statement(
         serial_consistency,
         execution_profile,
         native_types,
+        None,
     )
     return statement

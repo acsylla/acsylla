@@ -12,12 +12,13 @@ cdef class Result:
         self.iterator_refs.resize(0)
 
     @staticmethod
-    cdef Result new_(const CassResult* cass_result, int8_t native_types):
+    cdef Result new_(const CassResult* cass_result, int8_t native_types, bint legacy_types):
         cdef Result result
 
         result = Result.__new__(Result)
         result.cass_result = cass_result
         result.native_types = native_types
+        result.flags = (NATIVE_TYPES if native_types else 0) | (LEGACY_TYPES if legacy_types else 0)
         return result
 
     def has_more_pages(self):

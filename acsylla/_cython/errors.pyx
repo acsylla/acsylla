@@ -16,7 +16,9 @@ class AggregateNotFound(CassException):
 class TableNotFound(CassException):
     pass
 
-class ColumnNotFound(CassException):
+class ColumnNotFound(CassException, AttributeError):
+    # An AttributeError too: hasattr() and getattr() with a default take a column a row does not have as a missing
+    # attribute
     pass
 
 class IndexNotFound(CassException):

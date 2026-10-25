@@ -86,7 +86,14 @@ native_types = {
             (-62105616000.0, ("0001-12-14", date(1, 12, 14))),
             (-62105616000, ("0001-12-14", date(1, 12, 14))),
         ],
-        "invalid": [("bad_date", ValueError), ("-62105616000", ValueError)],
+        "invalid": [
+            ("bad_date", ValueError),
+            ("-62105616000", ValueError),
+            # Out of the dates of CQL
+            ("5881580-07-12", ValueError),
+            ("-5877641-06-22", ValueError),
+            ("2024-13-01", ValueError),
+        ],
     },
     "decimal": {
         "value_type": ValueType.DECIMAL,
@@ -107,7 +114,15 @@ native_types = {
             ),
             (3.141592653589793, ("3.141592653589793", Decimal("3.141592653589793"))),
         ],
-        "invalid": [("bad", ValueError), ("bad.decimal", ValueError), ("bad.123", ValueError), ("123.bad", ValueError)],
+        "invalid": [
+            ("bad", ValueError),
+            ("bad.decimal", ValueError),
+            ("bad.123", ValueError),
+            ("123.bad", ValueError),
+            ("NaN", ValueError),
+            (Decimal("Infinity"), ValueError),
+            (True, ValueError),
+        ],
     },
     "double": {
         "value_type": ValueType.DOUBLE,
@@ -278,8 +293,14 @@ native_types = {
     },
     "varint": {
         "value_type": ValueType.VARINT,
-        "valid": [(b"9223372036854775807", b"9223372036854775807")],
-        "invalid": [("varint_variant", ValueError), ("1234", ValueError)],
+        # The session of the tests has legacy_types=True, a varint is read as its bytes
+        "valid": [
+            (b"9223372036854775807", b"9223372036854775807"),
+            (1234, b"\x04\xd2"),
+            ("1234", b"\x04\xd2"),
+            (-1, b"\xff"),
+        ],
+        "invalid": [("varint_variant", ValueError), (1.5, ValueError), (True, ValueError)],
     },
 }
 
